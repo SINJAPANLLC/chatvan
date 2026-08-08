@@ -6,9 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 
 const DRAFT_KEY = 'sinjapan_van_draft_message';
 const EXAMPLES = [
-  "神奈川で来週から月3万円くらいで借りたい",
-  "ETCとドラレコが付いている軽バンを探しています",
-  "個人事業主ですが、最短1ヶ月から利用できる車はありますか？"
+  "神奈川で来週から軽バンかりたい",
 ];
 
 export default function Home() {
@@ -58,7 +56,7 @@ export default function Home() {
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-4 pb-8 max-w-3xl mx-auto w-full min-h-[calc(100dvh-100px)]">
       <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-foreground mb-4 tracking-tight text-balance text-center">
-        どんな軽バンをお探しですか？
+        チャットするだけ。軽バンかりれる。
       </h1>
       <p className="text-muted-foreground mb-12 text-center text-balance">
         希望条件をチャットで教えてください。あなたに合った軽バンをご提案します。
@@ -72,7 +70,7 @@ export default function Home() {
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="例：神奈川で来週から月3万円くらいで借りたい"
+              placeholder="どんな軽バンをお探しですか？"
               rows={1}
               disabled={isSubmitting}
               className="flex-1 bg-transparent outline-none resize-none text-base text-foreground placeholder:text-muted-foreground leading-relaxed min-h-[28px] max-h-[200px] disabled:opacity-50"
