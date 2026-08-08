@@ -48,8 +48,8 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     <div className="flex flex-col h-full">
       <div className="h-16 flex items-center justify-between px-6 border-b border-border shrink-0">
         <Link href="/admin" onClick={() => setMobileOpen(false)} className="flex items-center gap-2">
-          <span className="font-bold text-lg tracking-tight">Chat VAN</span>
-          <span className="text-xs font-medium text-muted-foreground mt-1">管理者</span>
+          <img src="/logo.jpg" alt="Chat VAN" className="h-7 w-auto" />
+          <span className="text-xs font-medium text-muted-foreground">管理者</span>
         </Link>
         <button className="md:hidden text-muted-foreground" onClick={() => setMobileOpen(false)}>
           <X className="h-5 w-5" />
@@ -113,8 +113,8 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             <Menu className="h-5 w-5" />
           </button>
           <Link href="/admin" className="flex items-center gap-2">
-            <span className="font-bold text-lg tracking-tight">Chat VAN</span>
-            <span className="text-xs text-muted-foreground mt-1">管理者</span>
+            <img src="/logo.jpg" alt="Chat VAN" className="h-7 w-auto" />
+            <span className="text-xs text-muted-foreground">管理者</span>
           </Link>
         </header>
 

@@ -36,8 +36,8 @@ export function UserLayout({ children }: { children: React.ReactNode }) {
   const NavContent = ({ onClose }: { onClose?: () => void }) => (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 pt-4 pb-2">
-        <Link href="/" onClick={onClose} className="font-bold text-lg tracking-tight px-2">
-          Chat VAN
+        <Link href="/" onClick={onClose} className="px-2">
+          <img src="/logo.jpg" alt="Chat VAN" className="h-7 w-auto" />
         </Link>
         {!onClose && (
           <button
@@ -171,8 +171,8 @@ export function UserLayout({ children }: { children: React.ReactNode }) {
             </button>
           )}
 
-          <Link href="/" className={`font-bold text-lg tracking-tight ${isLoggedIn && sidebarOpen ? 'md:hidden' : ''}`}>
-            Chat VAN
+          <Link href="/" className={`${isLoggedIn && sidebarOpen ? 'md:hidden' : ''}`}>
+            <img src="/logo.jpg" alt="Chat VAN" className="h-7 w-auto" />
           </Link>
 
           <div className="flex-1" />
