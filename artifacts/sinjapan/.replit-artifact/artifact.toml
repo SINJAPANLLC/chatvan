@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "CHAT-LOGI"
+description = "日本語対応の物流管理プラットフォーム。配送依頼、AIチャット、運賃管理、請求書管理、ドライバーポータルなど物流業務に必要な機能を統合したシステム。"
+version = "1.0.0"
+id = "artifacts/sinjapan"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19585
+
+[services.development]
+run = "pnpm --filter @workspace/sinjapan run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/sinjapan", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/sinjapan/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19585"
+BASE_PATH = "/"

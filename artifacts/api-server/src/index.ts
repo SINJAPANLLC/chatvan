@@ -1,18 +1,25 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { seedRequiredAccounts } from "./lib/seed";
+import { startScheduler } from "./lib/blogAutoGen";
+import { startAutoProspect } from "./lib/autoProspect";
+import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
 
-const rawPort = process.env["PORT"];
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
+async function runMigrations() {
+  try {
+    await db.execute(sql`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS master_card_data TEXT`);
+    await db.execute(sql`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS stops_json TEXT`);
+    logger.info("migration: master_card_data / stops_json columns ready");
+  } catch (e: any) {
+    logger.warn({ err: e.message }, "migration warning (non-fatal)");
+  }
 }
 
-const port = Number(rawPort);
+const port = Number(process.env.PORT ?? 8080);
 
 if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
+  throw new Error(`Invalid PORT value: "${process.env.PORT}"`);
 }
 
 app.listen(port, (err) => {
@@ -22,4 +29,8 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+  runMigrations();
+  seedRequiredAccounts();
+  startScheduler();
+  startAutoProspect();
 });

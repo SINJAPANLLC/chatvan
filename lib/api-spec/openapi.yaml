@@ -3,20 +3,40 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: SINJAPAN logistics AI platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: shipments
+    description: Shipment operations
+  - name: conversations
+    description: AI conversation messages
+  - name: carriers
+    description: Carrier management
+  - name: payments
+    description: Payment operations
+  - name: notifications
+    description: Notifications
+  - name: dashboard
+    description: Admin dashboard stats
+  - name: ai
+    description: AI chat processing
+  - name: pricing
+    description: Pricing rules
+  - name: users
+    description: User management
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +44,579 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # Auth
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "201":
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Not authenticated
+
+  # Shipments
+  /shipments:
+    get:
+      operationId: listShipments
+      tags: [shipments]
+      summary: List shipments
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: carrierId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: dateFrom
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: dateTo
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of shipments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShipmentList"
+    post:
+      operationId: createShipment
+      tags: [shipments]
+      summary: Create shipment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShipmentInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shipment"
+
+  /shipments/{id}:
+    get:
+      operationId: getShipment
+      tags: [shipments]
+      summary: Get shipment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Shipment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shipment"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateShipment
+      tags: [shipments]
+      summary: Update shipment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShipmentUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shipment"
+
+  /shipments/{id}/status:
+    patch:
+      operationId: updateShipmentStatus
+      tags: [shipments]
+      summary: Update shipment status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatusUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shipment"
+
+  # Conversations
+  /shipments/{id}/conversations:
+    get:
+      operationId: listConversations
+      tags: [conversations]
+      summary: List conversation messages for a shipment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConversationMessage"
+    post:
+      operationId: sendMessage
+      tags: [conversations]
+      summary: Send user message and get AI response
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageInput"
+      responses:
+        "200":
+          description: AI response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatResponse"
+
+  # AI
+  /ai/start:
+    post:
+      operationId: startAiChat
+      tags: [ai]
+      summary: Start AI consultation and create shipment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiStartInput"
+      responses:
+        "200":
+          description: AI response with shipment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatResponse"
+
+  # Carriers
+  /carriers:
+    get:
+      operationId: listCarriers
+      tags: [carriers]
+      summary: List carriers
+      responses:
+        "200":
+          description: List of carriers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Carrier"
+    post:
+      operationId: createCarrier
+      tags: [carriers]
+      summary: Create carrier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CarrierInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Carrier"
+
+  /carriers/{id}:
+    get:
+      operationId: getCarrier
+      tags: [carriers]
+      summary: Get carrier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Carrier
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Carrier"
+    patch:
+      operationId: updateCarrier
+      tags: [carriers]
+      summary: Update carrier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CarrierUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Carrier"
+    delete:
+      operationId: deleteCarrier
+      tags: [carriers]
+      summary: Delete carrier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+
+  # Payments
+  /payments:
+    get:
+      operationId: listPayments
+      tags: [payments]
+      summary: List payments
+      parameters:
+        - name: shipmentId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: List of payments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Payment"
+    post:
+      operationId: createPayment
+      tags: [payments]
+      summary: Create payment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+
+  /payments/{id}:
+    get:
+      operationId: getPayment
+      tags: [payments]
+      summary: Get payment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Payment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+
+  # Notifications
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List notifications for current user
+      responses:
+        "200":
+          description: List of notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+
+  /notifications/{id}/read:
+    patch:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+
+  # Dashboard
+  /dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [dashboard]
+      summary: Get admin dashboard stats
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /dashboard/kpi:
+    get:
+      operationId: getDashboardKpi
+      tags: [dashboard]
+      summary: Get KPI metrics
+      responses:
+        "200":
+          description: KPI metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KpiMetrics"
+
+  # Pricing Rules
+  /pricing-rules:
+    get:
+      operationId: listPricingRules
+      tags: [pricing]
+      summary: List pricing rules
+      responses:
+        "200":
+          description: List of pricing rules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PricingRule"
+    post:
+      operationId: createPricingRule
+      tags: [pricing]
+      summary: Create pricing rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PricingRuleInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PricingRule"
+
+  /pricing-rules/{id}:
+    patch:
+      operationId: updatePricingRule
+      tags: [pricing]
+      summary: Update pricing rule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PricingRuleUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PricingRule"
+    delete:
+      operationId: deletePricingRule
+      tags: [pricing]
+      summary: Delete pricing rule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+
+  # Users (admin)
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List users (admin)
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +627,519 @@ components:
       required:
         - status
 
+    # Auth
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    RegisterInput:
+      type: object
+      required: [email, password, name]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+        name:
+          type: string
+        companyName:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+
+    AuthResponse:
+      type: object
+      required: [user]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+
+    User:
+      type: object
+      required: [id, email, name, role, createdAt]
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+        companyName:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        role:
+          type: string
+          enum: [user, admin]
+        billingAddress:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    # Shipments
+    Shipment:
+      type: object
+      required: [id, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: ["integer", "null"]
+        requestText:
+          type: ["string", "null"]
+        pickupAddress:
+          type: ["string", "null"]
+        deliveryAddress:
+          type: ["string", "null"]
+        cargoType:
+          type: ["string", "null"]
+        cargoQuantity:
+          type: ["string", "null"]
+        cargoWeight:
+          type: ["string", "null"]
+        cargoSize:
+          type: ["string", "null"]
+        pickupDatetime:
+          type: ["string", "null"]
+        deliveryDeadline:
+          type: ["string", "null"]
+        vehicleType:
+          type: ["string", "null"]
+        deliveryMethod:
+          type: ["string", "null"]
+        customerPrice:
+          type: ["number", "null"]
+        carrierCost:
+          type: ["number", "null"]
+        grossProfit:
+          type: ["number", "null"]
+        status:
+          type: string
+        assignedCarrierId:
+          type: ["integer", "null"]
+        assignedDriverName:
+          type: ["string", "null"]
+        paymentStatus:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        user:
+          $ref: "#/components/schemas/User"
+        carrier:
+          $ref: "#/components/schemas/Carrier"
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    ShipmentList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Shipment"
+        total:
+          type: integer
+
+    ShipmentInput:
+      type: object
+      properties:
+        requestText:
+          type: string
+        pickupAddress:
+          type: string
+        deliveryAddress:
+          type: string
+        cargoType:
+          type: string
+        cargoQuantity:
+          type: string
+        cargoWeight:
+          type: string
+        cargoSize:
+          type: string
+        pickupDatetime:
+          type: string
+        deliveryDeadline:
+          type: string
+        vehicleType:
+          type: string
+        deliveryMethod:
+          type: string
+        customerPrice:
+          type: number
+        notes:
+          type: string
+
+    ShipmentUpdate:
+      type: object
+      properties:
+        pickupAddress:
+          type: string
+        deliveryAddress:
+          type: string
+        cargoType:
+          type: string
+        cargoQuantity:
+          type: string
+        cargoWeight:
+          type: string
+        cargoSize:
+          type: string
+        pickupDatetime:
+          type: string
+        deliveryDeadline:
+          type: string
+        vehicleType:
+          type: string
+        deliveryMethod:
+          type: string
+        customerPrice:
+          type: number
+        carrierCost:
+          type: number
+        grossProfit:
+          type: number
+        assignedCarrierId:
+          type: integer
+        assignedDriverName:
+          type: string
+        paymentStatus:
+          type: string
+        notes:
+          type: string
+
+    StatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+
+    # Conversations
+    ConversationMessage:
+      type: object
+      required: [id, shipmentId, sender, message, createdAt]
+      properties:
+        id:
+          type: integer
+        shipmentId:
+          type: integer
+        sender:
+          type: string
+          enum: [user, ai]
+        message:
+          type: string
+        structuredData:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    MessageInput:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    ChatResponse:
+      type: object
+      required: [message, shipmentId]
+      properties:
+        message:
+          type: string
+        shipmentId:
+          type: integer
+        isComplete:
+          type: boolean
+        proposal:
+          $ref: "#/components/schemas/ShipmentProposal"
+        extractedData:
+          type: ["string", "null"]
+
+    AiStartInput:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    ShipmentProposal:
+      type: object
+      properties:
+        vehicleType:
+          type: string
+        deliveryMethod:
+          type: string
+        pickupDatetime:
+          type: string
+        deliveryDatetime:
+          type: string
+        estimatedPrice:
+          type: number
+        reason:
+          type: string
+        notes:
+          type: string
+
+    # Carriers
+    Carrier:
+      type: object
+      required: [id, companyName, createdAt]
+      properties:
+        id:
+          type: integer
+        companyName:
+          type: string
+        contactName:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        serviceAreas:
+          type: ["string", "null"]
+        vehicleTypes:
+          type: ["string", "null"]
+        specialties:
+          type: ["string", "null"]
+        averageCost:
+          type: ["number", "null"]
+        onTimeRate:
+          type: ["number", "null"]
+        rating:
+          type: ["number", "null"]
+        notes:
+          type: ["string", "null"]
+        totalOrders:
+          type: integer
+        createdAt:
+          type: string
+
+    CarrierInput:
+      type: object
+      required: [companyName]
+      properties:
+        companyName:
+          type: string
+        contactName:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        serviceAreas:
+          type: string
+        vehicleTypes:
+          type: string
+        specialties:
+          type: string
+        averageCost:
+          type: number
+        onTimeRate:
+          type: number
+        rating:
+          type: number
+        notes:
+          type: string
+
+    CarrierUpdate:
+      type: object
+      properties:
+        companyName:
+          type: string
+        contactName:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        serviceAreas:
+          type: string
+        vehicleTypes:
+          type: string
+        specialties:
+          type: string
+        averageCost:
+          type: number
+        onTimeRate:
+          type: number
+        rating:
+          type: number
+        notes:
+          type: string
+
+    # Payments
+    Payment:
+      type: object
+      required: [id, shipmentId, amount, tax, totalAmount, paymentMethod, paymentStatus, createdAt]
+      properties:
+        id:
+          type: integer
+        shipmentId:
+          type: integer
+        amount:
+          type: number
+        tax:
+          type: number
+        totalAmount:
+          type: number
+        paymentMethod:
+          type: string
+        paymentStatus:
+          type: string
+        paidAt:
+          type: ["string", "null"]
+        stripePaymentIntentId:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    PaymentInput:
+      type: object
+      required: [shipmentId, amount, paymentMethod]
+      properties:
+        shipmentId:
+          type: integer
+        amount:
+          type: number
+        paymentMethod:
+          type: string
+
+    # Notifications
+    Notification:
+      type: object
+      required: [id, shipmentId, userId, title, message, readStatus, createdAt]
+      properties:
+        id:
+          type: integer
+        shipmentId:
+          type: integer
+        userId:
+          type: integer
+        title:
+          type: string
+        message:
+          type: string
+        readStatus:
+          type: boolean
+        createdAt:
+          type: string
+
+    # Dashboard
+    DashboardStats:
+      type: object
+      required: [todayConsultations, pendingQuotes, approvedToday, inProgress, confirmed, inTransit, delivered, totalRevenue, totalCost, grossProfit, avgProfitRate]
+      properties:
+        todayConsultations:
+          type: integer
+        pendingQuotes:
+          type: integer
+        approvedToday:
+          type: integer
+        inProgress:
+          type: integer
+        confirmed:
+          type: integer
+        inTransit:
+          type: integer
+        delivered:
+          type: integer
+        totalRevenue:
+          type: number
+        totalCost:
+          type: number
+        grossProfit:
+          type: number
+        avgProfitRate:
+          type: number
+        statusBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/StatusCount"
+
+    StatusCount:
+      type: object
+      required: [status, count]
+      properties:
+        status:
+          type: string
+        count:
+          type: integer
+
+    KpiMetrics:
+      type: object
+      required: [avgConsultationToQuote, quoteApprovalRate, avgApprovalToDispatch, dispatchSuccessRate, repeatRate, avgRevenuePerShipment, avgProfitPerShipment, avgProfitRate]
+      properties:
+        avgConsultationToQuote:
+          type: number
+        quoteApprovalRate:
+          type: number
+        avgApprovalToDispatch:
+          type: number
+        dispatchSuccessRate:
+          type: number
+        repeatRate:
+          type: number
+        avgRevenuePerShipment:
+          type: number
+        avgProfitPerShipment:
+          type: number
+        avgProfitRate:
+          type: number
+
+    # Pricing Rules
+    PricingRule:
+      type: object
+      required: [id, name, ruleType, value, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        ruleType:
+          type: string
+        value:
+          type: number
+        description:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+
+    PricingRuleInput:
+      type: object
+      required: [name, ruleType, value]
+      properties:
+        name:
+          type: string
+        ruleType:
+          type: string
+        value:
+          type: number
+        description:
+          type: string
+        isActive:
+          type: boolean
+
+    PricingRuleUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        ruleType:
+          type: string
+        value:
+          type: number
+        description:
+          type: string
+        isActive:
+          type: boolean

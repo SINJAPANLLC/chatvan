@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /chat/
+Disallow: /proposal/
+Disallow: /shipment/
+Disallow: /driver/
+Disallow: /invoices
+Disallow: /settings
+
+Sitemap: https://chatlogi.jp/sitemap.xml
