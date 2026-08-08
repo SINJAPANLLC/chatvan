@@ -2,34 +2,24 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: SINJAPAN logistics AI platform API
+  version: 0.2.0
+  description: Chat VAN - 軽バンレンタル相談サービス API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
   - name: auth
-    description: Authentication
-  - name: shipments
-    description: Shipment operations
-  - name: conversations
-    description: AI conversation messages
-  - name: carriers
-    description: Carrier management
-  - name: payments
-    description: Payment operations
+  - name: van
+    description: Van rental chat & applications
+  - name: vehicles
+    description: Vehicle management
+  - name: rental-companies
+    description: Rental company management
   - name: notifications
-    description: Notifications
-  - name: dashboard
-    description: Admin dashboard stats
-  - name: ai
-    description: AI chat processing
-  - name: pricing
-    description: Pricing rules
   - name: users
-    description: User management
+  - name: payments
+  - name: dashboard
 
 paths:
   /healthz:
@@ -45,12 +35,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 
-  # Auth
+  # ─── Auth ───────────────────────────────────────────────────────────────────
   /auth/login:
     post:
       operationId: login
       tags: [auth]
-      summary: Login
       requestBody:
         required: true
         content:
@@ -71,7 +60,6 @@ paths:
     post:
       operationId: register
       tags: [auth]
-      summary: Register
       requestBody:
         required: true
         content:
@@ -90,7 +78,6 @@ paths:
     post:
       operationId: logout
       tags: [auth]
-      summary: Logout
       responses:
         "200":
           description: Logged out
@@ -99,7 +86,6 @@ paths:
     get:
       operationId: getMe
       tags: [auth]
-      summary: Get current user
       responses:
         "200":
           description: Current user
@@ -110,71 +96,56 @@ paths:
         "401":
           description: Not authenticated
 
-  # Shipments
-  /shipments:
+  # ─── Van Chat ───────────────────────────────────────────────────────────────
+  /van/start:
+    post:
+      operationId: startVanChat
+      tags: [van]
+      summary: Start van rental chat (creates application + conversation)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VanStartInput"
+      responses:
+        "201":
+          description: Chat started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VanStartResponse"
+
+  /van/applications:
     get:
-      operationId: listShipments
-      tags: [shipments]
-      summary: List shipments
+      operationId: listVanApplications
+      tags: [van]
+      summary: List van applications (admin)
       parameters:
         - name: status
-          in: query
-          schema:
-            type: string
-        - name: userId
-          in: query
-          schema:
-            type: ["integer", "null"]
-        - name: carrierId
-          in: query
-          schema:
-            type: ["integer", "null"]
-        - name: dateFrom
-          in: query
-          schema:
-            type: ["string", "null"]
-        - name: dateTo
           in: query
           schema:
             type: ["string", "null"]
         - name: page
           in: query
           schema:
-            type: integer
+            type: ["integer", "null"]
         - name: limit
           in: query
           schema:
-            type: integer
+            type: ["integer", "null"]
       responses:
         "200":
-          description: List of shipments
+          description: List of applications
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ShipmentList"
-    post:
-      operationId: createShipment
-      tags: [shipments]
-      summary: Create shipment
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ShipmentInput"
-      responses:
-        "201":
-          description: Created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Shipment"
+                $ref: "#/components/schemas/VanApplicationList"
 
-  /shipments/{id}:
+  /van/applications/{id}:
     get:
-      operationId: getShipment
-      tags: [shipments]
-      summary: Get shipment
+      operationId: getVanApplication
+      tags: [van]
       parameters:
         - name: id
           in: path
@@ -183,17 +154,16 @@ paths:
             type: integer
       responses:
         "200":
-          description: Shipment
+          description: Application
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Shipment"
+                $ref: "#/components/schemas/VanApplication"
         "404":
           description: Not found
     patch:
-      operationId: updateShipment
-      tags: [shipments]
-      summary: Update shipment
+      operationId: updateVanApplication
+      tags: [van]
       parameters:
         - name: id
           in: path
@@ -205,46 +175,19 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ShipmentUpdate"
+              $ref: "#/components/schemas/VanApplicationUpdate"
       responses:
         "200":
           description: Updated
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Shipment"
+                $ref: "#/components/schemas/VanApplication"
 
-  /shipments/{id}/status:
-    patch:
-      operationId: updateShipmentStatus
-      tags: [shipments]
-      summary: Update shipment status
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/StatusUpdate"
-      responses:
-        "200":
-          description: Updated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Shipment"
-
-  # Conversations
-  /shipments/{id}/conversations:
+  /van/applications/{id}/messages:
     get:
-      operationId: listConversations
-      tags: [conversations]
-      summary: List conversation messages for a shipment
+      operationId: listVanMessages
+      tags: [van]
       parameters:
         - name: id
           in: path
@@ -253,17 +196,16 @@ paths:
             type: integer
       responses:
         "200":
-          description: List of messages
+          description: Messages
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/ConversationMessage"
+                  $ref: "#/components/schemas/VanMessage"
     post:
-      operationId: sendMessage
-      tags: [conversations]
-      summary: Send user message and get AI response
+      operationId: sendVanMessage
+      tags: [van]
       parameters:
         - name: id
           in: path
@@ -275,73 +217,107 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/MessageInput"
+              $ref: "#/components/schemas/VanMessageInput"
       responses:
         "200":
           description: AI response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ChatResponse"
+                $ref: "#/components/schemas/VanChatResponse"
 
-  # AI
-  /ai/start:
+  /van/applications/{id}/propose:
     post:
-      operationId: startAiChat
-      tags: [ai]
-      summary: Start AI consultation and create shipment
+      operationId: sendVanProposal
+      tags: [van]
+      summary: Admin sends vehicle proposal to user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AiStartInput"
+              $ref: "#/components/schemas/VanProposalInput"
       responses:
         "200":
-          description: AI response with shipment
+          description: Proposal sent
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ChatResponse"
+                $ref: "#/components/schemas/VanApplication"
 
-  # Carriers
-  /carriers:
-    get:
-      operationId: listCarriers
-      tags: [carriers]
-      summary: List carriers
+  /van/applications/{id}/accept:
+    post:
+      operationId: acceptVanProposal
+      tags: [van]
+      summary: User accepts a vehicle proposal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VanAcceptInput"
       responses:
         "200":
-          description: List of carriers
+          description: Application updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VanApplication"
+
+  # ─── Dashboard ──────────────────────────────────────────────────────────────
+  /van/dashboard:
+    get:
+      operationId: getVanDashboard
+      tags: [dashboard]
+      summary: Admin dashboard stats
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VanDashboardStats"
+
+  # ─── Contracts ──────────────────────────────────────────────────────────────
+  /van/contracts:
+    get:
+      operationId: listVanContracts
+      tags: [van]
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: Contracts
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Carrier"
-    post:
-      operationId: createCarrier
-      tags: [carriers]
-      summary: Create carrier
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CarrierInput"
-      responses:
-        "201":
-          description: Created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Carrier"
+                  $ref: "#/components/schemas/VanContract"
 
-  /carriers/{id}:
+  /van/contracts/{id}:
     get:
-      operationId: getCarrier
-      tags: [carriers]
-      summary: Get carrier
+      operationId: getVanContract
+      tags: [van]
       parameters:
         - name: id
           in: path
@@ -350,15 +326,14 @@ paths:
             type: integer
       responses:
         "200":
-          description: Carrier
+          description: Contract
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Carrier"
+                $ref: "#/components/schemas/VanContract"
     patch:
-      operationId: updateCarrier
-      tags: [carriers]
-      summary: Update carrier
+      operationId: updateVanContract
+      tags: [van]
       parameters:
         - name: id
           in: path
@@ -370,18 +345,50 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CarrierUpdate"
+              $ref: "#/components/schemas/VanContractUpdate"
       responses:
         "200":
           description: Updated
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Carrier"
-    delete:
-      operationId: deleteCarrier
-      tags: [carriers]
-      summary: Delete carrier
+                $ref: "#/components/schemas/VanContract"
+
+  # ─── Rental Companies ────────────────────────────────────────────────────────
+  /van/rental-companies:
+    get:
+      operationId: listRentalCompanies
+      tags: [rental-companies]
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RentalCompany"
+    post:
+      operationId: createRentalCompany
+      tags: [rental-companies]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RentalCompanyInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RentalCompany"
+
+  /van/rental-companies/{id}:
+    get:
+      operationId: getRentalCompany
+      tags: [rental-companies]
       parameters:
         - name: id
           in: path
@@ -390,22 +397,239 @@ paths:
             type: integer
       responses:
         "200":
+          description: Rental company
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RentalCompany"
+    patch:
+      operationId: updateRentalCompany
+      tags: [rental-companies]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RentalCompanyUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RentalCompany"
+    delete:
+      operationId: deleteRentalCompany
+      tags: [rental-companies]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
           description: Deleted
 
-  # Payments
-  /payments:
+  # ─── Vehicles ────────────────────────────────────────────────────────────────
+  /van/vehicles:
     get:
-      operationId: listPayments
-      tags: [payments]
-      summary: List payments
+      operationId: listVehicles
+      tags: [vehicles]
       parameters:
-        - name: shipmentId
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: prefecture
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: rentalCompanyId
           in: query
           schema:
             type: ["integer", "null"]
       responses:
         "200":
-          description: List of payments
+          description: Vehicles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Vehicle"
+    post:
+      operationId: createVehicle
+      tags: [vehicles]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VehicleInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+
+  /van/vehicles/{id}:
+    get:
+      operationId: getVehicle
+      tags: [vehicles]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Vehicle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+    patch:
+      operationId: updateVehicle
+      tags: [vehicles]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VehicleUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+    delete:
+      operationId: deleteVehicle
+      tags: [vehicles]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ─── Notifications ───────────────────────────────────────────────────────────
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+
+  /notifications/{id}/read:
+    patch:
+      operationId: markNotificationRead
+      tags: [notifications]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Marked as read
+
+  # ─── Users ───────────────────────────────────────────────────────────────────
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      responses:
+        "200":
+          description: Users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    patch:
+      operationId: updateUser
+      tags: [users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  # ─── Payments ────────────────────────────────────────────────────────────────
+  /payments:
+    get:
+      operationId: listPayments
+      tags: [payments]
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Payments
           content:
             application/json:
               schema:
@@ -415,7 +639,6 @@ paths:
     post:
       operationId: createPayment
       tags: [payments]
-      summary: Create payment
       requestBody:
         required: true
         content:
@@ -434,7 +657,6 @@ paths:
     get:
       operationId: getPayment
       tags: [payments]
-      summary: Get payment
       parameters:
         - name: id
           in: path
@@ -449,185 +671,16 @@ paths:
               schema:
                 $ref: "#/components/schemas/Payment"
 
-  # Notifications
-  /notifications:
-    get:
-      operationId: listNotifications
-      tags: [notifications]
-      summary: List notifications for current user
-      responses:
-        "200":
-          description: List of notifications
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Notification"
-
-  /notifications/{id}/read:
-    patch:
-      operationId: markNotificationRead
-      tags: [notifications]
-      summary: Mark notification as read
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        "200":
-          description: Updated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Notification"
-
-  # Dashboard
-  /dashboard/stats:
-    get:
-      operationId: getDashboardStats
-      tags: [dashboard]
-      summary: Get admin dashboard stats
-      responses:
-        "200":
-          description: Dashboard stats
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DashboardStats"
-
-  /dashboard/kpi:
-    get:
-      operationId: getDashboardKpi
-      tags: [dashboard]
-      summary: Get KPI metrics
-      responses:
-        "200":
-          description: KPI metrics
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/KpiMetrics"
-
-  # Pricing Rules
-  /pricing-rules:
-    get:
-      operationId: listPricingRules
-      tags: [pricing]
-      summary: List pricing rules
-      responses:
-        "200":
-          description: List of pricing rules
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/PricingRule"
-    post:
-      operationId: createPricingRule
-      tags: [pricing]
-      summary: Create pricing rule
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PricingRuleInput"
-      responses:
-        "201":
-          description: Created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PricingRule"
-
-  /pricing-rules/{id}:
-    patch:
-      operationId: updatePricingRule
-      tags: [pricing]
-      summary: Update pricing rule
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PricingRuleUpdate"
-      responses:
-        "200":
-          description: Updated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PricingRule"
-    delete:
-      operationId: deletePricingRule
-      tags: [pricing]
-      summary: Delete pricing rule
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        "200":
-          description: Deleted
-
-  # Users (admin)
-  /users:
-    get:
-      operationId: listUsers
-      tags: [users]
-      summary: List users (admin)
-      responses:
-        "200":
-          description: List of users
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/User"
-
-  /users/{id}:
-    get:
-      operationId: getUser
-      tags: [users]
-      summary: Get user
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        "200":
-          description: User
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/User"
-
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
-    # Auth
+    # ─── Auth ────────────────────────────────────────────────────────────────
     LoginInput:
       type: object
       required: [email, password]
@@ -647,10 +700,8 @@ components:
           type: string
         name:
           type: string
-        companyName:
-          type: ["string", "null"]
         phone:
-          type: ["string", "null"]
+          type: string
 
     AuthResponse:
       type: object
@@ -658,10 +709,12 @@ components:
       properties:
         user:
           $ref: "#/components/schemas/User"
+        token:
+          type: ["string", "null"]
 
     User:
       type: object
-      required: [id, email, name, role, createdAt]
+      required: [id, email, name, role]
       properties:
         id:
           type: integer
@@ -669,477 +722,518 @@ components:
           type: string
         name:
           type: string
-        companyName:
-          type: ["string", "null"]
         phone:
           type: ["string", "null"]
         role:
           type: string
-          enum: [user, admin]
-        billingAddress:
-          type: ["string", "null"]
         createdAt:
           type: string
 
-    # Shipments
-    Shipment:
+    UserUpdate:
       type: object
-      required: [id, status, createdAt, updatedAt]
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+
+    # ─── Van Application ─────────────────────────────────────────────────────
+    VanStartInput:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    VanStartResponse:
+      type: object
+      required: [applicationId, conversationId]
+      properties:
+        applicationId:
+          type: integer
+        conversationId:
+          type: integer
+        aiMessage:
+          type: string
+
+    VanApplication:
+      type: object
+      required: [id, status, createdAt]
       properties:
         id:
           type: integer
         userId:
           type: ["integer", "null"]
-        requestText:
-          type: ["string", "null"]
-        pickupAddress:
-          type: ["string", "null"]
-        deliveryAddress:
-          type: ["string", "null"]
-        cargoType:
-          type: ["string", "null"]
-        cargoQuantity:
-          type: ["string", "null"]
-        cargoWeight:
-          type: ["string", "null"]
-        cargoSize:
-          type: ["string", "null"]
-        pickupDatetime:
-          type: ["string", "null"]
-        deliveryDeadline:
-          type: ["string", "null"]
-        vehicleType:
-          type: ["string", "null"]
-        deliveryMethod:
-          type: ["string", "null"]
-        customerPrice:
-          type: ["number", "null"]
-        carrierCost:
-          type: ["number", "null"]
-        grossProfit:
-          type: ["number", "null"]
+        conversationId:
+          type: ["integer", "null"]
         status:
           type: string
-        assignedCarrierId:
+        area:
+          type: ["string", "null"]
+        startDate:
+          type: ["string", "null"]
+        monthlyBudget:
           type: ["integer", "null"]
-        assignedDriverName:
+        vehiclePreference:
           type: ["string", "null"]
-        paymentStatus:
+        purpose:
           type: ["string", "null"]
-        notes:
+        durationMonths:
+          type: ["integer", "null"]
+        insuranceStatus:
           type: ["string", "null"]
-        user:
-          $ref: "#/components/schemas/User"
-        carrier:
-          $ref: "#/components/schemas/Carrier"
+        hasBlackNumber:
+          type: ["boolean", "null"]
+        hasDeliveryExperience:
+          type: ["boolean", "null"]
+        applicantName:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        dob:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        requestText:
+          type: ["string", "null"]
+        adminNotes:
+          type: ["string", "null"]
+        proposedVehicles:
+          type: ["array", "null"]
+          items:
+            $ref: "#/components/schemas/Vehicle"
         createdAt:
           type: string
         updatedAt:
           type: string
 
-    ShipmentList:
+    VanApplicationUpdate:
       type: object
-      required: [items, total]
-      properties:
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/Shipment"
-        total:
-          type: integer
-
-    ShipmentInput:
-      type: object
-      properties:
-        requestText:
-          type: string
-        pickupAddress:
-          type: string
-        deliveryAddress:
-          type: string
-        cargoType:
-          type: string
-        cargoQuantity:
-          type: string
-        cargoWeight:
-          type: string
-        cargoSize:
-          type: string
-        pickupDatetime:
-          type: string
-        deliveryDeadline:
-          type: string
-        vehicleType:
-          type: string
-        deliveryMethod:
-          type: string
-        customerPrice:
-          type: number
-        notes:
-          type: string
-
-    ShipmentUpdate:
-      type: object
-      properties:
-        pickupAddress:
-          type: string
-        deliveryAddress:
-          type: string
-        cargoType:
-          type: string
-        cargoQuantity:
-          type: string
-        cargoWeight:
-          type: string
-        cargoSize:
-          type: string
-        pickupDatetime:
-          type: string
-        deliveryDeadline:
-          type: string
-        vehicleType:
-          type: string
-        deliveryMethod:
-          type: string
-        customerPrice:
-          type: number
-        carrierCost:
-          type: number
-        grossProfit:
-          type: number
-        assignedCarrierId:
-          type: integer
-        assignedDriverName:
-          type: string
-        paymentStatus:
-          type: string
-        notes:
-          type: string
-
-    StatusUpdate:
-      type: object
-      required: [status]
       properties:
         status:
           type: string
+        area:
+          type: string
+        startDate:
+          type: string
+        monthlyBudget:
+          type: integer
+        purpose:
+          type: string
+        durationMonths:
+          type: integer
+        insuranceStatus:
+          type: string
+        hasBlackNumber:
+          type: boolean
+        hasDeliveryExperience:
+          type: boolean
+        applicantName:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        dob:
+          type: string
+        address:
+          type: string
+        adminNotes:
+          type: string
 
-    # Conversations
-    ConversationMessage:
+    VanApplicationList:
       type: object
-      required: [id, shipmentId, sender, message, createdAt]
+      required: [applications, total]
+      properties:
+        applications:
+          type: array
+          items:
+            $ref: "#/components/schemas/VanApplication"
+        total:
+          type: integer
+
+    VanMessage:
+      type: object
+      required: [id, role, content, createdAt]
       properties:
         id:
           type: integer
-        shipmentId:
-          type: integer
-        sender:
+        role:
           type: string
-          enum: [user, ai]
-        message:
+        content:
           type: string
-        structuredData:
-          type: ["string", "null"]
+        options:
+          type: ["array", "null"]
+          items:
+            type: string
         createdAt:
           type: string
 
-    MessageInput:
+    VanMessageInput:
       type: object
       required: [message]
       properties:
         message:
           type: string
 
-    ChatResponse:
+    VanChatResponse:
       type: object
-      required: [message, shipmentId]
+      required: [message, isComplete]
       properties:
         message:
           type: string
-        shipmentId:
-          type: integer
+        options:
+          type: ["array", "null"]
+          items:
+            type: string
         isComplete:
           type: boolean
-        proposal:
-          $ref: "#/components/schemas/ShipmentProposal"
-        extractedData:
-          type: ["string", "null"]
+        inquiry:
+          type: ["object", "null"]
 
-    AiStartInput:
+    VanProposalInput:
       type: object
-      required: [message]
+      required: [vehicleIds]
       properties:
+        vehicleIds:
+          type: array
+          items:
+            type: integer
         message:
           type: string
 
-    ShipmentProposal:
+    VanAcceptInput:
       type: object
+      required: [vehicleId]
       properties:
-        vehicleType:
-          type: string
-        deliveryMethod:
-          type: string
-        pickupDatetime:
-          type: string
-        deliveryDatetime:
-          type: string
-        estimatedPrice:
-          type: number
-        reason:
-          type: string
-        notes:
-          type: string
+        vehicleId:
+          type: integer
 
-    # Carriers
-    Carrier:
+    VanDashboardStats:
       type: object
-      required: [id, companyName, createdAt]
+      required: [newConsultations, pendingReview, proposalSent, activeApplications, activeContracts, returningSoon, totalRevenue]
+      properties:
+        newConsultations:
+          type: integer
+        pendingReview:
+          type: integer
+        proposalSent:
+          type: integer
+        activeApplications:
+          type: integer
+        activeContracts:
+          type: integer
+        returningSoon:
+          type: integer
+        totalRevenue:
+          type: number
+        thisMonthRevenue:
+          type: number
+        totalVehicles:
+          type: integer
+        availableVehicles:
+          type: integer
+
+    VanContract:
+      type: object
+      required: [id, userId, vehicleId, status, monthlyPrice, createdAt]
       properties:
         id:
           type: integer
-        companyName:
+        applicationId:
+          type: ["integer", "null"]
+        userId:
+          type: integer
+        vehicleId:
+          type: integer
+        startDate:
+          type: ["string", "null"]
+        endDate:
+          type: ["string", "null"]
+        monthlyPrice:
+          type: number
+        sinJapanFee:
+          type: number
+        paymentDay:
+          type: integer
+        status:
           type: string
-        contactName:
-          type: ["string", "null"]
-        phone:
-          type: ["string", "null"]
-        email:
-          type: ["string", "null"]
-        serviceAreas:
-          type: ["string", "null"]
-        vehicleTypes:
-          type: ["string", "null"]
-        specialties:
-          type: ["string", "null"]
-        averageCost:
-          type: ["number", "null"]
-        onTimeRate:
-          type: ["number", "null"]
-        rating:
-          type: ["number", "null"]
         notes:
           type: ["string", "null"]
-        totalOrders:
-          type: integer
+        vehicle:
+          $ref: "#/components/schemas/Vehicle"
         createdAt:
           type: string
 
-    CarrierInput:
+    VanContractUpdate:
       type: object
-      required: [companyName]
       properties:
-        companyName:
+        status:
           type: string
-        contactName:
+        startDate:
           type: string
-        phone:
+        endDate:
           type: string
-        email:
-          type: string
-        serviceAreas:
-          type: string
-        vehicleTypes:
-          type: string
-        specialties:
-          type: string
-        averageCost:
-          type: number
-        onTimeRate:
-          type: number
-        rating:
-          type: number
         notes:
           type: string
 
-    CarrierUpdate:
+    # ─── Rental Company ───────────────────────────────────────────────────────
+    RentalCompany:
       type: object
-      properties:
-        companyName:
-          type: string
-        contactName:
-          type: string
-        phone:
-          type: string
-        email:
-          type: string
-        serviceAreas:
-          type: string
-        vehicleTypes:
-          type: string
-        specialties:
-          type: string
-        averageCost:
-          type: number
-        onTimeRate:
-          type: number
-        rating:
-          type: number
-        notes:
-          type: string
-
-    # Payments
-    Payment:
-      type: object
-      required: [id, shipmentId, amount, tax, totalAmount, paymentMethod, paymentStatus, createdAt]
+      required: [id, name, createdAt]
       properties:
         id:
           type: integer
-        shipmentId:
+        name:
+          type: string
+        contactName:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        serviceArea:
+          type: ["string", "null"]
+        paymentInfo:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        vehicleCount:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+
+    RentalCompanyInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        contactName:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        address:
+          type: string
+        serviceArea:
+          type: string
+        paymentInfo:
+          type: string
+        notes:
+          type: string
+
+    RentalCompanyUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        contactName:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        address:
+          type: string
+        serviceArea:
+          type: string
+        paymentInfo:
+          type: string
+        notes:
+          type: string
+
+    # ─── Vehicle ──────────────────────────────────────────────────────────────
+    Vehicle:
+      type: object
+      required: [id, maker, model, monthlyPrice, status, createdAt]
+      properties:
+        id:
           type: integer
+        rentalCompanyId:
+          type: ["integer", "null"]
+        maker:
+          type: string
+        model:
+          type: string
+        year:
+          type: ["integer", "null"]
+        mileage:
+          type: ["integer", "null"]
+        inspectionExpiry:
+          type: ["string", "null"]
+        prefecture:
+          type: ["string", "null"]
+        locationDetail:
+          type: ["string", "null"]
+        monthlyPrice:
+          type: number
+        sinJapanFee:
+          type: number
+        insuranceFee:
+          type: number
+        userPrice:
+          type: ["number", "null"]
+        minPeriodMonths:
+          type: integer
+        availableFrom:
+          type: ["string", "null"]
+        hasEtc:
+          type: boolean
+        hasDashcam:
+          type: boolean
+        hasBackupCam:
+          type: boolean
+        photos:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        status:
+          type: string
+        rentalCompany:
+          $ref: "#/components/schemas/RentalCompany"
+        createdAt:
+          type: string
+
+    VehicleInput:
+      type: object
+      required: [maker, model, monthlyPrice]
+      properties:
+        rentalCompanyId:
+          type: integer
+        maker:
+          type: string
+        model:
+          type: string
+        year:
+          type: integer
+        mileage:
+          type: integer
+        inspectionExpiry:
+          type: string
+        prefecture:
+          type: string
+        locationDetail:
+          type: string
+        monthlyPrice:
+          type: number
+        sinJapanFee:
+          type: number
+        insuranceFee:
+          type: number
+        minPeriodMonths:
+          type: integer
+        availableFrom:
+          type: string
+        hasEtc:
+          type: boolean
+        hasDashcam:
+          type: boolean
+        hasBackupCam:
+          type: boolean
+        photos:
+          type: string
+        notes:
+          type: string
+        status:
+          type: string
+
+    VehicleUpdate:
+      type: object
+      properties:
+        rentalCompanyId:
+          type: integer
+        maker:
+          type: string
+        model:
+          type: string
+        year:
+          type: integer
+        mileage:
+          type: integer
+        inspectionExpiry:
+          type: string
+        prefecture:
+          type: string
+        locationDetail:
+          type: string
+        monthlyPrice:
+          type: number
+        sinJapanFee:
+          type: number
+        insuranceFee:
+          type: number
+        minPeriodMonths:
+          type: integer
+        availableFrom:
+          type: string
+        hasEtc:
+          type: boolean
+        hasDashcam:
+          type: boolean
+        hasBackupCam:
+          type: boolean
+        photos:
+          type: string
+        notes:
+          type: string
+        status:
+          type: string
+
+    # ─── Notifications ────────────────────────────────────────────────────────
+    Notification:
+      type: object
+      required: [id, message, isRead, createdAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: ["integer", "null"]
+        message:
+          type: string
+        isRead:
+          type: boolean
+        link:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    # ─── Payments ─────────────────────────────────────────────────────────────
+    Payment:
+      type: object
+      required: [id, amount, status, createdAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: ["integer", "null"]
+        contractId:
+          type: ["integer", "null"]
         amount:
           type: number
-        tax:
-          type: number
-        totalAmount:
-          type: number
-        paymentMethod:
+        status:
           type: string
-        paymentStatus:
-          type: string
-        paidAt:
-          type: ["string", "null"]
-        stripePaymentIntentId:
+        description:
           type: ["string", "null"]
         createdAt:
           type: string
 
     PaymentInput:
       type: object
-      required: [shipmentId, amount, paymentMethod]
+      required: [amount]
       properties:
-        shipmentId:
+        userId:
+          type: integer
+        contractId:
           type: integer
         amount:
           type: number
-        paymentMethod:
-          type: string
-
-    # Notifications
-    Notification:
-      type: object
-      required: [id, shipmentId, userId, title, message, readStatus, createdAt]
-      properties:
-        id:
-          type: integer
-        shipmentId:
-          type: integer
-        userId:
-          type: integer
-        title:
-          type: string
-        message:
-          type: string
-        readStatus:
-          type: boolean
-        createdAt:
-          type: string
-
-    # Dashboard
-    DashboardStats:
-      type: object
-      required: [todayConsultations, pendingQuotes, approvedToday, inProgress, confirmed, inTransit, delivered, totalRevenue, totalCost, grossProfit, avgProfitRate]
-      properties:
-        todayConsultations:
-          type: integer
-        pendingQuotes:
-          type: integer
-        approvedToday:
-          type: integer
-        inProgress:
-          type: integer
-        confirmed:
-          type: integer
-        inTransit:
-          type: integer
-        delivered:
-          type: integer
-        totalRevenue:
-          type: number
-        totalCost:
-          type: number
-        grossProfit:
-          type: number
-        avgProfitRate:
-          type: number
-        statusBreakdown:
-          type: array
-          items:
-            $ref: "#/components/schemas/StatusCount"
-
-    StatusCount:
-      type: object
-      required: [status, count]
-      properties:
-        status:
-          type: string
-        count:
-          type: integer
-
-    KpiMetrics:
-      type: object
-      required: [avgConsultationToQuote, quoteApprovalRate, avgApprovalToDispatch, dispatchSuccessRate, repeatRate, avgRevenuePerShipment, avgProfitPerShipment, avgProfitRate]
-      properties:
-        avgConsultationToQuote:
-          type: number
-        quoteApprovalRate:
-          type: number
-        avgApprovalToDispatch:
-          type: number
-        dispatchSuccessRate:
-          type: number
-        repeatRate:
-          type: number
-        avgRevenuePerShipment:
-          type: number
-        avgProfitPerShipment:
-          type: number
-        avgProfitRate:
-          type: number
-
-    # Pricing Rules
-    PricingRule:
-      type: object
-      required: [id, name, ruleType, value, createdAt]
-      properties:
-        id:
-          type: integer
-        name:
-          type: string
-        ruleType:
-          type: string
-        value:
-          type: number
-        description:
-          type: ["string", "null"]
-        isActive:
-          type: boolean
-        createdAt:
-          type: string
-
-    PricingRuleInput:
-      type: object
-      required: [name, ruleType, value]
-      properties:
-        name:
-          type: string
-        ruleType:
-          type: string
-        value:
-          type: number
         description:
           type: string
-        isActive:
-          type: boolean
-
-    PricingRuleUpdate:
-      type: object
-      properties:
-        name:
-          type: string
-        ruleType:
-          type: string
-        value:
-          type: number
-        description:
-          type: string
-        isActive:
-          type: boolean

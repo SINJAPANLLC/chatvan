@@ -1,0 +1,1 @@
+- [Chat VAN migration](chat-van-migration.md) — Chat LOGI → Chat VAN へのリメイク。zod v3/v4 codegen 注意点あり。

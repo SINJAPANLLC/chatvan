@@ -1,15 +1,14 @@
 import { Router, type IRouter } from "express";
 import { db, shipmentsTable, usersTable, carriersTable } from "@workspace/db";
 import { eq, desc, and, gte, lte, inArray, sql } from "drizzle-orm";
-import {
-  CreateShipmentBody,
-  UpdateShipmentBody,
-  UpdateShipmentStatusBody,
-  ListShipmentsQueryParams,
-  GetShipmentParams,
-  UpdateShipmentParams,
-  UpdateShipmentStatusParams,
-} from "@workspace/api-zod";
+// Zod schemas removed in Chat VAN migration — using req.body directly
+type CreateShipmentBody = any;
+type UpdateShipmentBody = any;
+type UpdateShipmentStatusBody = any;
+type ListShipmentsQueryParams = any;
+type GetShipmentParams = any;
+type UpdateShipmentParams = any;
+type UpdateShipmentStatusParams = any;
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { authorizeOnFile } from "../lib/square-authorize";
 import { sendAutoNotification } from "../lib/autoNotify";

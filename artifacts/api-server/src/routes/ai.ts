@@ -1,7 +1,9 @@
 import { Router, type IRouter } from "express";
 import { db, shipmentsTable, conversationsTable, settingsTable } from "@workspace/db";
 import { eq, like } from "drizzle-orm";
-import { StartAiChatBody, SendMessageBody } from "@workspace/api-zod";
+// Zod schemas removed in Chat VAN migration
+type StartAiChatBody = any;
+type SendMessageBody = any;
 import { requireAuth } from "../middlewares/auth";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { calcPriceWithConfig, parsePricingConfig, DEFAULT_CONFIG } from "../lib/pricing";

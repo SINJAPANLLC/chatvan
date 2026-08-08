@@ -7,7 +7,7 @@ export default function LP() {
       <div className="relative w-full max-w-xl">
         <img
           src={`${import.meta.env.BASE_URL}lp-hero.png`}
-          alt="Chat LOGI"
+          alt="Chat VAN"
           className="w-full"
         />
         {/* 「無料で相談する」ボタン部分のタップ領域 */}

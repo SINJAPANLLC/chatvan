@@ -40,7 +40,7 @@ export default function ForgotPassword() {
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
           <Link href="/" className="inline-flex justify-center mb-2">
-            <img src="/logo.jpg" alt="Chat LOGI" className="h-8 w-auto" />
+            <img src="/logo.jpg" alt="Chat VAN" className="h-8 w-auto" />
           </Link>
           <h1 className="text-xl font-medium tracking-tight">パスワードをお忘れの方</h1>
           {!sent && <p className="text-sm text-muted-foreground">登録済みのメールアドレスを入力してください。<br />パスワードリセット用のリンクをお送りします。</p>}
