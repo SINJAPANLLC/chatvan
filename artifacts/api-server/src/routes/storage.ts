@@ -4,18 +4,11 @@
  */
 import { Readable } from 'stream';
 import { Router, type IRouter, type Request, type Response } from 'express';
-import { z } from 'zod';
 import { requireAdmin } from '../middlewares/auth';
 import { ObjectNotFoundError, ObjectStorageService } from '../lib/objectStorage';
 
 const router: IRouter = Router();
 const storage = new ObjectStorageService();
-
-const RequestUploadUrlBody = z.object({
-  name: z.string(),
-  size: z.number(),
-  contentType: z.string(),
-});
 
 /**
  * POST /storage/uploads/request-url
@@ -25,14 +18,13 @@ router.post(
   '/storage/uploads/request-url',
   requireAdmin,
   async (req: Request, res: Response): Promise<void> => {
-    const parsed = RequestUploadUrlBody.safeParse(req.body);
-    if (!parsed.success) {
+    const { name, size, contentType } = req.body ?? {};
+    if (!name || !contentType) {
       res.status(400).json({ error: 'name, size, contentType が必要です' });
       return;
     }
 
     try {
-      const { name, size, contentType } = parsed.data;
       const uploadURL = await storage.getObjectEntityUploadURL();
       const objectPath = storage.normalizeObjectEntityPath(uploadURL);
 
