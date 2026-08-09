@@ -671,9 +671,31 @@ router.get("/van/applications/:id/related", requireAuth, requireAdmin, async (re
   }
 });
 
+// ── Helper: verify application ownership ───────────────────────────────────
+async function getOwnedApplication(appId: number, userId: number | undefined, isAdmin: boolean) {
+  if (!userId) return null;
+  const [app] = await db.select().from(vanApplicationsTable).where(eq(vanApplicationsTable.id, appId)).limit(1);
+  if (!app) return null;
+  // Admin may access any application; regular users only their own
+  if (!isAdmin && app.userId !== userId) return null;
+  return app;
+}
+
+// ── Validate that a path is within the expected private objects namespace ───
+function isValidObjectPath(path: string | undefined): boolean {
+  if (!path) return false;
+  return /^\/objects\/[a-zA-Z0-9/_\-]+$/.test(path);
+}
+
 router.get("/van/applications/:id/identity-verification", requireAuth, async (req: Request, res: Response) => {
   try {
     const appId = parseInt(String(req.params.id));
+    const userId: number | undefined = (req.session as any)?.userId;
+    const isAdmin = (req.session as any)?.userRole === 'admin';
+
+    const app = await getOwnedApplication(appId, userId, isAdmin);
+    if (!app) return res.status(404).json({ error: "Not found" });
+
     const [result] = await db.select().from(identityVerificationsTable)
       .where(eq(identityVerificationsTable.applicationId, appId)).limit(1);
     return res.json(result ?? null);
@@ -686,25 +708,66 @@ router.post("/van/applications/:id/identity-verification", requireAuth, async (r
   try {
     const appId = parseInt(String(req.params.id));
     const userId: number | undefined = (req.session as any)?.userId;
+    const isAdmin = (req.session as any)?.userRole === 'admin';
+
+    // Ownership: regular users may only submit for their own application
+    const app = await getOwnedApplication(appId, userId, isAdmin);
+    if (!app) return res.status(404).json({ error: "Not found" });
+
     const b = req.body;
-    const [result] = await db.insert(identityVerificationsTable).values({
-      userId: userId!,
-      applicationId: appId,
-      fullName: b.full_name,
-      birthDate: b.birth_date,
-      address: b.address,
-      phone: b.phone,
-      email: b.email,
-      licenseFront: b.license_front,
-      licenseBack: b.license_back,
-      licenseExpiry: b.license_expiry,
-      licenseType: b.license_type,
-      licenseNumber: b.license_number,
-      emergencyContactName: b.emergency_contact_name,
-      emergencyContactPhone: b.emergency_contact_phone,
-      emergencyContactRelation: b.emergency_contact_relation,
-      status: 'submitted',
-    }).returning();
+
+    // Validate uploaded document paths are in the private objects namespace
+    if (!isValidObjectPath(b.license_front) || !isValidObjectPath(b.license_back)) {
+      return res.status(400).json({ error: "Invalid document path" });
+    }
+
+    // Verify upload ownership — both paths must have been issued to this user
+    const claimRows = await db.execute(sql`
+      SELECT object_path FROM upload_claims
+      WHERE object_path IN (${b.license_front}, ${b.license_back})
+        AND user_id = ${userId!}
+        AND content_type LIKE 'image/%'
+    `);
+    const claimedPaths = new Set(((claimRows as any)?.rows ?? claimRows).map((r: any) => r.object_path));
+    if (!claimedPaths.has(b.license_front) || !claimedPaths.has(b.license_back)) {
+      return res.status(403).json({ error: "Document paths not authorized for this user" });
+    }
+
+    // Upsert: update existing record if already submitted/rejected; insert if none
+    const existing = await db.select({ id: identityVerificationsTable.id })
+      .from(identityVerificationsTable)
+      .where(and(
+        eq(identityVerificationsTable.userId, userId!),
+        eq(identityVerificationsTable.applicationId, appId),
+      )).limit(1);
+
+    let result;
+    if (existing.length > 0) {
+      [result] = await db.update(identityVerificationsTable).set({
+        fullName: b.full_name, birthDate: b.birth_date, address: b.address, phone: b.phone,
+        email: b.email, licenseFront: b.license_front, licenseBack: b.license_back,
+        licenseExpiry: b.license_expiry, licenseType: b.license_type, licenseNumber: b.license_number,
+        emergencyContactName: b.emergency_contact_name, emergencyContactPhone: b.emergency_contact_phone,
+        emergencyContactRelation: b.emergency_contact_relation,
+        status: 'submitted' as any, rejectionReason: null, updatedAt: new Date(),
+      }).where(eq(identityVerificationsTable.id, existing[0].id)).returning();
+    } else {
+      [result] = await db.insert(identityVerificationsTable).values({
+        userId: userId!,
+        applicationId: appId,
+        fullName: b.full_name, birthDate: b.birth_date, address: b.address, phone: b.phone,
+        email: b.email, licenseFront: b.license_front, licenseBack: b.license_back,
+        licenseExpiry: b.license_expiry, licenseType: b.license_type, licenseNumber: b.license_number,
+        emergencyContactName: b.emergency_contact_name, emergencyContactPhone: b.emergency_contact_phone,
+        emergencyContactRelation: b.emergency_contact_relation, status: 'submitted',
+      }).returning();
+    }
+
+    // Mark claims as used
+    await db.execute(sql`
+      UPDATE upload_claims SET used_at = NOW()
+      WHERE object_path IN (${b.license_front}, ${b.license_back}) AND user_id = ${userId!}
+    `);
 
     // Notify admin
     const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
@@ -717,6 +780,34 @@ router.post("/van/applications/:id/identity-verification", requireAuth, async (r
     return res.status(201).json(result);
   } catch (err) {
     console.error("submit id verification error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// GET /van/my/identity-verification — ログイン中ユーザーの本人確認ステータス
+router.get("/van/my/identity-verification", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId: number | undefined = (req.session as any)?.userId;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+    const [result] = await db.select().from(identityVerificationsTable)
+      .where(eq(identityVerificationsTable.userId, userId))
+      .orderBy(desc(identityVerificationsTable.createdAt)).limit(1);
+    return res.json(result ?? null);
+  } catch (err) {
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// GET /van/my/applications — ログイン中ユーザーの相談一覧（最新順）
+router.get("/van/my/applications", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId: number | undefined = (req.session as any)?.userId;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+    const apps = await db.select().from(vanApplicationsTable)
+      .where(eq(vanApplicationsTable.userId, userId))
+      .orderBy(desc(vanApplicationsTable.createdAt)).limit(10);
+    return res.json(apps);
+  } catch (err) {
     return res.status(500).json({ error: "Internal error" });
   }
 });

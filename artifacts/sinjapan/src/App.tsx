@@ -22,6 +22,7 @@ const Login         = lazy(() => import('@/pages/login'));
 const Register      = lazy(() => import('@/pages/register'));
 const Contact       = lazy(() => import('@/pages/contact'));
 const BreakdownPage = lazy(() => import('@/pages/breakdown'));
+const IdentityVerification = lazy(() => import('@/pages/identity-verification'));
 
 // Admin Pages
 const AdminDashboard        = lazy(() => import('@/pages/admin/dashboard'));
@@ -169,6 +170,9 @@ function Router() {
         </Route>
         <Route path="/breakdown">
           <UserLayout><BreakdownPage /></UserLayout>
+        </Route>
+        <Route path="/identity-verification">
+          <UserLayout><IdentityVerification /></UserLayout>
         </Route>
 
         <Route component={NotFound} />

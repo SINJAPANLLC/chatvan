@@ -393,6 +393,23 @@ async function runMigrations() {
     logger.warn({ err: e.message }, "contract_messages migration (non-fatal)");
   }
 
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS upload_claims (
+        id SERIAL PRIMARY KEY,
+        object_path TEXT NOT NULL UNIQUE,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        application_id INTEGER,
+        content_type TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+        used_at TIMESTAMP
+      )
+    `);
+    logger.info("migration: upload_claims table ready");
+  } catch (e: any) {
+    logger.warn({ err: e.message }, "upload_claims migration (non-fatal)");
+  }
+
   logger.info("migration: all Chat VAN tables ready");
 }
 

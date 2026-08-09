@@ -1,22 +1,31 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useListVanContracts, useGetMe } from '@workspace/api-client-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Car, JapaneseYen, Calendar, CreditCard, ChevronRight, MessageSquare } from 'lucide-react';
+import { Loader2, Car, JapaneseYen, Calendar, CreditCard, ChevronRight, MessageSquare, BadgeCheck, AlertCircle, Clock } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { format } from 'date-fns';
+
+const API = (p: string) => `${import.meta.env.BASE_URL}api${p}`;
+const tok = () => localStorage.getItem('sinjapan_auth_token') ?? '';
+
+type IDVStatus = 'not_started' | 'submitted' | 'verified' | 'rejected' | 'expired';
 
 export default function MyPage() {
   const { data: user, isLoading: isUserLoading } = useGetMe();
   const [, setLocation] = useLocation();
+  const [idvStatus, setIdvStatus] = useState<IDVStatus | null>(null);
 
   const { data: contracts, isLoading: isContractsLoading } = useListVanContracts({}, {
     query: { enabled: !!user }
   });
 
   React.useEffect(() => {
-    if (!isUserLoading && !user) {
-      setLocation('/login');
-    }
+    if (!isUserLoading && !user) { setLocation('/login'); return; }
+    if (!user) return;
+    fetch(API('/van/my/identity-verification'), { headers: { Authorization: `Bearer ${tok()}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setIdvStatus((d?.status as IDVStatus) ?? 'not_started'))
+      .catch(() => setIdvStatus('not_started'));
   }, [user, isUserLoading, setLocation]);
 
   if (isUserLoading || isContractsLoading) {
@@ -95,6 +104,47 @@ export default function MyPage() {
             ))}
           </div>
         )}
+      </section>
+
+      {/* 本人確認ステータス */}
+      <section>
+        <h2 className="text-lg font-semibold mb-4 flex items-center">
+          <BadgeCheck className="h-5 w-5 mr-2" />本人確認
+        </h2>
+        <Link href="/identity-verification">
+          <Card className="hover:bg-muted transition-colors cursor-pointer border-border shadow-sm">
+            <CardContent className="p-5 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className={`h-10 w-10 rounded-full flex items-center justify-center border ${
+                  idvStatus === 'verified'  ? 'bg-green-50 border-green-300 text-green-600' :
+                  idvStatus === 'submitted' ? 'bg-amber-50 border-amber-300 text-amber-600' :
+                  idvStatus === 'rejected'  ? 'bg-red-50 border-red-300 text-red-600' :
+                  'bg-muted border-border text-muted-foreground'
+                }`}>
+                  {idvStatus === 'verified'  ? <BadgeCheck className="h-5 w-5" /> :
+                   idvStatus === 'submitted' ? <Clock className="h-5 w-5" /> :
+                   idvStatus === 'rejected'  ? <AlertCircle className="h-5 w-5" /> :
+                   <BadgeCheck className="h-5 w-5" />}
+                </div>
+                <div>
+                  <h3 className="font-medium">免許証・本人確認</h3>
+                  <p className={`text-xs mt-0.5 ${
+                    idvStatus === 'verified'  ? 'text-green-600' :
+                    idvStatus === 'submitted' ? 'text-amber-600' :
+                    idvStatus === 'rejected'  ? 'text-red-600'   :
+                    'text-muted-foreground'
+                  }`}>
+                    {idvStatus === 'verified'  ? '確認済み' :
+                     idvStatus === 'submitted' ? '確認待ち' :
+                     idvStatus === 'rejected'  ? '否認 — 再提出が必要です' :
+                     '未提出 — タップして提出する'}
+                  </p>
+                </div>
+              </div>
+              {idvStatus !== 'verified' && <ChevronRight className="h-5 w-5 text-muted-foreground" />}
+            </CardContent>
+          </Card>
+        </Link>
       </section>
 
       <section>
