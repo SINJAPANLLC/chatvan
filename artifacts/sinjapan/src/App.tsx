@@ -28,16 +28,15 @@ const AdminApplicationDetail= lazy(() => import('@/pages/admin/application-detai
 const AdminVehicles         = lazy(() => import('@/pages/admin/vehicles'));
 const AdminRentalCompanies  = lazy(() => import('@/pages/admin/rental-companies'));
 const AdminContracts        = lazy(() => import('@/pages/admin/contracts'));
-const AdminScreenings       = lazy(() => import('@/pages/admin/screenings'));
-const AdminPayments         = lazy(() => import('@/pages/admin/payments-van'));
-const AdminGps              = lazy(() => import('@/pages/admin/gps'));
-const AdminInsurance        = lazy(() => import('@/pages/admin/insurance'));
-const AdminIncidents        = lazy(() => import('@/pages/admin/incidents'));
-const AdminReturns          = lazy(() => import('@/pages/admin/returns'));
-const AdminAuditLogs        = lazy(() => import('@/pages/admin/audit-logs'));
 const AdminCustomers        = lazy(() => import('@/pages/admin/customers'));
 const AdminNotifications    = lazy(() => import('@/pages/admin/notifications'));
+const AdminInvoices         = lazy(() => import('@/pages/admin/invoices'));
+const AdminFinance          = lazy(() => import('@/pages/admin/finance'));
 const AdminPricing          = lazy(() => import('@/pages/admin/pricing'));
+const AdminEmailMarketing   = lazy(() => import('@/pages/admin/email-marketing'));
+const AdminBlog             = lazy(() => import('@/pages/admin/blog'));
+const AdminSeo              = lazy(() => import('@/pages/admin/seo'));
+const AdminContacts         = lazy(() => import('@/pages/admin/contacts'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -84,35 +83,32 @@ function Router() {
         <Route path="/admin/contracts">
           <AdminLayout><AdminContracts /></AdminLayout>
         </Route>
-        <Route path="/admin/screenings">
-          <AdminLayout><AdminScreenings /></AdminLayout>
-        </Route>
-        <Route path="/admin/payments">
-          <AdminLayout><AdminPayments /></AdminLayout>
-        </Route>
-        <Route path="/admin/gps">
-          <AdminLayout><AdminGps /></AdminLayout>
-        </Route>
-        <Route path="/admin/insurance">
-          <AdminLayout><AdminInsurance /></AdminLayout>
-        </Route>
-        <Route path="/admin/incidents">
-          <AdminLayout><AdminIncidents /></AdminLayout>
-        </Route>
-        <Route path="/admin/returns">
-          <AdminLayout><AdminReturns /></AdminLayout>
-        </Route>
-        <Route path="/admin/audit-logs">
-          <AdminLayout><AdminAuditLogs /></AdminLayout>
-        </Route>
         <Route path="/admin/customers">
           <AdminLayout><AdminCustomers /></AdminLayout>
         </Route>
         <Route path="/admin/notifications">
           <AdminLayout><AdminNotifications /></AdminLayout>
         </Route>
+        <Route path="/admin/invoices">
+          <AdminLayout><AdminInvoices /></AdminLayout>
+        </Route>
+        <Route path="/admin/finance">
+          <AdminLayout><AdminFinance /></AdminLayout>
+        </Route>
         <Route path="/admin/pricing">
           <AdminLayout><AdminPricing /></AdminLayout>
+        </Route>
+        <Route path="/admin/email-marketing">
+          <AdminLayout><AdminEmailMarketing /></AdminLayout>
+        </Route>
+        <Route path="/admin/blog">
+          <AdminLayout><AdminBlog /></AdminLayout>
+        </Route>
+        <Route path="/admin/seo">
+          <AdminLayout><AdminSeo /></AdminLayout>
+        </Route>
+        <Route path="/admin/contacts">
+          <AdminLayout><AdminContacts /></AdminLayout>
         </Route>
 
         {/* User Routes */}
