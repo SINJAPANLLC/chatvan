@@ -42,12 +42,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     { href: '/admin/rental-companies', label: 'レンタル会社',     icon: Building2 },
     { href: '/admin/vehicles',         label: '車両管理',         icon: Car },
     { href: '/admin/contracts',        label: '契約管理',         icon: FileText },
-    { href: '/admin/payments',         label: '決済・未払い',     icon: CreditCard },
-    { href: '/admin/insurance',        label: '保険管理',         icon: Shield },
-    { href: '/admin/gps',              label: 'GPS',              icon: MapPin },
-    { href: '/admin/incidents',        label: '事故・故障',       icon: AlertTriangle },
     { href: '/admin/recovery',         label: '未返却・回収',     icon: RotateCcw },
-    { href: '/admin/screening',        label: '審査',             icon: ClipboardCheck },
     { href: '/admin/notifications',    label: '通知管理',         icon: Bell },
     { href: '/admin/audit-logs',       label: '監査ログ',         icon: ScrollText },
     // 管理・マーケティング
