@@ -33,6 +33,12 @@ export default function Home() {
   const handleSubmit = async () => {
     if (!text.trim() || isSubmitting) return;
 
+    if (!user) {
+      localStorage.setItem(DRAFT_KEY, text);
+      setLocation('/register');
+      return;
+    }
+
     try {
       const chatRes = await startVanChat.mutateAsync({ data: { message: text } });
       localStorage.removeItem(DRAFT_KEY);

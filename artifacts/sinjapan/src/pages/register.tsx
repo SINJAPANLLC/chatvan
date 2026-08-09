@@ -3,7 +3,9 @@ import { useLocation, Link } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRegister, useGetMe } from '@workspace/api-client-react';
+import { useRegister, useGetMe, useStartVanChat } from '@workspace/api-client-react';
+
+const DRAFT_KEY = 'sinjapan_van_draft_message';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -22,6 +24,7 @@ export default function Register() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const register = useRegister();
+  const startVanChat = useStartVanChat();
   
   const { data: user, isLoading } = useGetMe();
   
@@ -42,6 +45,17 @@ export default function Register() {
       const res = await register.mutateAsync({ data });
       if ((res as any).token) {
         localStorage.setItem('sinjapan_auth_token', (res as any).token);
+      }
+      const draft = localStorage.getItem(DRAFT_KEY);
+      if (draft) {
+        try {
+          const chatRes = await startVanChat.mutateAsync({ data: { message: draft } });
+          localStorage.removeItem(DRAFT_KEY);
+          setLocation(`/van/${chatRes.applicationId}`);
+          return;
+        } catch {
+          // 失敗してもトップに戻る
+        }
       }
       setLocation('/');
     } catch (err) {
