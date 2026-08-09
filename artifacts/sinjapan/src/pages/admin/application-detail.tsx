@@ -1,74 +1,173 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { 
-  useGetVanApplication, 
-  useUpdateVanApplication, 
-  useListVehicles, 
+import {
+  useGetVanApplication,
+  useUpdateVanApplication,
+  useListVehicles,
   useSendVanProposal,
-  useListVanMessages
+  useListVanMessages,
 } from '@workspace/api-client-react';
-import { Loader2, ChevronLeft, Save, Send, Check } from 'lucide-react';
+import {
+  Loader2, ChevronLeft, Save, Send, Check, Printer,
+  User, Car, MessageSquare, FileText, CreditCard, ClipboardList,
+  Phone, Mail, MapPin, Calendar, Banknote, Shield, BadgeCheck,
+  Truck, Wrench, Camera, Package,
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
 
+// ─── helpers ─────────────────────────────────────────────────────────────────
+const yen = (n: number | null | undefined) =>
+  n != null ? `¥${Number(n).toLocaleString()}` : '-';
+
+const STATUS_STYLES: Record<string, string> = {
+  '相談中':     'bg-gray-100 text-gray-700 border-gray-200',
+  '確認中':     'bg-orange-50 text-orange-700 border-orange-200',
+  '提案送信済': 'bg-blue-50 text-blue-700 border-blue-200',
+  '申込受付':   'bg-yellow-50 text-yellow-700 border-yellow-200',
+  '審査中':     'bg-purple-50 text-purple-700 border-purple-200',
+  '提案確定':   'bg-teal-50 text-teal-700 border-teal-200',
+  '契約手続き': 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  '利用開始':   'bg-cyan-50 text-cyan-700 border-cyan-200',
+  '利用中':     'bg-green-50 text-green-700 border-green-200',
+  '返却予定':   'bg-amber-50 text-amber-700 border-amber-200',
+  '契約終了':   'bg-gray-50 text-gray-500 border-gray-200',
+  'キャンセル': 'bg-red-50 text-red-400 border-red-200',
+};
+
+const ALL_STATUSES = Object.keys(STATUS_STYLES);
+
+type Tab = 'overview' | 'customer' | 'vehicle' | 'chat' | 'instruction' | 'master';
+
+const TABS: { id: Tab; label: string; icon: React.ComponentType<any> }[] = [
+  { id: 'overview',     label: '概要',       icon: ClipboardList },
+  { id: 'customer',     label: '顧客情報',   icon: User },
+  { id: 'vehicle',      label: '車両情報',   icon: Car },
+  { id: 'chat',         label: 'チャット',   icon: MessageSquare },
+  { id: 'instruction',  label: '指示書',     icon: FileText },
+  { id: 'master',       label: 'マスターカード', icon: CreditCard },
+];
+
+// ─── Section wrapper ──────────────────────────────────────────────────────────
+function Section({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
+  return (
+    <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-muted/30">
+        <h3 className="text-sm font-semibold">{title}</h3>
+        {action}
+      </div>
+      <div className="p-5">{children}</div>
+    </div>
+  );
+}
+
+// ─── DL row ──────────────────────────────────────────────────────────────────
+function DL({ label, value, span2 }: { label: string; value?: React.ReactNode; span2?: boolean }) {
+  return (
+    <div className={span2 ? 'col-span-2' : ''}>
+      <dt className="text-xs text-muted-foreground mb-1">{label}</dt>
+      <dd className="text-sm font-medium">{value || <span className="text-muted-foreground">-</span>}</dd>
+    </div>
+  );
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
 export default function AdminApplicationDetail() {
   const [, params] = useRoute('/admin/applications/:id');
   const id = Number(params?.id);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const printRef = useRef<HTMLDivElement>(null);
+
+  const [tab, setTab] = useState<Tab>('overview');
 
   const { data: application, isLoading, refetch } = useGetVanApplication(id, { query: { enabled: !!id } });
   const { data: messages } = useListVanMessages(id, { query: { enabled: !!id } });
   const { data: vehiclesData } = useListVehicles({ status: '募集中' });
-  
+
   const updateApp = useUpdateVanApplication();
   const sendProposal = useSendVanProposal();
 
+  // ── form state ──────────────────────────────────────────────────────────────
+  const [status, setStatus] = useState('');
+  const [adminNotes, setAdminNotes] = useState('');
+  const [customerForm, setCustomerForm] = useState({
+    applicantName: '', phone: '', email: '',
+    dob: '', address: '', licenseInfo: '',
+    insuranceStatus: '', hasBlackNumber: '', hasDeliveryExperience: '',
+  });
   const [selectedVehicles, setSelectedVehicles] = useState<number[]>([]);
-  const [status, setStatus] = useState<string>('');
-  
+  const [proposalMessage, setProposalMessage] = useState('');
+
   React.useEffect(() => {
-    if (application && !status) {
-      setStatus(application.status);
-    }
-  }, [application, status]);
+    if (!application) return;
+    if (!status) setStatus(application.status);
+    setAdminNotes(application.adminNotes || '');
+    setCustomerForm({
+      applicantName: application.applicantName || '',
+      phone: application.phone || '',
+      email: application.email || '',
+      dob: application.dob || '',
+      address: application.address || '',
+      licenseInfo: application.licenseInfo || '',
+      insuranceStatus: application.insuranceStatus || '',
+      hasBlackNumber: application.hasBlackNumber == null ? '' : String(application.hasBlackNumber),
+      hasDeliveryExperience: application.hasDeliveryExperience == null ? '' : String(application.hasDeliveryExperience),
+    });
+  }, [application]);
 
   if (isLoading || !application) {
     return (
-      <div className="flex-1 flex items-center justify-center min-h-[50vh]">
+      <div className="flex items-center justify-center min-h-[50vh]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   const vehicles = vehiclesData || [];
+  const proposedVehicles: any[] = (application as any).proposedVehicles || [];
 
-  const handleUpdateStatus = async () => {
-    if (status === application.status) return;
+  // ── actions ─────────────────────────────────────────────────────────────────
+  const saveStatus = async () => {
     try {
-      await updateApp.mutateAsync({ id, data: { status: status as any } });
-      toast({ title: 'ステータスを更新しました' });
+      await updateApp.mutateAsync({ id, data: { status: status as any, adminNotes } });
+      toast({ title: 'ステータス・メモを保存しました' });
       refetch();
     } catch {
       toast({ variant: 'destructive', title: 'エラー', description: '更新に失敗しました' });
     }
   };
 
+  const saveCustomer = async () => {
+    try {
+      await updateApp.mutateAsync({
+        id,
+        data: {
+          ...customerForm,
+          hasBlackNumber: customerForm.hasBlackNumber === 'true' ? true : customerForm.hasBlackNumber === 'false' ? false : null,
+          hasDeliveryExperience: customerForm.hasDeliveryExperience === 'true' ? true : customerForm.hasDeliveryExperience === 'false' ? false : null,
+        } as any,
+      });
+      toast({ title: '顧客情報を保存しました' });
+      refetch();
+    } catch {
+      toast({ variant: 'destructive', title: 'エラー', description: '保存に失敗しました' });
+    }
+  };
+
   const toggleVehicle = (vid: number) => {
-    setSelectedVehicles(prev => 
-      prev.includes(vid) 
-        ? prev.filter(id => id !== vid) 
-        : prev.length >= 3 ? prev : [...prev, vid]
+    setSelectedVehicles(prev =>
+      prev.includes(vid) ? prev.filter(x => x !== vid) : prev.length >= 3 ? prev : [...prev, vid],
     );
   };
 
   const handleSendProposal = async () => {
     if (selectedVehicles.length === 0) return;
     try {
-      await sendProposal.mutateAsync({ id, data: { vehicleIds: selectedVehicles } });
+      await sendProposal.mutateAsync({ id, data: { vehicleIds: selectedVehicles, message: proposalMessage } });
       toast({ title: '提案を送信しました' });
       setSelectedVehicles([]);
+      setProposalMessage('');
       setStatus('提案送信済');
       refetch();
     } catch {
@@ -76,144 +175,644 @@ export default function AdminApplicationDetail() {
     }
   };
 
+  const handlePrint = () => window.print();
+
+  // ── render tabs ──────────────────────────────────────────────────────────────
+  const app = application as any;
+
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => setLocation('/admin/applications')}
-            className="p-2 hover:bg-muted rounded-full transition-colors"
-          >
+    <div className="space-y-0 max-w-6xl mx-auto">
+      {/* ── ヘッダ ── */}
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setLocation('/admin/applications')} className="p-2 hover:bg-muted rounded-full transition-colors">
             <ChevronLeft className="h-5 w-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">相談詳細 #{application.id}</h1>
-            <p className="text-sm text-muted-foreground mt-1">作成日: {format(new Date(application.createdAt), 'yyyy/MM/dd HH:mm')}</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold">相談詳細 #{app.id}</h1>
+              <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border ${STATUS_STYLES[app.status] || 'bg-gray-100 text-gray-700'}`}>
+                {app.status}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {app.applicantName || '匿名'} · 登録: {format(new Date(app.createdAt), 'yyyy/MM/dd HH:mm')}
+            </p>
           </div>
         </div>
-        
-        <div className="flex items-center gap-2">
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="px-3 py-2 bg-background border border-border rounded-lg text-sm outline-none"
-          >
-            <option value="相談中">相談中</option>
-            <option value="確認中">確認中</option>
-            <option value="提案送信済">提案送信済</option>
-            <option value="申込受付">申込受付</option>
-            <option value="審査中">審査中</option>
-            <option value="契約手続き">契約手続き</option>
-            <option value="利用中">利用中</option>
-            <option value="キャンセル">キャンセル</option>
-          </select>
-          <button
-            onClick={handleUpdateStatus}
-            disabled={updateApp.isPending || status === application.status}
-            className="px-4 py-2 bg-foreground text-background text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-50 flex items-center"
-          >
-            {updateApp.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
-            保存
-          </button>
-        </div>
+        <button onClick={handlePrint} className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-sm hover:bg-muted transition-colors print:hidden">
+          <Printer className="h-4 w-4" />印刷
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 space-y-6">
-          <Card className="shadow-sm border-border">
-            <CardHeader>
-              <CardTitle className="text-base font-semibold">ヒアリング内容</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 text-sm">
-                <div>
-                  <dt className="text-muted-foreground mb-1">希望エリア</dt>
-                  <dd className="font-medium">{application.area || '未定'}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground mb-1">予算（月額）</dt>
-                  <dd className="font-medium">{application.monthlyBudget ? `¥${application.monthlyBudget.toLocaleString()}` : '未定'}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground mb-1">利用開始希望</dt>
-                  <dd className="font-medium">{application.startDate ? format(new Date(application.startDate), 'yyyy/MM/dd') : '未定'}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground mb-1">利用期間</dt>
-                  <dd className="font-medium">{application.durationMonths ? `${application.durationMonths}ヶ月` : '未定'}</dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-muted-foreground mb-1">利用目的・備考</dt>
-                  <dd className="font-medium bg-muted/50 p-3 rounded-md">{application.purpose || '-'}</dd>
-                </div>
-              </dl>
-            </CardContent>
-          </Card>
+      {/* ── タブナビ ── */}
+      <div className="flex border-b border-border mb-6 overflow-x-auto print:hidden">
+        {TABS.map(t => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+                tab === t.id
+                  ? 'border-foreground text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Icon className="h-4 w-4" />{t.label}
+            </button>
+          );
+        })}
+      </div>
 
-          <Card className="shadow-sm border-border">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-base font-semibold">車両提案の作成</CardTitle>
-              <span className="text-xs text-muted-foreground">最大3台まで選択可 ({selectedVehicles.length}/3)</span>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3 mb-6 max-h-64 overflow-y-auto pr-2">
-                {vehicles.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">募集中ステータスの車両がありません。</p>
-                ) : (
-                  vehicles.map(v => {
-                    const isSelected = selectedVehicles.includes(v.id);
-                    return (
-                      <div 
-                        key={v.id} 
-                        onClick={() => toggleVehicle(v.id)}
-                        className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${isSelected ? 'border-foreground bg-foreground/5' : 'border-border hover:bg-muted'}`}
-                      >
-                        <div>
-                          <p className="font-medium text-sm">{v.maker} {v.model} ({v.year || '-'}年)</p>
-                          <p className="text-xs text-muted-foreground mt-1">{v.prefecture} / 月額 ¥{v.userPrice.toLocaleString()}</p>
-                        </div>
-                        <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${isSelected ? 'border-foreground bg-foreground text-background' : 'border-border'}`}>
-                          {isSelected && <Check className="h-3 w-3" />}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+      {/* ═══════════════════════════════════════════════════════════════════════
+          TAB: 概要
+         ═══════════════════════════════════════════════════════════════════════ */}
+      {tab === 'overview' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="lg:col-span-2 space-y-5">
+            {/* ステータス管理 */}
+            <Section title="ステータス管理" action={
               <button
-                onClick={handleSendProposal}
-                disabled={selectedVehicles.length === 0 || sendProposal.isPending}
-                className="w-full py-2 bg-foreground text-background text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-50 flex items-center justify-center"
+                onClick={saveStatus}
+                disabled={updateApp.isPending}
+                className="flex items-center gap-1 px-3 py-1.5 bg-foreground text-background text-xs font-medium rounded-lg hover:opacity-90 disabled:opacity-50"
               >
-                {sendProposal.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-                提案を送信する
+                {updateApp.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                保存
               </button>
-            </CardContent>
-          </Card>
-        </div>
+            }>
+              <select
+                value={status}
+                onChange={e => setStatus(e.target.value)}
+                className="w-full sm:w-64 px-3 py-2 bg-background border border-border rounded-lg text-sm outline-none focus:border-foreground/50"
+              >
+                {ALL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </Section>
 
-        <div className="md:col-span-1 space-y-6">
-          <Card className="shadow-sm border-border flex flex-col h-[600px]">
-            <CardHeader className="pb-3 border-b border-border/50 shrink-0">
-              <CardTitle className="text-base font-semibold">チャット履歴</CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/30">
-              {messages?.map(msg => (
+            {/* ヒアリング内容 */}
+            <Section title="ヒアリング内容">
+              <dl className="grid grid-cols-2 gap-4">
+                <DL label="希望エリア" value={app.area} />
+                <DL label="月額予算" value={app.monthlyBudget ? yen(app.monthlyBudget) : null} />
+                <DL label="利用開始希望日" value={app.startDate} />
+                <DL label="希望利用期間" value={app.durationMonths ? `${app.durationMonths}ヶ月` : null} />
+                <DL label="利用目的" value={app.purpose} span2 />
+                <DL label="希望車種" value={app.vehiclePreference} />
+                <DL label="保険加入状況" value={app.insuranceStatus} />
+                <DL label="黒ナンバー" value={app.hasBlackNumber == null ? null : app.hasBlackNumber ? '取得済み' : '未取得'} />
+                <DL label="配送経験" value={app.hasDeliveryExperience == null ? null : app.hasDeliveryExperience ? 'あり' : 'なし'} />
+              </dl>
+            </Section>
+
+            {/* 管理メモ */}
+            <Section title="管理メモ（内部用）">
+              <textarea
+                value={adminNotes}
+                onChange={e => setAdminNotes(e.target.value)}
+                placeholder="管理者のメモ（ユーザーには表示されません）"
+                rows={5}
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm outline-none focus:border-foreground/50 resize-none"
+              />
+              <button
+                onClick={saveStatus}
+                disabled={updateApp.isPending}
+                className="mt-3 flex items-center gap-1 px-3 py-1.5 bg-foreground text-background text-xs font-medium rounded-lg hover:opacity-90 disabled:opacity-50"
+              >
+                {updateApp.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                メモを保存
+              </button>
+            </Section>
+          </div>
+
+          {/* 右カラム: 最初のメッセージ */}
+          <div className="space-y-5">
+            <Section title="最初のメッセージ">
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                {app.requestText || 'なし'}
+              </p>
+            </Section>
+            <Section title="顧客サマリ">
+              <div className="space-y-2.5 text-sm">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span>{app.applicantName || '未入力'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span>{app.phone || '未入力'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="break-all">{app.email || '未入力'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span>{app.address || '未入力'}</span>
+                </div>
+              </div>
+            </Section>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          TAB: 顧客情報
+         ═══════════════════════════════════════════════════════════════════════ */}
+      {tab === 'customer' && (
+        <div className="space-y-5">
+          <Section title="基本情報" action={
+            <button onClick={saveCustomer} disabled={updateApp.isPending}
+              className="flex items-center gap-1 px-3 py-1.5 bg-foreground text-background text-xs font-medium rounded-lg hover:opacity-90 disabled:opacity-50">
+              {updateApp.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+              保存
+            </button>
+          }>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {[
+                { label: '氏名', key: 'applicantName', placeholder: '山田 太郎' },
+                { label: '電話番号', key: 'phone', placeholder: '090-1234-5678' },
+                { label: 'メールアドレス', key: 'email', placeholder: 'yamada@example.com' },
+                { label: '生年月日', key: 'dob', placeholder: '1990-01-15' },
+              ].map(f => (
+                <div key={f.key}>
+                  <label className="text-xs text-muted-foreground block mb-1.5">{f.label}</label>
+                  <input
+                    value={(customerForm as any)[f.key]}
+                    onChange={e => setCustomerForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                    placeholder={f.placeholder}
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm outline-none focus:border-foreground/50"
+                  />
+                </div>
+              ))}
+              <div className="sm:col-span-2">
+                <label className="text-xs text-muted-foreground block mb-1.5">住所</label>
+                <input
+                  value={customerForm.address}
+                  onChange={e => setCustomerForm(prev => ({ ...prev, address: e.target.value }))}
+                  placeholder="神奈川県横浜市中区○○1-2-3"
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm outline-none focus:border-foreground/50"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="text-xs text-muted-foreground block mb-1.5">運転免許証情報</label>
+                <input
+                  value={customerForm.licenseInfo}
+                  onChange={e => setCustomerForm(prev => ({ ...prev, licenseInfo: e.target.value }))}
+                  placeholder="普通免許 / 有効期限: 2028-01-15 / 番号: 123456789012"
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm outline-none focus:border-foreground/50"
+                />
+              </div>
+            </div>
+          </Section>
+
+          <Section title="利用条件・資格情報">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1.5">保険加入状況</label>
+                <select
+                  value={customerForm.insuranceStatus}
+                  onChange={e => setCustomerForm(prev => ({ ...prev, insuranceStatus: e.target.value }))}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm outline-none focus:border-foreground/50"
+                >
+                  <option value="">未確認</option>
+                  <option value="加入済み">加入済み</option>
+                  <option value="未加入（これから加入）">未加入（これから加入）</option>
+                  <option value="わからない">わからない</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1.5">黒ナンバー取得状況</label>
+                <select
+                  value={customerForm.hasBlackNumber}
+                  onChange={e => setCustomerForm(prev => ({ ...prev, hasBlackNumber: e.target.value }))}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm outline-none focus:border-foreground/50"
+                >
+                  <option value="">未確認</option>
+                  <option value="true">取得済み</option>
+                  <option value="false">未取得</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1.5">配送経験</label>
+                <select
+                  value={customerForm.hasDeliveryExperience}
+                  onChange={e => setCustomerForm(prev => ({ ...prev, hasDeliveryExperience: e.target.value }))}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm outline-none focus:border-foreground/50"
+                >
+                  <option value="">未確認</option>
+                  <option value="true">あり</option>
+                  <option value="false">なし（初めて）</option>
+                </select>
+              </div>
+            </div>
+            <button onClick={saveCustomer} disabled={updateApp.isPending}
+              className="mt-4 flex items-center gap-1 px-3 py-1.5 bg-foreground text-background text-xs font-medium rounded-lg hover:opacity-90 disabled:opacity-50">
+              {updateApp.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+              保存
+            </button>
+          </Section>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          TAB: 車両情報
+         ═══════════════════════════════════════════════════════════════════════ */}
+      {tab === 'vehicle' && (
+        <div className="space-y-5">
+          {/* 提案済み車両 */}
+          <Section title={`提案済み車両（${proposedVehicles.length}台）`}>
+            {proposedVehicles.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">まだ提案した車両はありません。</p>
+            ) : (
+              <div className="space-y-4">
+                {proposedVehicles.map((v: any) => (
+                  <div key={v.id} className="border border-border rounded-xl p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="font-semibold text-sm">{v.maker} {v.model}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{v.year || '-'}年式 / {v.prefecture}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold">{yen(v.userPrice)}<span className="text-xs font-normal text-muted-foreground">/月</span></p>
+                        <span className={`text-xs px-2 py-0.5 rounded-full border ${
+                          v.status === '募集中' ? 'bg-green-50 text-green-700 border-green-200' :
+                          v.status === '貸出中' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                          'bg-gray-50 text-gray-600 border-gray-200'
+                        }`}>{v.status}</span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mb-3">
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <Truck className="h-3.5 w-3.5" />
+                        走行{v.mileage ? `${v.mileage.toLocaleString()}km` : '-'}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <Wrench className="h-3.5 w-3.5" />
+                        車検{v.inspectionExpiry || '-'}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <Calendar className="h-3.5 w-3.5" />
+                        最低{v.minPeriodMonths || 1}ヶ月〜
+                      </div>
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <Camera className="h-3.5 w-3.5" />
+                        ETC:{v.hasEtc ? '✓' : '-'} / DR:{v.hasDashcam ? '✓' : '-'}
+                      </div>
+                    </div>
+                    {/* 料金内訳 */}
+                    <div className="bg-muted/40 rounded-lg p-3 text-xs space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">レンタル会社受取</span>
+                        <span>{yen(v.monthlyPrice)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">SIN JAPAN手数料</span>
+                        <span>{yen(v.sinJapanFee)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">保険料</span>
+                        <span>{yen(v.insuranceFee)}</span>
+                      </div>
+                      <div className="flex justify-between font-semibold border-t border-border pt-1 mt-1">
+                        <span>ユーザー月額</span>
+                        <span>{yen(v.userPrice)}</span>
+                      </div>
+                    </div>
+                    {/* レンタル会社 */}
+                    {v.rentalCompany && (
+                      <div className="mt-3 pt-3 border-t border-border text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground">レンタル会社：</span>
+                        {v.rentalCompany.name}
+                        {v.rentalCompany.phone && ` / TEL: ${v.rentalCompany.phone}`}
+                        {v.locationDetail && ` / ${v.locationDetail}`}
+                      </div>
+                    )}
+                    {v.notes && (
+                      <p className="mt-2 text-xs text-muted-foreground bg-muted/50 rounded p-2">{v.notes}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+
+          {/* 新規提案 */}
+          <Section title="車両を新たに提案" action={
+            <span className="text-xs text-muted-foreground">最大3台 ({selectedVehicles.length}/3)</span>
+          }>
+            <div className="space-y-2 max-h-72 overflow-y-auto pr-1 mb-4">
+              {vehicles.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">募集中の車両がありません。</p>
+              ) : (
+                vehicles.map(v => {
+                  const isSelected = selectedVehicles.includes(v.id);
+                  const price = Number(v.monthlyPrice) + Number((v as any).sinJapanFee ?? 0) + Number((v as any).insuranceFee ?? 0);
+                  return (
+                    <div
+                      key={v.id}
+                      onClick={() => toggleVehicle(v.id)}
+                      className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                        isSelected ? 'border-foreground bg-foreground/5' : 'border-border hover:bg-muted'
+                      }`}
+                    >
+                      <div>
+                        <p className="font-medium text-sm">{v.maker} {v.model} ({v.year || '-'}年)</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{v.prefecture} / {yen(price)}/月</p>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                        isSelected ? 'border-foreground bg-foreground text-background' : 'border-muted-foreground'
+                      }`}>
+                        {isSelected && <Check className="h-3 w-3" />}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            <div className="mb-3">
+              <label className="text-xs text-muted-foreground block mb-1.5">提案メッセージ（任意）</label>
+              <textarea
+                value={proposalMessage}
+                onChange={e => setProposalMessage(e.target.value)}
+                placeholder="ご希望の条件に合う車両をご提案します..."
+                rows={3}
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm outline-none focus:border-foreground/50 resize-none"
+              />
+            </div>
+            <button
+              onClick={handleSendProposal}
+              disabled={selectedVehicles.length === 0 || sendProposal.isPending}
+              className="w-full py-2.5 bg-foreground text-background text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {sendProposal.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              提案を送信する
+            </button>
+          </Section>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          TAB: チャット
+         ═══════════════════════════════════════════════════════════════════════ */}
+      {tab === 'chat' && (
+        <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden flex flex-col" style={{ height: '70vh' }}>
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-muted/30 shrink-0">
+            <h3 className="text-sm font-semibold">チャット履歴</h3>
+            <span className="text-xs text-muted-foreground">{messages?.length || 0}件</span>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/20">
+            {!messages?.length ? (
+              <p className="text-sm text-muted-foreground text-center py-8">メッセージはありません。</p>
+            ) : (
+              messages.map(msg => (
                 <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                   <span className="text-[10px] text-muted-foreground mb-1 mx-1">
-                    {msg.role === 'user' ? 'ユーザー' : 'AI'}
+                    {msg.role === 'user' ? 'ユーザー' : 'AI'} · {format(new Date(msg.createdAt), 'HH:mm')}
                   </span>
-                  <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
-                    msg.role === 'user' ? 'bg-foreground text-background' : 'bg-background border border-border text-foreground'
+                  <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap leading-relaxed ${
+                    msg.role === 'user'
+                      ? 'bg-foreground text-background rounded-br-sm'
+                      : 'bg-background border border-border text-foreground rounded-bl-sm'
                   }`}>
                     {msg.content}
                   </div>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
+              ))
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          TAB: 指示書
+         ═══════════════════════════════════════════════════════════════════════ */}
+      {tab === 'instruction' && (
+        <div className="space-y-4">
+          <div className="flex justify-end print:hidden">
+            <button onClick={handlePrint} className="flex items-center gap-1.5 px-4 py-2 bg-foreground text-background text-sm font-medium rounded-lg hover:opacity-90">
+              <Printer className="h-4 w-4" />印刷する
+            </button>
+          </div>
+          <div ref={printRef} className="bg-white border border-border rounded-xl p-8 shadow-sm print:shadow-none print:border-0">
+            {/* ヘッダ */}
+            <div className="border-b-2 border-black pb-4 mb-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-2xl font-black tracking-tight">車両引渡指示書</h2>
+                  <p className="text-sm text-gray-500 mt-1">Chat VAN / SIN JAPAN株式会社</p>
+                </div>
+                <div className="text-right text-sm">
+                  <p className="font-bold">相談 #{app.id}</p>
+                  <p className="text-gray-500">{format(new Date(app.createdAt), 'yyyy年MM月dd日')}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* 顧客情報 */}
+            <div className="mb-6">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">■ 顧客情報</h3>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                <div><span className="text-gray-500 w-28 inline-block">氏名</span><span className="font-semibold">{app.applicantName || '未入力'}</span></div>
+                <div><span className="text-gray-500 w-28 inline-block">電話番号</span><span>{app.phone || '-'}</span></div>
+                <div><span className="text-gray-500 w-28 inline-block">メール</span><span>{app.email || '-'}</span></div>
+                <div><span className="text-gray-500 w-28 inline-block">住所</span><span>{app.address || '-'}</span></div>
+                <div><span className="text-gray-500 w-28 inline-block">免許証</span><span>{app.licenseInfo || '-'}</span></div>
+                <div><span className="text-gray-500 w-28 inline-block">黒ナンバー</span><span>{app.hasBlackNumber == null ? '-' : app.hasBlackNumber ? '取得済み' : '未取得'}</span></div>
+                <div><span className="text-gray-500 w-28 inline-block">保険</span><span>{app.insuranceStatus || '-'}</span></div>
+              </div>
+            </div>
+
+            {/* 車両情報 */}
+            <div className="mb-6">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">■ 引渡し車両</h3>
+              {proposedVehicles.length === 0 ? (
+                <p className="text-sm text-gray-400 italic">提案車両なし</p>
+              ) : proposedVehicles.map((v: any, i: number) => (
+                <div key={v.id} className="border border-gray-200 rounded-lg p-4 mb-3">
+                  <p className="font-bold">{i + 1}. {v.maker} {v.model} {v.year ? `(${v.year}年)` : ''}</p>
+                  <div className="grid grid-cols-2 gap-x-8 gap-y-1 mt-2 text-sm">
+                    <div><span className="text-gray-500 w-24 inline-block">所在エリア</span>{v.prefecture} {v.locationDetail || ''}</div>
+                    <div><span className="text-gray-500 w-24 inline-block">月額</span>{yen(v.userPrice)}/月</div>
+                    <div><span className="text-gray-500 w-24 inline-block">走行距離</span>{v.mileage ? `${v.mileage.toLocaleString()}km` : '-'}</div>
+                    <div><span className="text-gray-500 w-24 inline-block">車検期限</span>{v.inspectionExpiry || '-'}</div>
+                    <div><span className="text-gray-500 w-24 inline-block">ETC</span>{v.hasEtc ? 'あり' : 'なし'}</div>
+                    <div><span className="text-gray-500 w-24 inline-block">ドラレコ</span>{v.hasDashcam ? 'あり' : 'なし'}</div>
+                    {v.rentalCompany && <div className="col-span-2"><span className="text-gray-500 w-24 inline-block">レンタル会社</span>{v.rentalCompany.name} {v.rentalCompany.phone ? `（${v.rentalCompany.phone}）` : ''}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* レンタル条件 */}
+            <div className="mb-6">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">■ レンタル条件</h3>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                <div><span className="text-gray-500 w-28 inline-block">利用開始希望</span>{app.startDate || '-'}</div>
+                <div><span className="text-gray-500 w-28 inline-block">利用期間</span>{app.durationMonths ? `${app.durationMonths}ヶ月` : '-'}</div>
+                <div><span className="text-gray-500 w-28 inline-block">月額予算</span>{app.monthlyBudget ? yen(app.monthlyBudget) : '-'}</div>
+                <div><span className="text-gray-500 w-28 inline-block">利用目的</span>{app.purpose || '-'}</div>
+              </div>
+            </div>
+
+            {/* 管理メモ */}
+            {app.adminNotes && (
+              <div className="mb-6">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">■ 管理者メモ</h3>
+                <p className="text-sm whitespace-pre-wrap bg-gray-50 p-3 rounded-lg">{app.adminNotes}</p>
+              </div>
+            )}
+
+            {/* 署名欄 */}
+            <div className="border-t border-gray-200 pt-6 mt-6">
+              <div className="grid grid-cols-3 gap-8 text-sm">
+                <div>
+                  <p className="text-gray-500 mb-6">担当者確認</p>
+                  <div className="border-b border-black" />
+                </div>
+                <div>
+                  <p className="text-gray-500 mb-6">引渡し確認</p>
+                  <div className="border-b border-black" />
+                </div>
+                <div>
+                  <p className="text-gray-500 mb-6">顧客署名</p>
+                  <div className="border-b border-black" />
+                </div>
+              </div>
+              <p className="text-center text-xs text-gray-400 mt-8">Chat VAN / SIN JAPAN株式会社 · 本書は車両引渡し時にご利用ください</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          TAB: マスターカード
+         ═══════════════════════════════════════════════════════════════════════ */}
+      {tab === 'master' && (
+        <div className="space-y-4">
+          <div className="flex justify-end print:hidden">
+            <button onClick={handlePrint} className="flex items-center gap-1.5 px-4 py-2 bg-foreground text-background text-sm font-medium rounded-lg hover:opacity-90">
+              <Printer className="h-4 w-4" />印刷する
+            </button>
+          </div>
+          <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden print:shadow-none print:border-0">
+            {/* カードヘッダ */}
+            <div className="bg-black text-white px-6 py-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs tracking-widest text-gray-400 uppercase mb-1">Chat VAN / SIN JAPAN</p>
+                  <h2 className="text-xl font-black">マスターカード</h2>
+                </div>
+                <div className="text-right">
+                  <p className="text-3xl font-black">#{app.id}</p>
+                  <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold mt-1 inline-block ${
+                    STATUS_STYLES[app.status]?.replace('border-', '').replace('-50', '-900').replace('-200', '') || 'bg-gray-700 text-white'
+                  }`} style={{ background: 'rgba(255,255,255,0.15)', color: 'white' }}>
+                    {app.status}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* 顧客 */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <User className="h-4 w-4" />
+                  <h3 className="text-sm font-bold">顧客情報</h3>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {[
+                    { icon: User,    label: '氏名',   value: app.applicantName },
+                    { icon: Phone,   label: 'TEL',    value: app.phone },
+                    { icon: Mail,    label: 'Email',  value: app.email },
+                    { icon: MapPin,  label: '住所',   value: app.address },
+                    { icon: Shield,  label: '保険',   value: app.insuranceStatus },
+                    { icon: BadgeCheck, label: '黒ナンバー', value: app.hasBlackNumber == null ? null : app.hasBlackNumber ? '取得済み' : '未取得' },
+                  ].map(item => {
+                    const Icon = item.icon;
+                    return (
+                      <div key={item.label} className="bg-muted/40 rounded-lg p-3">
+                        <p className="flex items-center gap-1 text-xs text-muted-foreground mb-1"><Icon className="h-3 w-3" />{item.label}</p>
+                        <p className="text-sm font-medium truncate">{item.value || <span className="text-muted-foreground">-</span>}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 希望条件 */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Package className="h-4 w-4" />
+                  <h3 className="text-sm font-bold">希望条件</h3>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { icon: MapPin,    label: 'エリア',  value: app.area },
+                    { icon: Banknote,  label: '月額予算', value: app.monthlyBudget ? yen(app.monthlyBudget) : null },
+                    { icon: Calendar,  label: '開始日',   value: app.startDate },
+                    { icon: Truck,     label: '期間',    value: app.durationMonths ? `${app.durationMonths}ヶ月` : null },
+                  ].map(item => {
+                    const Icon = item.icon;
+                    return (
+                      <div key={item.label} className="bg-muted/40 rounded-lg p-3">
+                        <p className="flex items-center gap-1 text-xs text-muted-foreground mb-1"><Icon className="h-3 w-3" />{item.label}</p>
+                        <p className="text-sm font-semibold">{item.value || <span className="text-muted-foreground font-normal">-</span>}</p>
+                      </div>
+                    );
+                  })}
+                  <div className="col-span-2 sm:col-span-4 bg-muted/40 rounded-lg p-3">
+                    <p className="text-xs text-muted-foreground mb-1">利用目的</p>
+                    <p className="text-sm font-medium">{app.purpose || <span className="text-muted-foreground font-normal">-</span>}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 提案車両 */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Car className="h-4 w-4" />
+                  <h3 className="text-sm font-bold">提案車両</h3>
+                </div>
+                {proposedVehicles.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-2">提案車両なし</p>
+                ) : (
+                  <div className="space-y-2">
+                    {proposedVehicles.map((v: any, i: number) => (
+                      <div key={v.id} className="flex items-center justify-between bg-muted/40 rounded-lg px-4 py-3">
+                        <div>
+                          <p className="text-sm font-semibold">{i + 1}. {v.maker} {v.model} {v.year ? `(${v.year})` : ''}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {v.prefecture} / ETC:{v.hasEtc ? '✓' : '-'} / DR:{v.hasDashcam ? '✓' : '-'}
+                            {v.rentalCompany ? ` / ${v.rentalCompany.name}` : ''}
+                          </p>
+                        </div>
+                        <p className="text-base font-bold shrink-0">{yen(v.userPrice)}<span className="text-xs font-normal text-muted-foreground">/月</span></p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 管理メモ */}
+              {app.adminNotes && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <p className="text-xs font-bold text-amber-700 mb-2">管理メモ</p>
+                  <p className="text-sm whitespace-pre-wrap text-amber-900">{app.adminNotes}</p>
+                </div>
+              )}
+
+              {/* フッタ */}
+              <div className="border-t border-border pt-4 flex justify-between text-xs text-muted-foreground">
+                <span>相談 #{app.id} · 登録: {format(new Date(app.createdAt), 'yyyy/MM/dd')}</span>
+                <span>Chat VAN / SIN JAPAN株式会社</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
