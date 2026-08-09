@@ -6,9 +6,11 @@ import {
   useDeleteRentalCompany,
   RentalCompany
 } from '@workspace/api-client-react';
-import { Loader2, Plus, Edit, Trash2, Building2, Save } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Building2, Save, Mail, Key } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+const API = (path: string) => `${import.meta.env.BASE_URL}api${path}`;
+const token = () => localStorage.getItem('sinjapan_auth_token') ?? '';
 
 export default function AdminRentalCompanies() {
   const { data: companies, isLoading, refetch } = useListRentalCompanies();
@@ -24,6 +26,31 @@ export default function AdminRentalCompanies() {
     name: '', contactPerson: '', phone: '', email: '',
     address: '', serviceArea: '', notes: ''
   });
+
+  // 招待
+  const [inviteCompany, setInviteCompany] = useState<RentalCompany | null>(null);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviting, setInviting] = useState(false);
+  const [inviteResult, setInviteResult] = useState<{ email: string; tempPassword?: string } | null>(null);
+
+  const handleInvite = async () => {
+    if (!inviteCompany) return;
+    setInviting(true);
+    try {
+      const r = await fetch(API(`/van/rental-companies/${inviteCompany.id}/invite`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+        body: JSON.stringify({ email: inviteEmail || inviteCompany.email }),
+      });
+      const j = await r.json();
+      if (r.ok) {
+        setInviteResult(j);
+        toast({ title: j.message });
+      } else {
+        toast({ variant: 'destructive', title: j.error });
+      }
+    } finally { setInviting(false); }
+  };
 
   if (isLoading) {
     return (
@@ -114,6 +141,13 @@ export default function AdminRentalCompanies() {
                 </td>
                 <td className="px-6 py-4">{c.serviceArea || '-'}</td>
                 <td className="px-6 py-4 text-right">
+                  <button
+                    onClick={() => { setInviteCompany(c); setInviteEmail(c.email ?? ''); setInviteResult(null); }}
+                    title="協力会社アカウントを招待"
+                    className="p-1.5 text-muted-foreground hover:text-primary mr-1"
+                  >
+                    <Key className="h-4 w-4" />
+                  </button>
                   <button onClick={() => handleOpenEdit(c)} className="p-1.5 text-muted-foreground hover:text-foreground">
                     <Edit className="h-4 w-4" />
                   </button>
@@ -209,6 +243,68 @@ export default function AdminRentalCompanies() {
               {(createMut.isPending || updateMut.isPending) ? <Loader2 className="h-4 w-4 mr-2 animate-spin"/> : <Save className="h-4 w-4 mr-2"/>}
               保存する
             </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 招待ダイアログ */}
+      <Dialog open={!!inviteCompany} onOpenChange={open => { if (!open) { setInviteCompany(null); setInviteResult(null); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="h-4 w-4" />
+              協力会社アカウント招待
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">{inviteCompany?.name}</span> にポータルアクセス用アカウントを発行します。
+            </p>
+
+            {!inviteResult ? (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">メールアドレス</label>
+                  <input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={e => setInviteEmail(e.target.value)}
+                    placeholder={inviteCompany?.email ?? 'example@company.jp'}
+                    className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:border-foreground/50"
+                  />
+                  <p className="text-xs text-muted-foreground">空欄の場合は会社登録メールアドレスを使用します</p>
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button onClick={() => setInviteCompany(null)} className="px-4 py-2 border rounded-md text-sm hover:bg-muted">キャンセル</button>
+                  <button onClick={handleInvite} disabled={inviting}
+                    className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50">
+                    {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                    アカウント発行
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-3">
+                <div className="p-4 bg-green-50 border border-green-200 rounded-xl space-y-2">
+                  <p className="text-sm font-medium text-green-700">✅ アカウントを発行しました</p>
+                  <div className="text-sm text-green-700 space-y-1">
+                    <p>メール: <span className="font-mono font-medium">{inviteResult.email}</span></p>
+                    {inviteResult.tempPassword && (
+                      <p>仮パスワード: <span className="font-mono font-medium bg-green-100 px-1 rounded">{inviteResult.tempPassword}</span></p>
+                    )}
+                  </div>
+                </div>
+                {inviteResult.tempPassword && (
+                  <p className="text-xs text-muted-foreground">上記の仮パスワードを会社にお伝えください。ログイン後は設定画面から変更できます。</p>
+                )}
+                <div className="flex justify-end">
+                  <button onClick={() => { setInviteCompany(null); setInviteResult(null); }}
+                    className="px-4 py-2 bg-foreground text-background rounded-md text-sm font-medium hover:opacity-90">
+                    閉じる
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

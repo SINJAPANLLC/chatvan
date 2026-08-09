@@ -1016,6 +1016,48 @@ router.get("/van/recovery-cases/:id/gps-report", requireAuth, requireAdmin, asyn
   }
 });
 
+// ── 協力会社アカウント招待 ─────────────────────────────────────────────────
+router.post("/van/rental-companies/:id/invite", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const rcId = parseInt(String(req.params.id));
+    const [company] = await db.select().from(rentalCompaniesTable).where(eq(rentalCompaniesTable.id, rcId)).limit(1);
+    if (!company) return res.status(404).json({ error: "Not found" });
+
+    const inviteEmail = req.body.email || company.email;
+    if (!inviteEmail) return res.status(400).json({ error: "メールアドレスを指定してください" });
+
+    // 既存ユーザーに権限付与
+    const [existing] = await db.select({ id: usersTable.id }).from(usersTable)
+      .where(eq(usersTable.email, inviteEmail)).limit(1);
+    if (existing) {
+      await db.execute(sql`UPDATE users SET role = 'rental_company', rental_company_id = ${rcId} WHERE id = ${existing.id}`);
+      return res.json({ message: "既存アカウントに協力会社権限を付与しました", userId: existing.id, email: inviteEmail });
+    }
+
+    // 新規ユーザー作成
+    const bcrypt = await import("bcryptjs");
+    const chars = "abcdefghijkmnpqrstuvwxyz23456789";
+    const tempPassword = Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+    const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+    const raw = await db.execute(sql`
+      INSERT INTO users (email, password_hash, name, role, rental_company_id)
+      VALUES (${inviteEmail}, ${passwordHash}, ${req.body.name ?? company.name}, 'rental_company', ${rcId})
+      RETURNING id, email, name
+    `);
+    const newUser = (raw as any).rows?.[0] ?? (raw as any)[0];
+    return res.status(201).json({
+      message: "アカウントを作成しました",
+      userId: newUser?.id,
+      email: inviteEmail,
+      tempPassword,
+    });
+  } catch (err) {
+    console.error("invite error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
 // ── Rental Companies ───────────────────────────────────────────────────────
 router.get("/van/rental-companies", requireAuth, async (req: Request, res: Response) => {
   try {

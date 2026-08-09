@@ -3,7 +3,7 @@ import { Link, useLocation } from 'wouter';
 import { useGetMe, useLogout } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  Plus, LayoutDashboard, LogOut, Settings, Menu, X, MessageSquare, PanelLeftClose, PanelLeftOpen, User as UserIcon
+  Plus, LayoutDashboard, LogOut, Settings, Menu, X, MessageSquare, PanelLeftClose, PanelLeftOpen, User as UserIcon, Building2
 } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 
@@ -89,6 +89,14 @@ export function UserLayout({ children }: { children: React.ReactNode }) {
                 設定
               </button>
             </Link>
+            {user?.role === 'rental_company' && (
+              <Link href="/company" onClick={onClose}>
+                <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+                  <Building2 className="h-4 w-4 shrink-0" />
+                  協力会社
+                </button>
+              </Link>
+            )}
             {user?.role === 'admin' && (
               <Link href="/admin" onClick={onClose}>
                 <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">

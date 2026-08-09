@@ -40,6 +40,18 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
   });
 }
 
+export function requireRentalCompany(req: Request, res: Response, next: NextFunction): void {
+  resolveUser(req).then(ok => {
+    if (!ok) { res.status(401).json({ error: "認証が必要です" }); return; }
+    if (req.session.userRole !== "rental_company" && req.session.userRole !== "admin") {
+      res.status(403).json({ error: "協力会社権限が必要です" }); return;
+    }
+    next();
+  }).catch(() => {
+    res.status(401).json({ error: "認証が必要です" });
+  });
+}
+
 // Augment session type
 declare module "express-session" {
   interface SessionData {

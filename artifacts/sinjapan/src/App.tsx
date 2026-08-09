@@ -10,6 +10,7 @@ setAuthTokenGetter(() => localStorage.getItem('sinjapan_auth_token'));
 
 import { UserLayout } from '@/components/layout/UserLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
+import { CompanyLayout } from '@/components/layout/CompanyLayout';
 
 // User Pages
 const Home          = lazy(() => import('@/pages/home'));
@@ -32,6 +33,14 @@ const AdminContracts        = lazy(() => import('@/pages/admin/contracts'));
 const AdminCustomers        = lazy(() => import('@/pages/admin/customers'));
 const AdminNotifications    = lazy(() => import('@/pages/admin/notifications'));
 const AdminPricing          = lazy(() => import('@/pages/admin/pricing'));
+// 協力会社ポータル
+const CompanyDashboard  = lazy(() => import('@/pages/company/dashboard'));
+const CompanyVehicles   = lazy(() => import('@/pages/company/vehicles'));
+const CompanyContracts  = lazy(() => import('@/pages/company/contracts'));
+const CompanyInsurance  = lazy(() => import('@/pages/company/insurance'));
+const CompanyGps        = lazy(() => import('@/pages/company/gps'));
+const CompanyContact    = lazy(() => import('@/pages/company/contact'));
+
 // Chat VAN 固有管理画面
 const AdminInsurance        = lazy(() => import('@/pages/admin/insurance'));
 const AdminGps              = lazy(() => import('@/pages/admin/gps'));
@@ -111,6 +120,26 @@ function Router() {
         </Route>
         <Route path="/admin/audit-logs">
           <AdminLayout><AdminAuditLogs /></AdminLayout>
+        </Route>
+
+        {/* 協力会社ポータル */}
+        <Route path="/company">
+          <CompanyLayout><CompanyDashboard /></CompanyLayout>
+        </Route>
+        <Route path="/company/vehicles">
+          <CompanyLayout><CompanyVehicles /></CompanyLayout>
+        </Route>
+        <Route path="/company/contracts">
+          <CompanyLayout><CompanyContracts /></CompanyLayout>
+        </Route>
+        <Route path="/company/insurance">
+          <CompanyLayout><CompanyInsurance /></CompanyLayout>
+        </Route>
+        <Route path="/company/gps">
+          <CompanyLayout><CompanyGps /></CompanyLayout>
+        </Route>
+        <Route path="/company/contact">
+          <CompanyLayout><CompanyContact /></CompanyLayout>
         </Route>
 
         {/* User Routes */}

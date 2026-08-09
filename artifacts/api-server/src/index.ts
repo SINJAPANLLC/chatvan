@@ -354,6 +354,15 @@ async function runMigrations() {
     }
   }
 
+  // rental_company ロール追加 + rental_company_id カラム
+  try {
+    await db.execute(sql`ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'rental_company'`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS rental_company_id INTEGER REFERENCES rental_companies(id)`);
+    logger.info("migration: rental_company role & column ready");
+  } catch (e: any) {
+    logger.warn({ err: e.message }, "rental_company migration (non-fatal)");
+  }
+
   logger.info("migration: all Chat VAN tables ready");
 }
 
