@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   useListVehicles, 
   useCreateVehicle, 
@@ -7,7 +7,7 @@ import {
   useListRentalCompanies,
   Vehicle
 } from '@workspace/api-client-react';
-import { Loader2, Plus, Edit, Trash2, X, Save } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Save, Upload, X, ImageIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
@@ -29,6 +29,58 @@ export default function AdminVehicles() {
     rentalCompanyId: undefined
   } as any);
 
+  // ── 画像アップロード state ─────────────────────────────────────────────────
+  const [photoPath, setPhotoPath] = useState<string>('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast({ variant: 'destructive', title: '画像ファイルを選択してください' });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ variant: 'destructive', title: 'ファイルサイズは10MB以内にしてください' });
+      return;
+    }
+    setUploading(true);
+    setUploadProgress(10);
+    try {
+      const token = localStorage.getItem('sinjapan_auth_token');
+      // Step 1: presigned URL を取得
+      const urlRes = await fetch('/api/storage/uploads/request-url', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+      });
+      if (!urlRes.ok) throw new Error('アップロードURLの取得に失敗しました');
+      const { uploadURL, objectPath } = await urlRes.json();
+      setUploadProgress(40);
+
+      // Step 2: GCS に直接アップロード
+      const uploadRes = await fetch(uploadURL, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type },
+      });
+      if (!uploadRes.ok) throw new Error('アップロードに失敗しました');
+      setUploadProgress(100);
+
+      setPhotoPath(objectPath);
+      setFormData(prev => ({ ...prev, photos: JSON.stringify([objectPath]) }));
+      toast({ title: '画像をアップロードしました' });
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: err.message || 'アップロードエラー' });
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center min-h-[50vh]">
@@ -45,6 +97,7 @@ export default function AdminVehicles() {
       status: '募集中', hasEtc: false, hasDashcam: false, hasBackupCam: false,
       rentalCompanyId: undefined
     } as any);
+    setPhotoPath('');
     setIsModalOpen(true);
   };
 
@@ -54,6 +107,11 @@ export default function AdminVehicles() {
       ...v,
       rentalCompanyId: v.rentalCompany?.id
     } as any);
+    // 既存写真の先頭を photoPath に反映
+    try {
+      const photos = JSON.parse((v as any).photos || '[]');
+      setPhotoPath(photos[0] || '');
+    } catch { setPhotoPath(''); }
     setIsModalOpen(true);
   };
 
@@ -119,6 +177,7 @@ export default function AdminVehicles() {
         <table className="w-full text-sm text-left">
           <thead className="bg-muted text-muted-foreground">
             <tr>
+              <th className="px-6 py-3 font-medium w-12"></th>
               <th className="px-6 py-3 font-medium">車両</th>
               <th className="px-6 py-3 font-medium">ステータス</th>
               <th className="px-6 py-3 font-medium">料金 (月額/手数料)</th>
@@ -130,6 +189,17 @@ export default function AdminVehicles() {
           <tbody className="divide-y divide-border">
             {vehicles?.map(v => (
               <tr key={v.id} className="hover:bg-muted/30">
+                <td className="pl-4 py-3">
+                  {(() => {
+                    try {
+                      const photos = JSON.parse((v as any).photos || '[]');
+                      if (photos[0]) return (
+                        <img src={`/api/storage${photos[0]}`} alt="" className="w-10 h-10 rounded-md object-cover border border-border" />
+                      );
+                    } catch {}
+                    return <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center"><ImageIcon className="h-4 w-4 text-muted-foreground" /></div>;
+                  })()}
+                </td>
                 <td className="px-6 py-4">
                   <div className="font-medium text-foreground">{v.maker} {v.model}</div>
                   <div className="text-xs text-muted-foreground">{v.year ? `${v.year}年式` : '-'}</div>
@@ -165,6 +235,63 @@ export default function AdminVehicles() {
             <DialogTitle>{editingId ? '車両の編集' : '車両の新規登録'}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 py-4">
+            {/* ── 画像アップロード ── */}
+            <div className="col-span-2 space-y-2">
+              <label className="text-sm font-medium">車両画像（1枚）</label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); e.target.value = ''; }}
+              />
+              {photoPath ? (
+                <div className="relative w-full h-40 rounded-lg overflow-hidden border border-border group">
+                  <img
+                    src={`/api/storage${photoPath}`}
+                    alt="車両画像"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-3 py-1.5 bg-white text-black text-xs font-medium rounded-md hover:bg-gray-100"
+                    >
+                      変更
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setPhotoPath(''); setFormData(prev => ({ ...prev, photos: '[]' })); }}
+                      className="px-3 py-1.5 bg-white text-black text-xs font-medium rounded-md hover:bg-gray-100"
+                    >
+                      削除
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="w-full h-28 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-foreground/40 hover:text-foreground transition-colors disabled:opacity-50"
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                      <span className="text-xs">アップロード中... {uploadProgress}%</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-6 w-6" />
+                      <span className="text-xs">クリックして画像を選択</span>
+                      <span className="text-[10px]">JPG / PNG / WebP · 最大10MB</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium">メーカー</label>
               <input 

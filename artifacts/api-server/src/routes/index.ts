@@ -21,6 +21,7 @@ import blogRouter from "./blog";
 import contactsRouter from "./contacts";
 import seoRouter from "./seo";
 import vanRouter from "./van";
+import storageRouter from "./storage";
 
 const router: IRouter = Router();
 
@@ -46,5 +47,6 @@ router.use(blogRouter);
 router.use(contactsRouter);
 router.use(seoRouter);
 router.use(vanRouter);
+router.use(storageRouter);
 
 export default router;
