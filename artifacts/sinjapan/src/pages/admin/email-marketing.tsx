@@ -44,9 +44,9 @@ function buildPreviewHtml(subject: string, bodyText: string, ctaText: string) {
   <p style="margin:0 0 12px;font-size:10px;font-weight:700;color:#999;letter-spacing:1px">Chat VAN の特長</p>
   <table class="feat" width="100%" cellpadding="0" cellspacing="0">
     <tr>
-      <td width="33%" style="padding-right:8px;vertical-align:top"><p style="margin:0 0 3px;font-size:12px;font-weight:700;color:#111">チャットで依頼</p><p style="margin:0;font-size:11px;color:#666">入力するだけ。最短即日手配。</p></td>
-      <td width="33%" style="padding:0 4px;vertical-align:top"><p style="margin:0 0 3px;font-size:12px;font-weight:700;color:#111">プロが手配</p><p style="margin:0;font-size:11px;color:#666">Chat VANが手配します。</p></td>
-      <td width="33%" style="padding-left:8px;vertical-align:top"><p style="margin:0 0 3px;font-size:12px;font-weight:700;color:#111">状況を確認</p><p style="margin:0;font-size:11px;color:#666">配送状況を24時間確認可能。</p></td>
+      <td width="33%" style="padding-right:8px;vertical-align:top"><p style="margin:0 0 3px;font-size:12px;font-weight:700;color:#111">チャットで相談</p><p style="margin:0;font-size:11px;color:#666">条件を入力するだけ。</p></td>
+      <td width="33%" style="padding:0 4px;vertical-align:top"><p style="margin:0 0 3px;font-size:12px;font-weight:700;color:#111">最適な軽バンを提案</p><p style="margin:0;font-size:11px;color:#666">Chat VANが厳選します。</p></td>
+      <td width="33%" style="padding-left:8px;vertical-align:top"><p style="margin:0 0 3px;font-size:12px;font-weight:700;color:#111">そのまま契約</p><p style="margin:0;font-size:11px;color:#666">最短で翌日から利用可能。</p></td>
     </tr>
   </table>
 </td></tr>
@@ -68,17 +68,17 @@ const TEMPLATES = [
   {
     label: '新規ご挨拶',
     subject: '【Chat VAN】はじめまして',
-    body: 'はじめまして。「Chat VAN」と申します。\n\nChat VANはチャットで依頼するだけで、配車・手配をすべて代行するサービスです。\n貴社の物流業務をよりシンプルにできると考え、ご連絡いたしました。\n\nぜひ一度、詳細をご説明する機会をいただけますと幸いです。\n\nよろしくお願いいたします。',
+    body: 'はじめまして。「Chat VAN」と申します。\n\nChat VANは、チャットで希望条件をお伝えいただくだけで、最適な軽バンをご提案するレンタルサービスです。\n\n・月額定額で軽バンを利用できる\n・最短1ヶ月から契約可能\n・ETCやドラレコ付き車両も選べる\n\nぜひ一度、詳細をご説明する機会をいただけますと幸いです。\n\nよろしくお願いいたします。',
   },
   {
     label: 'サービス案内',
-    subject: '【Chat VAN】物流コスト削減のご提案',
-    body: 'お世話になっております。Chat VANでございます。\n\nチャットで依頼するだけで、配車・手配をすべて代行するサービスです。\n\n・チャットで即日見積もり\n・複数の運送会社から最適提案\n・ペーパーレスで書類管理もラクラク\n\n無料でお試しいただけますので、お気軽にご連絡ください。',
+    subject: '【Chat VAN】軽バンレンタルのご提案',
+    body: 'お世話になっております。Chat VANでございます。\n\nチャットで条件を伝えるだけで、最適な軽バンをご提案するサービスです。\n\n・月額定額・最短1ヶ月から\n・エリア・予算・用途に合わせて提案\n・保険・車検込みでコスト管理が簡単\n\nまずはお気軽にご相談ください。',
   },
   {
     label: 'フォローアップ',
     subject: '【Chat VAN】その後いかがでしょうか',
-    body: 'いつもお世話になっております。Chat VANでございます。\n\n先日はお時間をいただきありがとうございました。\nその後、弊社サービスのご検討はいかがでしょうか。\n\nご不明な点やご質問があれば、どうぞお気軽にご連絡ください。\n引き続きよろしくお願いいたします。',
+    body: 'いつもお世話になっております。Chat VANでございます。\n\n先日はお時間をいただきありがとうございました。\nその後、軽バンのご利用についてご検討はいかがでしょうか。\n\nご不明な点やご質問があれば、どうぞお気軽にご連絡ください。\n引き続きよろしくお願いいたします。',
   },
   { label: 'カスタム', subject: '', body: '' },
 ];

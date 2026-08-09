@@ -166,7 +166,7 @@ function PricingTab() {
       <div className="rounded-xl border border-border overflow-hidden">
         <div className="bg-muted/30 px-4 py-2.5 border-b border-border">
           <p className="text-sm font-semibold">庸車相場（円/台）— 車両 × 距離帯</p>
-          <p className="text-xs text-muted-foreground mt-0.5">運送会社への支払い目安。顧客価格はここにマージン率を加算して計算されます</p>
+          <p className="text-xs text-muted-foreground mt-0.5">レンタル会社への支払い目安。顧客価格はここにSIN JAPAN手数料と保険料を加算して計算されます</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

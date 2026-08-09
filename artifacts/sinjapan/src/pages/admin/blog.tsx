@@ -24,10 +24,10 @@ type Post = {
   published: boolean; publishedAt?: string; createdAt: string; updatedAt: string;
 };
 
-const CATEGORIES = ['コスト削減', '物流DX', '運送会社選び', '物流戦略', '物流運営', '物流コラム'];
+const CATEGORIES = ['軽バン活用術', '節約・コスト', 'レンタル基礎知識', '個人事業主向け', '法人向け', 'Chat VANコラム'];
 
 const EMPTY_FORM = {
-  slug: '', title: '', excerpt: '', content: '', category: '物流コラム',
+  slug: '', title: '', excerpt: '', content: '', category: 'Chat VANコラム',
   metaTitle: '', metaDescription: '', published: false,
 };
 
@@ -192,9 +192,9 @@ function GenerateDialog({ onGenerated, onClose }: { onGenerated: (d: any) => voi
   const [generating, setGenerating] = useState(false);
 
   const PAIN_PRESETS = [
-    '配送コストが高い', '急な配送依頼に対応できない', '運送会社が見つからない',
-    '配送状況が把握できない', 'ドライバー不足で困っている', '書類管理が煩雑',
-    '物流DXを進めたい', '季節の繁閑差に対応できない',
+    '軽バンの費用を抑えたい', '急ぎで軽バンが必要', '月々の出費を固定したい',
+    '保険・車検が面倒', '個人事業主で審査が不安', '短期間だけ使いたい',
+    '複数台まとめて借りたい', '特定の装備（ETC・ドラレコ）がほしい',
   ];
 
   const handleGenerate = async () => {
@@ -228,7 +228,7 @@ function GenerateDialog({ onGenerated, onClose }: { onGenerated: (d: any) => voi
           <div className="space-y-1.5">
             <Label>メインキーワード <span className="text-red-500">*</span></Label>
             <Input value={keyword} onChange={e => setKeyword(e.target.value)}
-              placeholder="例: 配送コスト削減、物流DX、運送会社 選び方" />
+              placeholder="例: 軽バン レンタル 比較、個人事業主 軽バン 月額" />
           </div>
           <div className="space-y-2">
             <Label>ターゲットの悩み</Label>
@@ -382,7 +382,7 @@ export default function AdminBlog() {
                   {autoGen.enabled ? '有効' : '無効'}
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">{autoGen.schedule} · 物流テーマを自動ローテーション</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{autoGen.schedule} · 軽バンレンタルテーマを自動ローテーション</p>
               {autoGen.lastRun && (
                 <p className="text-xs text-muted-foreground mt-0.5 truncate">
                   最終生成: {new Date(autoGen.lastRun).toLocaleString('ja-JP')}

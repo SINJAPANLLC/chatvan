@@ -17,11 +17,11 @@ function apiFetch(path: string, opts?: RequestInit) {
 type SeoField = { label: string; key: string; type: 'input' | 'textarea'; placeholder: string };
 
 const SEO_FIELDS: SeoField[] = [
-  { label: 'サイトタイトル',        key: 'title',          type: 'input',    placeholder: 'Chat VAN | チャットするだけで荷物が運べる' },
-  { label: 'メタディスクリプション', key: 'description',    type: 'textarea', placeholder: 'チャットで依頼するだけ。あとはChat VANが配車・手配をすべて代行します。' },
-  { label: 'メタキーワード',         key: 'keywords',       type: 'input',    placeholder: '物流, 配送, 物流代行, 配車, 運送' },
-  { label: 'OGタイトル（SNS表示）', key: 'ogTitle',        type: 'input',    placeholder: 'Chat VAN | チャットするだけで荷物が運べる' },
-  { label: 'OG説明文（SNS表示）',   key: 'ogDescription',  type: 'textarea', placeholder: 'チャットで依頼するだけ。Chat VANが手配します。' },
+  { label: 'サイトタイトル',        key: 'title',          type: 'input',    placeholder: 'Chat VAN | チャットするだけ。軽バンかりれる。' },
+  { label: 'メタディスクリプション', key: 'description',    type: 'textarea', placeholder: 'チャットで希望条件を伝えるだけ。あなたに合った軽バンをご提案します。月額定額・最短1ヶ月から。' },
+  { label: 'メタキーワード',         key: 'keywords',       type: 'input',    placeholder: '軽バン レンタル, 軽バン 月額, 軽バン サブスク, 軽貨物 レンタル' },
+  { label: 'OGタイトル（SNS表示）', key: 'ogTitle',        type: 'input',    placeholder: 'Chat VAN | チャットするだけ。軽バンかりれる。' },
+  { label: 'OG説明文（SNS表示）',   key: 'ogDescription',  type: 'textarea', placeholder: 'チャットで条件を伝えるだけ。Chat VANが最適な軽バンをご提案します。' },
   { label: 'OG画像URL',            key: 'ogImage',        type: 'input',    placeholder: 'https://example.com/og-image.png' },
   { label: 'Google Analyticsタグ', key: 'gaTag',          type: 'input',    placeholder: 'G-XXXXXXXXXX' },
   { label: 'Googleサーチコンソール確認コード', key: 'gscCode', type: 'input', placeholder: 'google-site-verification=...' },
@@ -108,7 +108,7 @@ export default function AdminSeo() {
       <div className="border-t border-border pt-6">
         <h2 className="text-sm font-semibold mb-4 flex items-center gap-2"><Globe className="h-4 w-4" />プレビュー（Googleでの表示イメージ）</h2>
         <div className="border border-border rounded-xl p-4 bg-muted/20 space-y-1">
-          <p className="text-[#1a0dab] text-base font-medium truncate">{values.title || 'Chat VAN | AI物流マッチング'}</p>
+          <p className="text-[#1a0dab] text-base font-medium truncate">{values.title || 'Chat VAN | チャットするだけ。軽バンかりれる。'}</p>
           <p className="text-[#006621] text-xs">https://chatlogi.jp</p>
           <p className="text-sm text-muted-foreground line-clamp-2">{values.description || 'メタディスクリプションを入力してください。'}</p>
         </div>
