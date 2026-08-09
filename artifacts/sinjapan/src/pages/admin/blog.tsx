@@ -159,7 +159,7 @@ function ArticleEditor({
               <div className="space-y-1.5">
                 <Label>メタタイトル <span className="text-xs text-muted-foreground font-normal">60文字以内</span></Label>
                 <Input value={form.metaTitle} onChange={e => set('metaTitle', e.target.value)}
-                  placeholder={form.title || 'タイトル｜Chat LOGI ブログ'} maxLength={80} />
+                  placeholder={form.title || 'タイトル｜Chat VAN ブログ'} maxLength={80} />
               </div>
               <div className="space-y-1.5">
                 <Label>メタディスクリプション <span className="text-xs text-muted-foreground font-normal">120文字以内</span></Label>

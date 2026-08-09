@@ -19,11 +19,11 @@ function apiFetch(path: string, opts?: RequestInit) {
 // テンプレート
 const TEMPLATES = [
   { label: 'カスタム',   subject: '',                          body: '' },
-  { label: '配車確定',   subject: '【Chat LOGI】配車が確定しました',   body: 'お世話になっております。\nご依頼の案件について、配車が確定いたしました。\n\n引き続きよろしくお願いいたします。' },
-  { label: '集荷完了',   subject: '【Chat LOGI】集荷が完了しました',   body: 'お世話になっております。\nご依頼の荷物の集荷が完了いたしました。\n\n配送状況については担当者よりご連絡いたします。' },
-  { label: '配送完了',   subject: '【Chat LOGI】配送が完了しました',   body: 'お世話になっております。\nご依頼の荷物の配送が完了いたしました。\n\nご利用いただきありがとうございました。' },
-  { label: '請求書発行', subject: '【Chat LOGI】請求書を発行しました', body: 'お世話になっております。\n請求書を発行いたしました。マイページよりご確認ください。\n\nご不明な点がございましたらお気軽にお問い合わせください。' },
-  { label: 'お知らせ',   subject: '【Chat LOGI】重要なお知らせ',       body: 'お世話になっております。\n以下の通りお知らせいたします。\n\n' },
+  { label: '配車確定',   subject: '【Chat VAN】配車が確定しました',   body: 'お世話になっております。\nご依頼の案件について、配車が確定いたしました。\n\n引き続きよろしくお願いいたします。' },
+  { label: '集荷完了',   subject: '【Chat VAN】集荷が完了しました',   body: 'お世話になっております。\nご依頼の荷物の集荷が完了いたしました。\n\n配送状況については担当者よりご連絡いたします。' },
+  { label: '配送完了',   subject: '【Chat VAN】配送が完了しました',   body: 'お世話になっております。\nご依頼の荷物の配送が完了いたしました。\n\nご利用いただきありがとうございました。' },
+  { label: '請求書発行', subject: '【Chat VAN】請求書を発行しました', body: 'お世話になっております。\n請求書を発行いたしました。マイページよりご確認ください。\n\nご不明な点がございましたらお気軽にお問い合わせください。' },
+  { label: 'お知らせ',   subject: '【Chat VAN】重要なお知らせ',       body: 'お世話になっております。\n以下の通りお知らせいたします。\n\n' },
 ];
 
 type SendTarget = 'all' | 'select';
@@ -190,7 +190,7 @@ function SendForm({ onSent }: { onSent: () => void }) {
           <Input
             value={subject}
             onChange={e => { setSubject(e.target.value); setTemplateIdx(0); }}
-            placeholder="【Chat LOGI】件名を入力..."
+            placeholder="【Chat VAN】件名を入力..."
           />
         </div>
 
@@ -334,74 +334,74 @@ const AUTO_RULES = [
 const PREVIEW_DATA: Record<string, { badge?: string; name: string; subject: string; body: string; cta: string }> = {
   '会員登録': {
     name: '山田 太郎',
-    subject: '【Chat LOGI】ご登録ありがとうございます',
-    body: 'この度はChat LOGIにご登録いただきありがとうございます。\n\nチャットで運びたい荷物を教えていただくだけで、Chat LOGIがすべて手配いたします。\nいつでもお気軽にご利用ください。',
-    cta: 'Chat LOGIを使ってみる →',
+    subject: '【Chat VAN】ご登録ありがとうございます',
+    body: 'この度はChat VANにご登録いただきありがとうございます。\n\nチャットで運びたい荷物を教えていただくだけで、Chat VANがすべて手配いたします。\nいつでもお気軽にご利用ください。',
+    cta: 'Chat VANを使ってみる →',
   },
   'パスワードリセット': {
     name: '山田 太郎',
-    subject: '【Chat LOGI】パスワードリセットのご案内',
+    subject: '【Chat VAN】パスワードリセットのご案内',
     body: 'パスワードリセットのリクエストを受け付けました。\n\n下のボタンからパスワードを再設定してください。\nリンクの有効期限は1時間です。\n\n心当たりのない場合はこのメールを無視してください。',
     cta: 'パスワードを再設定する →',
   },
   '配車確定': {
     badge: '配車確定',
     name: '山田 太郎',
-    subject: '【Chat LOGI】配車が確定しました',
+    subject: '【Chat VAN】配車が確定しました',
     body: '担当ドライバーの手配が完了いたしました。\n\nルート：東京都渋谷区 → 大阪府大阪市北区\n\n集荷日時が近づきましたら担当者よりご連絡いたします。',
     cta: '案件の詳細を確認する →',
   },
   '集荷完了': {
     badge: '集荷完了',
     name: '山田 太郎',
-    subject: '【Chat LOGI】集荷が完了しました',
+    subject: '【Chat VAN】集荷が完了しました',
     body: '荷物の集荷が完了いたしました。\n\nルート：東京都渋谷区 → 大阪府大阪市北区\n\nこれより配送を開始いたします。',
     cta: '配送状況を確認する →',
   },
   '配送中': {
     badge: '配送中',
     name: '山田 太郎',
-    subject: '【Chat LOGI】配送を開始しました',
+    subject: '【Chat VAN】配送を開始しました',
     body: '荷物の配送を開始いたしました。\n\nルート：東京都渋谷区 → 大阪府大阪市北区\n\n到着予定時刻については担当者よりご連絡いたします。',
     cta: '配送状況を確認する →',
   },
   '納品完了': {
     badge: '納品完了',
     name: '山田 太郎',
-    subject: '【Chat LOGI】納品が完了しました',
-    body: '荷物が無事に納品完了いたしました。\n\nこのたびはChat LOGIをご利用いただきありがとうございました。',
+    subject: '【Chat VAN】納品が完了しました',
+    body: '荷物が無事に納品完了いたしました。\n\nこのたびはChat VANをご利用いただきありがとうございました。',
     cta: '案件の詳細を確認する →',
   },
   '請求完了': {
     badge: '請求完了',
     name: '山田 太郎',
-    subject: '【Chat LOGI】請求書を発行しました',
+    subject: '【Chat VAN】請求書を発行しました',
     body: '請求書を発行いたしました。\n\nマイページよりご確認・ダウンロードいただけます。\nご不明な点がございましたらお気軽にお問い合わせください。',
     cta: '請求書を確認する →',
   },
   'キャンセル': {
     badge: 'キャンセル',
     name: '山田 太郎',
-    subject: '【Chat LOGI】案件がキャンセルされました',
+    subject: '【Chat VAN】案件がキャンセルされました',
     body: '案件のキャンセルが完了いたしました。\n\nご利用いただきありがとうございました。またのご依頼をお待ちしております。',
     cta: 'マイページを確認する →',
   },
   '決済完了': {
     badge: '決済完了',
     name: '山田 太郎',
-    subject: '【Chat LOGI】決済が完了しました',
+    subject: '【Chat VAN】決済が完了しました',
     body: 'クレジットカードの決済が完了いたしました。\n\nご利用いただきありがとうございました。\n領収書・請求書はマイページよりご確認いただけます。',
     cta: '領収書を確認する →',
   },
   '受付確認': {
     name: '山田 太郎',
-    subject: '【Chat LOGI】お問い合わせを受け付けました',
+    subject: '【Chat VAN】お問い合わせを受け付けました',
     body: 'お問い合わせいただきありがとうございます。\n\n内容を確認次第、担当者よりご連絡いたします。\n通常2営業日以内にご返信いたします。',
     cta: 'マイページを確認する →',
   },
   '返信通知': {
     name: '山田 太郎',
-    subject: '【Chat LOGI】お問い合わせへの回答',
+    subject: '【Chat VAN】お問い合わせへの回答',
     body: 'お問い合わせへのご回答をお送りします。\n\n--- 担当者からの回答 ---\nご質問いただいた件につきまして、以下の通りご回答申し上げます。\n\n詳細はマイページよりご確認ください。',
     cta: 'お問い合わせを確認する →',
   },
@@ -487,7 +487,7 @@ function EmailPreview() {
           {/* ヘッダー */}
           <div style={{ background: '#000', padding: '20px 28px', borderRadius: '10px 10px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <span style={{ color: '#fff', fontWeight: 800, fontSize: 16, letterSpacing: 1 }}>Chat LOGI</span>
+              <span style={{ color: '#fff', fontWeight: 800, fontSize: 16, letterSpacing: 1 }}>Chat VAN</span>
             </div>
             {p.badge && (
               <span style={{ background: '#fff', color: '#000', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20 }}>{p.badge}</span>
@@ -504,13 +504,13 @@ function EmailPreview() {
             </table>
             <hr style={{ border: 'none', borderTop: '1px solid #ebebeb', margin: '0 0 20px' }} />
             <p style={{ margin: 0, fontSize: 11, color: '#aaa', lineHeight: 1.7 }}>
-              このメールは <strong>Chat LOGI</strong> から自動送信されています。<br />
+              このメールは <strong>Chat VAN</strong> から自動送信されています。<br />
               心当たりのない場合や、ご不明な点は担当者までお問い合わせください。
             </p>
           </div>
           {/* フッター */}
           <div style={{ background: '#f7f7f7', padding: '14px 28px', borderRadius: '0 0 10px 10px', border: '1px solid #e5e5e5', borderTop: 'none', display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 11, color: '#bbb' }}>© {year} Chat LOGI</span>
+            <span style={{ fontSize: 11, color: '#bbb' }}>© {year} Chat VAN</span>
             <span style={{ fontSize: 11, color: '#bbb' }}>合同会社SIN JAPAN</span>
           </div>
         </div>

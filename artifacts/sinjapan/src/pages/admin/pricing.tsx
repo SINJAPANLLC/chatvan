@@ -287,7 +287,7 @@ function PromptTab() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold">AIプロンプト設定</h2>
-          <p className="text-sm text-muted-foreground">Chat LOGIのAIアシスタントへの指示内容を編集できます</p>
+          <p className="text-sm text-muted-foreground">Chat VANのAIアシスタントへの指示内容を編集できます</p>
         </div>
         <div className="flex gap-2">
           {isDirty && <Button variant="outline" size="sm" onClick={() => setPrompt(original)}>

@@ -194,7 +194,7 @@ export default function Chat() {
             </button>
           </div>
         </div>
-        <p className="text-center mt-2 text-xs text-muted-foreground">Chat LOGIが最適な配送プランをご提案します。</p>
+        <p className="text-center mt-2 text-xs text-muted-foreground">Chat VANが最適な配送プランをご提案します。</p>
       </div>
     </div>
   );

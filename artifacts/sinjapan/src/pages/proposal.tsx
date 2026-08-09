@@ -399,7 +399,7 @@ export default function Proposal() {
           {/* ── Header: 価格 ── */}
           <div className="px-6 py-5 flex items-center justify-between bg-muted/30 border-b border-border">
             <div className="flex items-center gap-2 font-semibold">
-              <CheckCircle className="h-5 w-5" />Chat LOGI 推奨プラン
+              <CheckCircle className="h-5 w-5" />Chat VAN 推奨プラン
             </div>
             <div className="text-right">
               {isEditing ? (

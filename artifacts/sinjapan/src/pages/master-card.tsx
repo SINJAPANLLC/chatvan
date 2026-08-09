@@ -158,7 +158,7 @@ export default function MasterCardPage() {
       {/* 操作バー（印刷時非表示） */}
       <div className="print:hidden sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="font-bold text-lg tracking-tight">Chat LOGI</span>
+          <span className="font-bold text-lg tracking-tight">Chat VAN</span>
           <span className="text-gray-400 text-sm">|</span>
           <span className="text-sm text-gray-600">顧客マスターカード</span>
         </div>

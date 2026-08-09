@@ -153,7 +153,7 @@ export default function Contact() {
       </Form>
 
       <div className="border-t border-border pt-6 text-sm text-muted-foreground space-y-1">
-        <p className="font-medium text-foreground">Chat LOGI サポート</p>
+        <p className="font-medium text-foreground">Chat VAN サポート</p>
         <p>合同会社SIN JAPAN</p>
         <p>〒243-0303 神奈川県愛甲郡愛川町中津7287</p>
         <p>TEL 046-212-2325　FAX 046-212-2326</p>

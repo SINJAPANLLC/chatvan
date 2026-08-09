@@ -150,7 +150,7 @@ export default function DriverPortal() {
       <div className="bg-foreground text-background px-5 py-4">
         <div className="flex items-center gap-2 mb-1">
           <Truck className="h-5 w-5" />
-          <span className="font-bold text-lg tracking-tight">Chat LOGI</span>
+          <span className="font-bold text-lg tracking-tight">Chat VAN</span>
         </div>
         <p className="text-sm opacity-70">配送指示書 — 案件 #{String(shipment.id).padStart(6, '0')}</p>
       </div>
@@ -339,7 +339,7 @@ export default function DriverPortal() {
           </div>
         )}
 
-        <p className="text-center text-xs text-muted-foreground pb-8">Chat LOGI ドライバーポータル</p>
+        <p className="text-center text-xs text-muted-foreground pb-8">Chat VAN ドライバーポータル</p>
       </div>
     </div>
   );

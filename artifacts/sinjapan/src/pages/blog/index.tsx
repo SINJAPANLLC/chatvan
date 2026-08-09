@@ -33,7 +33,7 @@ export default function BlogIndex() {
       .then(setPosts)
       .catch(() => setPosts([]))
       .finally(() => setLoading(false));
-    document.title = 'Chat LOGI ブログ｜物流担当者のための実践ガイド';
+    document.title = 'Chat VAN ブログ｜物流担当者のための実践ガイド';
   }, []);
 
   const categories = ['すべて', ...Array.from(new Set(posts.map(p => p.category)))];
@@ -47,7 +47,7 @@ export default function BlogIndex() {
       <header style={{ borderBottom: '1px solid #e5e5e5', background: '#fff', position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
           <Link href="/lp">
-            <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: 1, color: '#000', cursor: 'pointer' }}>Chat LOGI</span>
+            <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: 1, color: '#000', cursor: 'pointer' }}>Chat VAN</span>
           </Link>
           <nav style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
             <Link href="/blog"><span style={{ fontSize: 13, color: '#333', fontWeight: 600 }}>ブログ</span></Link>
@@ -181,7 +181,7 @@ export default function BlogIndex() {
 
       {/* フッター */}
       <footer style={{ borderTop: '1px solid #e5e5e5', padding: '32px 24px', textAlign: 'center' }}>
-        <p style={{ color: '#bbb', fontSize: 12 }}>© {new Date().getFullYear()} Chat LOGI｜チャットするだけで荷物が運べる</p>
+        <p style={{ color: '#bbb', fontSize: 12 }}>© {new Date().getFullYear()} Chat VAN｜チャットするだけで荷物が運べる</p>
       </footer>
     </div>
   );

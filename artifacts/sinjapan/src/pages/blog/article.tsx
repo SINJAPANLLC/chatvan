@@ -60,7 +60,7 @@ export default function BlogArticle() {
     ]).then(([p, all]) => {
       setPost(p);
       setRelated((all as Post[]).filter((a: Post) => a.slug !== slug && a.category === p.category).slice(0, 3));
-      const pageTitle = p.metaTitle ?? `${p.title}｜Chat LOGI ブログ`;
+      const pageTitle = p.metaTitle ?? `${p.title}｜Chat VAN ブログ`;
       document.title = pageTitle;
       const baseUrl = 'https://chatlogi.jp';
       const canonicalUrl = `${baseUrl}/blog/${p.slug}`;
@@ -110,7 +110,7 @@ export default function BlogArticle() {
       <header style={{ borderBottom: '1px solid #e5e5e5', background: '#fff', position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
           <Link href="/lp">
-            <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: 1, color: '#000', cursor: 'pointer' }}>Chat LOGI</span>
+            <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: 1, color: '#000', cursor: 'pointer' }}>Chat VAN</span>
           </Link>
           <nav style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
             <Link href="/blog"><span style={{ fontSize: 13, color: '#333' }}>ブログ</span></Link>
@@ -201,7 +201,7 @@ export default function BlogArticle() {
               物流コストを<br />削減したいですか？
             </p>
             <p style={{ color: '#aaa', fontSize: 12, margin: '0 0 20px', lineHeight: 1.7 }}>
-              チャットするだけ。あとはChat LOGIが手配します。
+              チャットするだけ。あとはChat VANが手配します。
             </p>
             <Link href="/lp">
               <span style={{ display: 'block', background: '#fff', color: '#000', padding: '12px 0', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', textAlign: 'center' }}>
@@ -253,7 +253,7 @@ export default function BlogArticle() {
 
       {/* フッター */}
       <footer style={{ borderTop: '1px solid #e5e5e5', padding: '32px 24px', textAlign: 'center' }}>
-        <p style={{ color: '#bbb', fontSize: 12 }}>© {new Date().getFullYear()} Chat LOGI｜チャットするだけで荷物が運べる</p>
+        <p style={{ color: '#bbb', fontSize: 12 }}>© {new Date().getFullYear()} Chat VAN｜チャットするだけで荷物が運べる</p>
       </footer>
     </div>
   );

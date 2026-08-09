@@ -180,7 +180,7 @@ export default function Invoices() {
                 className="w-full py-2.5 rounded-full bg-foreground text-background text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40">
                 {submitting ? '送信中…' : '申請する'}
               </button>
-              <p className="text-xs text-muted-foreground text-center mt-2">審査通過後、Chat LOGIより与信枠が設定されます</p>
+              <p className="text-xs text-muted-foreground text-center mt-2">審査通過後、Chat VANより与信枠が設定されます</p>
             </div>
           </form>
         )}
