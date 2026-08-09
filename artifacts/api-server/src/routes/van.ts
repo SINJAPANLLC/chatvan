@@ -584,6 +584,93 @@ router.post("/van/contracts/:id/agree-vehicle", requireAuth, async (req: Request
 });
 
 // ── 免許証確認 ─────────────────────────────────────────────────────────────
+// ── GET /van/applications/:id/related ──────────────────────────────────────
+// 相談詳細画面の追加タブ用: 契約・保険・GPS・事故・審査・決済を一括取得
+router.get("/van/applications/:id/related", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const appId = parseInt(String(req.params.id));
+    const appRow = await db.execute(sql`SELECT user_id FROM van_applications WHERE id = ${appId} LIMIT 1`);
+    const userId = ((appRow as any)?.rows ?? appRow)[0]?.user_id;
+    if (!userId) return res.status(404).json({ error: "Application not found" });
+
+    const [contracts, incidents, screening, identityVerification] = await Promise.all([
+      // 契約
+      db.execute(sql`
+        SELECT vc.*, v.maker, v.model, v.license_plate, v.prefecture,
+          rc.name as rental_company_name
+        FROM van_contracts vc
+        LEFT JOIN vehicles v ON vc.vehicle_id = v.id
+        LEFT JOIN rental_companies rc ON v.rental_company_id = rc.id
+        WHERE vc.user_id = ${userId}
+        ORDER BY vc.created_at DESC
+      `),
+      // 事故
+      db.execute(sql`
+        SELECT vi.*, vc.id as contract_number,
+          v.maker, v.model, v.license_plate
+        FROM van_incidents vi
+        LEFT JOIN van_contracts vc ON vi.contract_id = vc.id
+        LEFT JOIN vehicles v ON vc.vehicle_id = v.id
+        WHERE vi.user_id = ${userId}
+        ORDER BY vi.created_at DESC
+      `),
+      // 審査
+      db.execute(sql`
+        SELECT s.* FROM screenings s WHERE s.application_id = ${appId} ORDER BY s.created_at DESC
+      `),
+      // 本人確認
+      db.execute(sql`
+        SELECT iv.* FROM identity_verifications iv WHERE iv.application_id = ${appId} ORDER BY iv.created_at DESC LIMIT 1
+      `),
+    ]);
+
+    const contractRows = ((contracts as any)?.rows ?? contracts) as any[];
+    const contractIds = contractRows.map((c: any) => c.id).filter(Boolean);
+
+    // 保険・GPS・決済はcontract経由
+    const [insurance, gps, payments] = await Promise.all([
+      contractIds.length ? db.execute(sql`
+        SELECT ip.*, v.maker, v.model, v.license_plate
+        FROM insurance_policies ip
+        LEFT JOIN vehicles v ON ip.vehicle_id = v.id
+        WHERE ip.contract_id = ANY(ARRAY[${sql.raw(contractIds.join(','))}]::int[])
+        ORDER BY ip.expiry_date ASC
+      `) : { rows: [] },
+      contractIds.length ? db.execute(sql`
+        SELECT gd.*, v.maker, v.model, v.license_plate,
+          (SELECT row_to_json(gl) FROM gps_locations gl WHERE gl.gps_device_id = gd.id ORDER BY gl.recorded_at DESC LIMIT 1) as last_location
+        FROM gps_devices gd
+        JOIN vehicles v ON gd.vehicle_id = v.id
+        WHERE v.id IN (
+          SELECT vehicle_id FROM van_contracts WHERE id = ANY(ARRAY[${sql.raw(contractIds.join(','))}]::int[])
+        )
+      `) : { rows: [] },
+      contractIds.length ? db.execute(sql`
+        SELECT pr.*, vc.id as contract_number
+        FROM payment_retries pr
+        LEFT JOIN van_contracts vc ON pr.contract_id = vc.id
+        WHERE pr.user_id = ${userId}
+        ORDER BY pr.attempted_at DESC
+      `) : { rows: [] },
+    ]);
+
+    const toR = (r: any) => r?.rows ?? (Array.isArray(r) ? r : []);
+
+    return res.json({
+      contracts: toR(contracts),
+      insurance: toR(insurance),
+      gps: toR(gps),
+      incidents: toR(incidents),
+      screening: toR(screening),
+      identityVerification: toR(identityVerification)[0] ?? null,
+      payments: toR(payments),
+    });
+  } catch (err) {
+    console.error("related data error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
 router.get("/van/applications/:id/identity-verification", requireAuth, async (req: Request, res: Response) => {
   try {
     const appId = parseInt(String(req.params.id));

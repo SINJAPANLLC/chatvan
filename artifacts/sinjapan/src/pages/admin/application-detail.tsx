@@ -12,6 +12,7 @@ import {
   User, Car, MessageSquare, FileText, CreditCard, ClipboardList,
   Phone, Mail, MapPin, Calendar, Banknote, Shield, BadgeCheck,
   Truck, Wrench, Camera, Package,
+  ScrollText, Wallet, MapPinned, AlertTriangle, ClipboardCheck,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -37,15 +38,22 @@ const STATUS_STYLES: Record<string, string> = {
 
 const ALL_STATUSES = Object.keys(STATUS_STYLES);
 
-type Tab = 'overview' | 'customer' | 'vehicle' | 'chat' | 'instruction' | 'master';
+type Tab = 'overview' | 'customer' | 'vehicle' | 'chat' | 'instruction' | 'master'
+         | 'contract' | 'payment' | 'insurance' | 'gps' | 'incident' | 'screening';
 
 const TABS: { id: Tab; label: string; icon: React.ComponentType<any> }[] = [
-  { id: 'overview',     label: '概要',       icon: ClipboardList },
-  { id: 'customer',     label: '顧客情報',   icon: User },
-  { id: 'vehicle',      label: '車両情報',   icon: Car },
-  { id: 'chat',         label: 'チャット',   icon: MessageSquare },
-  { id: 'instruction',  label: '指示書',     icon: FileText },
-  { id: 'master',       label: 'マスターカード', icon: CreditCard },
+  { id: 'overview',    label: '概要',           icon: ClipboardList },
+  { id: 'customer',    label: '顧客情報',       icon: User },
+  { id: 'vehicle',     label: '車両情報',       icon: Car },
+  { id: 'chat',        label: 'チャット',       icon: MessageSquare },
+  { id: 'contract',    label: '契約',           icon: ScrollText },
+  { id: 'payment',     label: '決済',           icon: Wallet },
+  { id: 'insurance',   label: '保険',           icon: Shield },
+  { id: 'gps',         label: 'GPS',            icon: MapPinned },
+  { id: 'incident',    label: '事故・故障',     icon: AlertTriangle },
+  { id: 'screening',   label: '審査',           icon: ClipboardCheck },
+  { id: 'instruction', label: '指示書',         icon: FileText },
+  { id: 'master',      label: 'マスターカード', icon: CreditCard },
 ];
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
@@ -98,6 +106,27 @@ export default function AdminApplicationDetail() {
   });
   const [selectedVehicles, setSelectedVehicles] = useState<number[]>([]);
   const [proposalMessage, setProposalMessage] = useState('');
+
+  // 追加タブ用関連データ
+  const [related, setRelated] = useState<any>(null);
+  const [relatedLoading, setRelatedLoading] = useState(false);
+  const RELATED_TABS: Tab[] = ['contract', 'payment', 'insurance', 'gps', 'incident', 'screening'];
+
+  const loadRelated = async () => {
+    if (related || relatedLoading) return;
+    setRelatedLoading(true);
+    try {
+      const token = localStorage.getItem('sinjapan_auth_token');
+      const r = await fetch(`${import.meta.env.BASE_URL}api/van/applications/${id}/related`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (r.ok) setRelated(await r.json());
+    } finally { setRelatedLoading(false); }
+  };
+
+  React.useEffect(() => {
+    if (RELATED_TABS.includes(tab as Tab)) loadRelated();
+  }, [tab]);
 
   React.useEffect(() => {
     if (!application) return;
@@ -582,6 +611,227 @@ export default function AdminApplicationDetail() {
               ))
             )}
           </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          TAB: 契約
+         ═══════════════════════════════════════════════════════════════════════ */}
+      {tab === 'contract' && (
+        <div className="space-y-4">
+          {relatedLoading ? <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-muted-foreground" /></div> : (
+            related?.contracts?.length === 0 ? (
+              <div className="bg-card border border-border rounded-xl p-12 text-center text-muted-foreground text-sm">契約はありません</div>
+            ) : related?.contracts?.map((c: any) => (
+              <Section key={c.id} title={`契約 #${c.id} — ${c.maker ?? ''} ${c.model ?? ''}`}>
+                <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                  <DL label="ステータス" value={<span className="px-2 py-0.5 bg-muted rounded-full text-xs">{c.status}</span>} />
+                  <DL label="ナンバー" value={c.license_plate} />
+                  <DL label="都道府県" value={c.prefecture} />
+                  <DL label="月額" value={c.monthly_price ? `¥${Number(c.monthly_price).toLocaleString()}` : null} />
+                  <DL label="開始日" value={c.start_date} />
+                  <DL label="支払日" value={c.payment_day ? `毎月${c.payment_day}日` : null} />
+                  <DL label="レンタル会社" value={c.rental_company_name} />
+                  <DL label="登録日" value={c.created_at ? format(new Date(c.created_at), 'yyyy/MM/dd') : null} />
+                </dl>
+              </Section>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          TAB: 決済
+         ═══════════════════════════════════════════════════════════════════════ */}
+      {tab === 'payment' && (
+        <div className="space-y-4">
+          {relatedLoading ? <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-muted-foreground" /></div> : (
+            <Section title={`決済履歴（${related?.payments?.length ?? 0}件）`}>
+              {!related?.payments?.length ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">決済履歴はありません</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead><tr className="text-xs text-muted-foreground border-b border-border">
+                    <th className="pb-2 text-left">対象月</th>
+                    <th className="pb-2 text-left">金額</th>
+                    <th className="pb-2 text-left">結果</th>
+                    <th className="pb-2 text-left">試行日</th>
+                    <th className="pb-2 text-left">理由</th>
+                  </tr></thead>
+                  <tbody className="divide-y divide-border">
+                    {related.payments.map((p: any) => (
+                      <tr key={p.id} className="py-2">
+                        <td className="py-2.5 font-mono text-xs">{p.period_month}</td>
+                        <td className="py-2.5">¥{Number(p.amount).toLocaleString()}</td>
+                        <td className="py-2.5">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                            p.result === 'success' ? 'bg-green-100 text-green-700' :
+                            p.result === 'failed'  ? 'bg-red-100 text-red-700' :
+                            'bg-muted text-muted-foreground'
+                          }`}>{p.result ?? '-'}</span>
+                        </td>
+                        <td className="py-2.5 text-xs text-muted-foreground">{p.attempted_at ? format(new Date(p.attempted_at), 'MM/dd HH:mm') : '-'}</td>
+                        <td className="py-2.5 text-xs text-muted-foreground max-w-[200px] truncate">{p.failure_reason ?? '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </Section>
+          )}
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          TAB: 保険
+         ═══════════════════════════════════════════════════════════════════════ */}
+      {tab === 'insurance' && (
+        <div className="space-y-4">
+          {relatedLoading ? <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-muted-foreground" /></div> : (
+            related?.insurance?.length === 0 ? (
+              <div className="bg-card border border-border rounded-xl p-12 text-center text-muted-foreground text-sm">保険情報はありません</div>
+            ) : related?.insurance?.map((ins: any) => (
+              <Section key={ins.id} title={`保険 #${ins.id} — ${ins.maker ?? ''} ${ins.model ?? ''}`}>
+                <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                  <DL label="保険会社" value={ins.insurer} />
+                  <DL label="証券番号" value={ins.policy_number} />
+                  <DL label="種類" value={ins.insurance_type} />
+                  <DL label="満了日" value={ins.expiry_date} />
+                  <DL label="ステータス" value={<span className={`px-2 py-0.5 rounded-full text-xs ${ins.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>{ins.status}</span>} />
+                  <DL label="商用利用可" value={ins.covers_commercial_use ? '対応' : '非対応'} />
+                  <DL label="月額保険料" value={ins.monthly_premium ? `¥${Number(ins.monthly_premium).toLocaleString()}` : null} />
+                  <DL label="ナンバー" value={ins.license_plate} />
+                </dl>
+              </Section>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          TAB: GPS
+         ═══════════════════════════════════════════════════════════════════════ */}
+      {tab === 'gps' && (
+        <div className="space-y-4">
+          {relatedLoading ? <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-muted-foreground" /></div> : (
+            related?.gps?.length === 0 ? (
+              <div className="bg-card border border-border rounded-xl p-12 text-center text-muted-foreground text-sm">GPS機器はありません</div>
+            ) : related?.gps?.map((g: any) => {
+              const loc = g.last_location;
+              return (
+                <Section key={g.id} title={`GPS #${g.id} — ${g.maker ?? ''} ${g.model ?? ''} ${g.license_plate ?? ''}`}>
+                  <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                    <DL label="デバイスID" value={g.device_id} />
+                    <DL label="ステータス" value={g.status} />
+                    <DL label="通信キャリア" value={g.carrier} />
+                    {loc && <>
+                      <DL label="緯度" value={loc.lat ?? loc.latitude} />
+                      <DL label="経度" value={loc.lng ?? loc.longitude} />
+                      <DL label="最終更新" value={loc.recorded_at ? format(new Date(loc.recorded_at), 'MM/dd HH:mm') : null} />
+                      <DL label="速度" value={loc.speed != null ? `${loc.speed} km/h` : null} />
+                      {(loc.lat ?? loc.latitude) && (
+                        <div className="col-span-2 sm:col-span-3">
+                          <a
+                            href={`https://maps.google.com/?q=${loc.lat ?? loc.latitude},${loc.lng ?? loc.longitude}`}
+                            target="_blank" rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-xs hover:bg-muted transition-colors"
+                          >
+                            <MapPinned className="h-3.5 w-3.5" />Googleマップで開く
+                          </a>
+                        </div>
+                      )}
+                    </>}
+                    {!loc && <div className="col-span-3 text-xs text-muted-foreground">位置情報なし</div>}
+                  </dl>
+                </Section>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          TAB: 事故・故障
+         ═══════════════════════════════════════════════════════════════════════ */}
+      {tab === 'incident' && (
+        <div className="space-y-4">
+          {relatedLoading ? <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-muted-foreground" /></div> : (
+            related?.incidents?.length === 0 ? (
+              <div className="bg-card border border-border rounded-xl p-12 text-center text-muted-foreground text-sm">事故・故障の報告はありません</div>
+            ) : related?.incidents?.map((inc: any) => (
+              <Section key={inc.id} title={`#${inc.id} ${inc.incident_type === 'accident' ? '🚨 事故' : inc.incident_type === 'breakdown' ? '🔧 故障' : '報告'}`}>
+                <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                  <DL label="ステータス" value={<span className={`px-2 py-0.5 rounded-full text-xs ${inc.status === '解決済み' ? 'bg-green-100 text-green-700' : inc.status === '対応中' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>{inc.status}</span>} />
+                  <DL label="車両" value={`${inc.maker ?? ''} ${inc.model ?? ''} ${inc.license_plate ?? ''}`} />
+                  <DL label="現在地" value={inc.location} />
+                  <DL label="怪我あり" value={inc.has_injuries != null ? (inc.has_injuries ? 'あり' : 'なし') : null} />
+                  <DL label="警察対応" value={inc.police_contacted != null ? (inc.police_contacted ? '済み' : '未') : null} />
+                  <DL label="報告日時" value={inc.created_at ? format(new Date(inc.created_at), 'yyyy/MM/dd HH:mm') : null} />
+                  {inc.description && <DL label="状況説明" value={inc.description} span2 />}
+                </dl>
+              </Section>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          TAB: 審査
+         ═══════════════════════════════════════════════════════════════════════ */}
+      {tab === 'screening' && (
+        <div className="space-y-4">
+          {relatedLoading ? <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-muted-foreground" /></div> : (<>
+            {/* 本人確認 */}
+            <Section title="本人確認（免許証）">
+              {!related?.identityVerification ? (
+                <p className="text-sm text-muted-foreground py-2 text-center">本人確認書類は未提出です</p>
+              ) : (
+                <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                  <DL label="ステータス" value={<span className={`px-2 py-0.5 rounded-full text-xs ${
+                    related.identityVerification.status === 'approved' ? 'bg-green-100 text-green-700' :
+                    related.identityVerification.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                    'bg-yellow-100 text-yellow-700'
+                  }`}>{related.identityVerification.status}</span>} />
+                  <DL label="提出日" value={related.identityVerification.created_at ? format(new Date(related.identityVerification.created_at), 'yyyy/MM/dd') : null} />
+                  {related.identityVerification.front_image_path && (
+                    <div className="col-span-2 sm:col-span-3 flex gap-3 flex-wrap">
+                      {[['表面', related.identityVerification.front_image_path], ['裏面', related.identityVerification.back_image_path], ['自撮り', related.identityVerification.selfie_path]].filter(([, p]) => p).map(([label, path]) => (
+                        <div key={label as string}>
+                          <p className="text-xs text-muted-foreground mb-1">{label}</p>
+                          <img src={`${import.meta.env.BASE_URL}api/storage${path}`} alt={label as string} className="h-24 w-auto rounded-lg border border-border object-cover" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {related.identityVerification.rejection_reason && (
+                    <DL label="却下理由" value={related.identityVerification.rejection_reason} span2 />
+                  )}
+                </dl>
+              )}
+            </Section>
+
+            {/* 審査結果 */}
+            <Section title={`審査結果（${related?.screening?.length ?? 0}件）`}>
+              {!related?.screening?.length ? (
+                <p className="text-sm text-muted-foreground py-2 text-center">審査記録はありません</p>
+              ) : related.screening.map((s: any) => (
+                <div key={s.id} className="border border-border rounded-xl p-4 mb-3 last:mb-0">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                      s.result === 'approved' ? 'bg-green-100 text-green-700' :
+                      s.result === 'rejected' ? 'bg-red-100 text-red-700' :
+                      s.result === 'conditional' ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-muted text-muted-foreground'
+                    }`}>{s.result === 'approved' ? '承認' : s.result === 'rejected' ? '否決' : s.result === 'conditional' ? '条件付き承認' : '審査中'}</span>
+                    <span className="text-xs text-muted-foreground">{s.created_at ? format(new Date(s.created_at), 'yyyy/MM/dd HH:mm') : ''}</span>
+                  </div>
+                  {s.reason && <p className="text-sm mb-2"><span className="text-xs text-muted-foreground block mb-0.5">審査理由</span>{s.reason}</p>}
+                  {s.conditions && <p className="text-sm mb-2"><span className="text-xs text-muted-foreground block mb-0.5">承認条件</span>{s.conditions}</p>}
+                  {s.risk_notes && <p className="text-sm bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-900 text-xs">{s.risk_notes}</p>}
+                </div>
+              ))}
+            </Section>
+          </>)}
         </div>
       )}
 
