@@ -363,6 +363,24 @@ async function runMigrations() {
     logger.warn({ err: e.message }, "rental_company migration (non-fatal)");
   }
 
+  // 契約チャット
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS contract_messages (
+        id SERIAL PRIMARY KEY,
+        contract_id INTEGER REFERENCES van_contracts(id) NOT NULL,
+        sender_id INTEGER REFERENCES users(id) NOT NULL,
+        sender_role TEXT NOT NULL DEFAULT 'user',
+        message TEXT NOT NULL,
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )
+    `);
+    logger.info("migration: contract_messages table ready");
+  } catch (e: any) {
+    logger.warn({ err: e.message }, "contract_messages migration (non-fatal)");
+  }
+
   logger.info("migration: all Chat VAN tables ready");
 }
 

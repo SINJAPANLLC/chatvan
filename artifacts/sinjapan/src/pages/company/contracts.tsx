@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { FileText, Phone, Mail } from 'lucide-react';
+import { FileText, Phone, Mail, MessageSquare } from 'lucide-react';
+import { Link } from 'wouter';
 const API = (path: string) => `${import.meta.env.BASE_URL}api${path}`;
 const token = () => localStorage.getItem('sinjapan_auth_token') ?? '';
 
@@ -98,6 +99,14 @@ export default function CompanyContracts() {
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
                       {c.start_date ?? c.startDate ?? '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Link href={`/contract-chat/${c.id}`}>
+                        <button className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border rounded-lg text-xs hover:bg-muted transition-colors">
+                          <MessageSquare className="h-3.5 w-3.5" />
+                          チャット
+                        </button>
+                      </Link>
                     </td>
                   </tr>
                 );

@@ -23,6 +23,7 @@ import seoRouter from "./seo";
 import vanRouter from "./van";
 import vanExtrasRouter from "./van-extras";
 import companyRouter from "./company";
+import contractChatRouter from "./contract-chat";
 import storageRouter from "./storage";
 
 const router: IRouter = Router();
@@ -51,6 +52,7 @@ router.use(seoRouter);
 router.use(vanRouter);
 router.use(vanExtrasRouter);
 router.use(companyRouter);
+router.use(contractChatRouter);
 router.use(storageRouter);
 
 export default router;

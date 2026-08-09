@@ -33,6 +33,9 @@ const AdminContracts        = lazy(() => import('@/pages/admin/contracts'));
 const AdminCustomers        = lazy(() => import('@/pages/admin/customers'));
 const AdminNotifications    = lazy(() => import('@/pages/admin/notifications'));
 const AdminPricing          = lazy(() => import('@/pages/admin/pricing'));
+// 契約チャット
+const ContractChat = lazy(() => import('@/pages/contract-chat'));
+
 // 協力会社ポータル
 const CompanyDashboard  = lazy(() => import('@/pages/company/dashboard'));
 const CompanyVehicles   = lazy(() => import('@/pages/company/vehicles'));
@@ -121,6 +124,9 @@ function Router() {
         <Route path="/admin/audit-logs">
           <AdminLayout><AdminAuditLogs /></AdminLayout>
         </Route>
+
+        {/* 契約チャット（ユーザー・協力会社・Admin共通） */}
+        <Route path="/contract-chat/:id" component={ContractChat} />
 
         {/* 協力会社ポータル */}
         <Route path="/company">

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useListVanContracts, useGetMe } from '@workspace/api-client-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Car, JapaneseYen, Calendar, CreditCard, ChevronRight } from 'lucide-react';
+import { Loader2, Car, JapaneseYen, Calendar, CreditCard, ChevronRight, MessageSquare } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { format } from 'date-fns';
 
@@ -68,7 +68,7 @@ export default function MyPage() {
                       {contract.status}
                     </span>
                   </div>
-                  <div className="sm:w-2/3 p-6 flex flex-col justify-center">
+                  <div className="sm:w-2/3 p-6 flex flex-col justify-between gap-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <p className="text-xs text-muted-foreground mb-1 flex items-center"><JapaneseYen className="h-3.5 w-3.5 mr-1"/>月額料金</p>
@@ -83,6 +83,12 @@ export default function MyPage() {
                         <p className="font-medium">毎月 {contract.paymentDay}日</p>
                       </div>
                     </div>
+                    <Link href={`/contract-chat/${contract.id}`}>
+                      <button className="flex items-center gap-2 px-4 py-2 border border-border rounded-lg text-sm hover:bg-muted transition-colors">
+                        <MessageSquare className="h-4 w-4" />
+                        協力会社にメッセージ
+                      </button>
+                    </Link>
                   </div>
                 </div>
               </Card>
