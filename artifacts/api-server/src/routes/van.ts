@@ -1,7 +1,7 @@
 /**
  * Chat VAN — van rental routes
  * Handles: /van/start, /van/applications, /van/vehicles, /van/rental-companies,
- *           /van/contracts, /van/dashboard
+ *           /van/contracts, /van/dashboard, /van/admin/* (screenings, payments, GPS, insurance, incidents, returns, audit-logs)
  */
 import { Router, type IRouter } from "express";
 import {
@@ -15,6 +15,14 @@ import {
   notificationsTable,
   usersTable,
   settingsTable,
+  screeningsTable,
+  vanPaymentsTable,
+  insurancePoliciesTable,
+  gpsDevicesTable,
+  gpsLocationsTable,
+  vanReturnsTable,
+  auditLogsTable,
+  vanIncidentsTable,
 } from "@workspace/db";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
@@ -130,7 +138,7 @@ router.post("/van/start", async (req, res) => {
     // Create application
     const [app] = await db.insert(vanApplicationsTable).values({
       userId: userId ?? null,
-      status: "相談中",
+      status: "hearing",
       requestText: message,
     }).returning();
 
@@ -166,7 +174,7 @@ router.post("/van/start", async (req, res) => {
     // If complete inquiry, update application
     if (inquiry) {
       await db.update(vanApplicationsTable).set({
-        status: "確認中",
+        status: "vehicle_search",
         area: inquiry.area as string,
         startDate: inquiry.startDate as string,
         monthlyBudget: inquiry.monthlyBudget as number,
@@ -282,9 +290,9 @@ router.post("/van/applications/:id/messages", async (req, res) => {
     });
 
     // Update application if inquiry complete
-    if (inquiry && app.status === "相談中") {
+    if (inquiry && app.status === "hearing") {
       await db.update(vanApplicationsTable).set({
-        status: "確認中",
+        status: "vehicle_search",
         area: (inquiry.area as string) ?? app.area,
         startDate: (inquiry.startDate as string) ?? app.startDate,
         monthlyBudget: (inquiry.monthlyBudget as number) ?? app.monthlyBudget,
@@ -418,7 +426,7 @@ router.post("/van/applications/:id/propose", requireAuth, requireAdmin, async (r
 
     // Update application status
     const [app] = await db.update(vanApplicationsTable)
-      .set({ status: "提案送信済", updatedAt: new Date() })
+      .set({ status: "proposal_sent", updatedAt: new Date() })
       .where(eq(vanApplicationsTable.id, appId))
       .returning();
 
@@ -458,7 +466,7 @@ router.post("/van/applications/:id/accept", requireAuth, async (req, res) => {
     const appId = parseInt(String(req.params.id));
     const { vehicleId } = req.body as { vehicleId: number };
     const [app] = await db.update(vanApplicationsTable)
-      .set({ status: "申込受付", updatedAt: new Date() })
+      .set({ status: "kyc_pending", updatedAt: new Date() })
       .where(eq(vanApplicationsTable.id, appId))
       .returning();
     if (!app) return res.status(404).json({ error: "Not found" });
@@ -495,25 +503,25 @@ router.get("/van/dashboard", requireAuth, requireAdmin, async (req, res) => {
       [availableVehicles],
     ] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(vanApplicationsTable)
-        .where(eq(vanApplicationsTable.status, "相談中")),
+        .where(eq(vanApplicationsTable.status, "hearing")),
       db.select({ count: sql<number>`count(*)` }).from(vanApplicationsTable)
-        .where(eq(vanApplicationsTable.status, "確認中")),
+        .where(eq(vanApplicationsTable.status, "vehicle_search")),
       db.select({ count: sql<number>`count(*)` }).from(vanApplicationsTable)
-        .where(eq(vanApplicationsTable.status, "提案送信済")),
+        .where(eq(vanApplicationsTable.status, "proposal_sent")),
       db.select({ count: sql<number>`count(*)` }).from(vanApplicationsTable)
-        .where(inArray(vanApplicationsTable.status, ["申込受付", "審査中", "提案確定", "契約手続き"] as any[])),
+        .where(inArray(vanApplicationsTable.status, ["kyc_pending", "screening", "contract_pending", "contracting"] as any[])),
       db.select({ count: sql<number>`count(*)` }).from(vanContractsTable)
-        .where(inArray(vanContractsTable.status, ["利用中"] as any[])),
+        .where(inArray(vanContractsTable.status, ["active"] as any[])),
       db.select({ count: sql<number>`count(*)` }).from(vanContractsTable)
-        .where(eq(vanContractsTable.status, "返却予定" as any)),
+        .where(eq(vanContractsTable.status, "return_scheduled" as any)),
       db.select({ count: sql<number>`count(*)` }).from(vehiclesTable),
       db.select({ count: sql<number>`count(*)` }).from(vehiclesTable)
-        .where(eq(vehiclesTable.status, "募集中")),
+        .where(eq(vehiclesTable.status, "available")),
     ]);
 
     const [revenueRow] = await db.select({
       total: sql<number>`coalesce(sum(monthly_price), 0)`,
-    }).from(vanContractsTable).where(eq(vanContractsTable.status, "利用中" as any));
+    }).from(vanContractsTable).where(eq(vanContractsTable.status, "active" as any));
 
     return res.json({
       newConsultations: Number(newConsultations.count),
@@ -746,6 +754,238 @@ router.delete("/van/vehicles/:id", requireAuth, requireAdmin, async (req, res) =
     return res.status(204).send();
   } catch (err) {
     console.error("delete vehicle error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── GET /van/admin/screenings ─────────────────────────────────────────────
+router.get("/van/admin/screenings", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const rows = await db.select({
+      screening: screeningsTable,
+      application: vanApplicationsTable,
+    }).from(screeningsTable)
+      .leftJoin(vanApplicationsTable, eq(screeningsTable.applicationId, vanApplicationsTable.id))
+      .orderBy(desc(screeningsTable.createdAt));
+    return res.json(rows.map(({ screening, application }) => ({
+      ...screening,
+      application: application ? { applicantName: application.applicantName, area: application.area, status: application.status } : null,
+    })));
+  } catch (err) {
+    console.error("list screenings error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── PUT /van/admin/screenings/:id ─────────────────────────────────────────
+router.put("/van/admin/screenings/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id));
+    const [updated] = await db.update(screeningsTable)
+      .set({ ...req.body, updatedAt: new Date() })
+      .where(eq(screeningsTable.id, id)).returning();
+    if (!updated) return res.status(404).json({ error: "Not found" });
+    return res.json(updated);
+  } catch (err) {
+    console.error("update screening error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── GET /van/admin/payments ────────────────────────────────────────────────
+router.get("/van/admin/payments", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const rows = await db.select({
+      payment: vanPaymentsTable,
+      contract: vanContractsTable,
+    }).from(vanPaymentsTable)
+      .leftJoin(vanContractsTable, eq(vanPaymentsTable.contractId, vanContractsTable.id))
+      .orderBy(desc(vanPaymentsTable.createdAt));
+    return res.json(rows.map(({ payment, contract }) => ({
+      ...payment,
+      contract: contract ? { userId: contract.userId, vehicleId: contract.vehicleId } : null,
+    })));
+  } catch (err) {
+    console.error("list van payments error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── GET /van/admin/gps/devices ────────────────────────────────────────────
+router.get("/van/admin/gps/devices", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const rows = await db.select({
+      device: gpsDevicesTable,
+      vehicle: vehiclesTable,
+    }).from(gpsDevicesTable)
+      .leftJoin(vehiclesTable, eq(gpsDevicesTable.vehicleId, vehiclesTable.id))
+      .orderBy(desc(gpsDevicesTable.createdAt));
+    return res.json(rows.map(({ device, vehicle }) => ({
+      ...device,
+      vehicle: vehicle ? { maker: vehicle.maker, model: vehicle.model, licensePlate: vehicle.licensePlate } : null,
+    })));
+  } catch (err) {
+    console.error("list gps devices error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── GET /van/admin/insurance ──────────────────────────────────────────────
+router.get("/van/admin/insurance", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const rows = await db.select({
+      policy: insurancePoliciesTable,
+      vehicle: vehiclesTable,
+    }).from(insurancePoliciesTable)
+      .leftJoin(vehiclesTable, eq(insurancePoliciesTable.vehicleId, vehiclesTable.id))
+      .orderBy(desc(insurancePoliciesTable.createdAt));
+    return res.json(rows.map(({ policy, vehicle }) => ({
+      ...policy,
+      vehicle: vehicle ? { maker: vehicle.maker, model: vehicle.model, licensePlate: vehicle.licensePlate } : null,
+    })));
+  } catch (err) {
+    console.error("list insurance error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── POST /van/admin/insurance ─────────────────────────────────────────────
+router.post("/van/admin/insurance", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const [policy] = await db.insert(insurancePoliciesTable)
+      .values({ ...req.body, status: req.body.status ?? "active" }).returning();
+    return res.status(201).json(policy);
+  } catch (err) {
+    console.error("create insurance error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── GET /van/admin/incidents ──────────────────────────────────────────────
+router.get("/van/admin/incidents", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const rows = await db.select({
+      incident: vanIncidentsTable,
+      user: usersTable,
+    }).from(vanIncidentsTable)
+      .leftJoin(usersTable, eq(vanIncidentsTable.userId, usersTable.id))
+      .orderBy(desc(vanIncidentsTable.createdAt));
+    return res.json(rows.map(({ incident, user }) => ({
+      ...incident,
+      user: user ? { name: user.name, email: user.email } : null,
+    })));
+  } catch (err) {
+    console.error("list incidents error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── PUT /van/admin/incidents/:id ──────────────────────────────────────────
+router.put("/van/admin/incidents/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id));
+    const [updated] = await db.update(vanIncidentsTable)
+      .set({ ...req.body, updatedAt: new Date() })
+      .where(eq(vanIncidentsTable.id, id)).returning();
+    if (!updated) return res.status(404).json({ error: "Not found" });
+    return res.json(updated);
+  } catch (err) {
+    console.error("update incident error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── GET /van/admin/returns ────────────────────────────────────────────────
+router.get("/van/admin/returns", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const rows = await db.select({
+      ret: vanReturnsTable,
+      user: usersTable,
+      vehicle: vehiclesTable,
+    }).from(vanReturnsTable)
+      .leftJoin(usersTable, eq(vanReturnsTable.userId, usersTable.id))
+      .leftJoin(vehiclesTable, eq(vanReturnsTable.vehicleId, vehiclesTable.id))
+      .orderBy(desc(vanReturnsTable.createdAt));
+    return res.json(rows.map(({ ret, user, vehicle }) => ({
+      ...ret,
+      user: user ? { name: user.name, email: user.email } : null,
+      vehicle: vehicle ? { maker: vehicle.maker, model: vehicle.model, licensePlate: vehicle.licensePlate } : null,
+    })));
+  } catch (err) {
+    console.error("list returns error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── PUT /van/admin/returns/:id ────────────────────────────────────────────
+router.put("/van/admin/returns/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id));
+    const [updated] = await db.update(vanReturnsTable)
+      .set({ ...req.body, updatedAt: new Date() })
+      .where(eq(vanReturnsTable.id, id)).returning();
+    if (!updated) return res.status(404).json({ error: "Not found" });
+    return res.json(updated);
+  } catch (err) {
+    console.error("update return error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── GET /van/admin/audit-logs ─────────────────────────────────────────────
+router.get("/van/admin/audit-logs", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const logs = await db.select().from(auditLogsTable)
+      .orderBy(desc(auditLogsTable.createdAt))
+      .limit(500);
+    return res.json(logs);
+  } catch (err) {
+    console.error("list audit logs error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── POST /van/incidents (user reports accident/breakdown) ──────────────────
+router.post("/van/incidents", requireAuth, async (req, res) => {
+  try {
+    const userId: number | undefined = (req.session as any)?.userId;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+    const [incident] = await db.insert(vanIncidentsTable)
+      .values({ ...req.body, userId, status: "received" }).returning();
+    // Notify admins
+    const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
+    for (const admin of admins) {
+      await db.insert(notificationsTable).values({
+        userId: admin.id,
+        message: `事故・故障報告が届きました（ユーザーID: ${userId}）`,
+        title: '緊急: 事故・故障報告',
+      });
+    }
+    return res.status(201).json(incident);
+  } catch (err) {
+    console.error("create incident error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── POST /van/returns (user requests return) ──────────────────────────────
+router.post("/van/returns", requireAuth, async (req, res) => {
+  try {
+    const userId: number | undefined = (req.session as any)?.userId;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+    const [ret] = await db.insert(vanReturnsTable)
+      .values({ ...req.body, userId, status: "requested" }).returning();
+    const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
+    for (const admin of admins) {
+      await db.insert(notificationsTable).values({
+        userId: admin.id,
+        message: `返却申請が届きました（ユーザーID: ${userId}）`,
+        title: 'Chat VAN 返却申請',
+      });
+    }
+    return res.status(201).json(ret);
+  } catch (err) {
+    console.error("create return error:", err);
     return res.status(500).json({ error: "Internal error" });
   }
 });

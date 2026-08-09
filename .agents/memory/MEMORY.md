@@ -1,1 +1,2 @@
 - [Chat VAN migration](chat-van-migration.md) — Chat LOGI → Chat VAN へのリメイク。zod v3/v4 codegen 注意点あり。
+- [Chat VAN DB statuses](chat-van-db-statuses.md) — van_applications/vehicles/contracts のステータスは English 内部値、UI は日本語ラベル。
