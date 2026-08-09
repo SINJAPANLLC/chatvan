@@ -14,6 +14,7 @@ import {
   rentalCompaniesTable,
   notificationsTable,
   usersTable,
+  settingsTable,
 } from "@workspace/db";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
@@ -86,6 +87,15 @@ Chat VANは、チャットで希望条件を伝えると最適な軽バンを提
 }
 </van_inquiry>`;
 
+// ── Helper: get system prompt from DB (falls back to hardcoded default) ───
+async function getSystemPrompt(): Promise<string> {
+  try {
+    const [row] = await db.select().from(settingsTable).where(eq(settingsTable.key, "ai_system_prompt"));
+    if (row?.value) return row.value;
+  } catch { /* ignore */ }
+  return VAN_SYSTEM_PROMPT;
+}
+
 // ── Helper: parse options tag ──────────────────────────────────────────────
 function parseOptions(text: string): string[] | null {
   const match = text.match(/<options>([\s\S]*?)<\/options>/);
@@ -132,10 +142,11 @@ router.post("/van/start", async (req, res) => {
     }).returning();
 
     // Call OpenAI
+    const systemPrompt = await getSystemPrompt();
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: VAN_SYSTEM_PROMPT },
+        { role: "system", content: systemPrompt },
         { role: "user", content: message },
       ],
     });
@@ -243,8 +254,9 @@ router.post("/van/applications/:id/messages", async (req, res) => {
     });
 
     // Build OpenAI messages
+    const systemPrompt = await getSystemPrompt();
     const openaiMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [
-      { role: "system", content: VAN_SYSTEM_PROMPT },
+      { role: "system", content: systemPrompt },
       ...history.map((m) => ({
         role: (m.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
         content: m.content,
