@@ -3,7 +3,8 @@ import { Link, useLocation } from 'wouter';
 import { useGetMe, useLogout } from '@workspace/api-client-react';
 import {
   LayoutDashboard, Car, Building2, Users, FileText,
-  Loader2, ArrowLeft, Bell, Menu, X, MessageSquare
+  Loader2, ArrowLeft, Bell, Menu, X, MessageSquare,
+  Receipt, TrendingUp, Bot, Mail, BookOpen, Search, MessageCircle
 } from 'lucide-react';
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -42,6 +43,13 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     { href: '/admin/contracts',        label: '契約管理',         icon: FileText },
     { href: '/admin/customers',        label: 'ユーザー管理',     icon: Users },
     { href: '/admin/notifications',    label: '通知管理',         icon: Bell },
+    { href: '/admin/invoices',         label: '請求書払い管理',   icon: Receipt },
+    { href: '/admin/finance',          label: 'PL・BS・CF',       icon: TrendingUp },
+    { href: '/admin/pricing',          label: 'AIプロンプト',     icon: Bot },
+    { href: '/admin/email-marketing',  label: 'メール営業',       icon: Mail },
+    { href: '/admin/blog',             label: 'ブログ管理',       icon: BookOpen },
+    { href: '/admin/seo',              label: 'SEO設定',          icon: Search },
+    { href: '/admin/contacts',         label: 'お問い合わせ',     icon: MessageCircle },
   ];
 
   const NavContent = () => (
