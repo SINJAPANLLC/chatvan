@@ -4,7 +4,9 @@ import { useGetMe, useLogout } from '@workspace/api-client-react';
 import {
   LayoutDashboard, Car, Building2, Users, FileText,
   Loader2, ArrowLeft, Bell, Menu, X, MessageSquare,
-  Receipt, TrendingUp, Bot, Mail, BookOpen, Search, MessageCircle
+  Shield, MapPin, AlertTriangle, RotateCcw, Bot,
+  CreditCard, ClipboardCheck, ScrollText,
+  Receipt, TrendingUp, Mail, BookOpen, Search, MessageCircle,
 } from 'lucide-react';
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -14,9 +16,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   React.useEffect(() => {
-    if (!isLoading && (!user || user.role !== 'admin')) {
-      setLocation('/');
-    }
+    if (!isLoading && (!user || user.role !== 'admin')) setLocation('/');
   }, [user, isLoading, setLocation]);
 
   if (isLoading) {
@@ -26,7 +26,6 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-
   if (!user || user.role !== 'admin') return null;
 
   const handleLogout = () => {
@@ -36,13 +35,22 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   };
 
   const navItems = [
+    // Chat VAN コア
     { href: '/admin',                  label: 'ダッシュボード',   icon: LayoutDashboard },
     { href: '/admin/applications',     label: '相談一覧',         icon: MessageSquare },
-    { href: '/admin/vehicles',         label: '車両管理',         icon: Car },
-    { href: '/admin/rental-companies', label: 'レンタル会社',     icon: Building2 },
-    { href: '/admin/contracts',        label: '契約管理',         icon: FileText },
     { href: '/admin/customers',        label: 'ユーザー管理',     icon: Users },
+    { href: '/admin/rental-companies', label: 'レンタル会社',     icon: Building2 },
+    { href: '/admin/vehicles',         label: '車両管理',         icon: Car },
+    { href: '/admin/contracts',        label: '契約管理',         icon: FileText },
+    { href: '/admin/payments',         label: '決済・未払い',     icon: CreditCard },
+    { href: '/admin/insurance',        label: '保険管理',         icon: Shield },
+    { href: '/admin/gps',              label: 'GPS',              icon: MapPin },
+    { href: '/admin/incidents',        label: '事故・故障',       icon: AlertTriangle },
+    { href: '/admin/recovery',         label: '未返却・回収',     icon: RotateCcw },
+    { href: '/admin/screening',        label: '審査',             icon: ClipboardCheck },
     { href: '/admin/notifications',    label: '通知管理',         icon: Bell },
+    { href: '/admin/audit-logs',       label: '監査ログ',         icon: ScrollText },
+    // 管理・マーケティング
     { href: '/admin/invoices',         label: '請求書払い管理',   icon: Receipt },
     { href: '/admin/finance',          label: 'PL・BS・CF',       icon: TrendingUp },
     { href: '/admin/pricing',          label: 'AIプロンプト',     icon: Bot },
@@ -64,15 +72,13 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         </button>
       </div>
 
-      <nav className="flex-1 py-6 px-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 py-4 px-3 space-y-0.5 overflow-y-auto">
         {navItems.map((item) => {
           const isActive = location === item.href || (item.href !== '/admin' && location.startsWith(item.href));
           return (
             <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}>
-              <div className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors cursor-pointer ${
-                isActive
-                  ? 'bg-foreground text-background'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              <div className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
+                isActive ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}>
                 <item.icon className="h-4 w-4 shrink-0" />
                 {item.label}
@@ -82,16 +88,12 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         })}
       </nav>
 
-      <div className="p-4 border-t border-border shrink-0 space-y-2">
-        <button 
-          onClick={handleLogout}
-          className="w-full text-left px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-        >
+      <div className="p-4 border-t border-border shrink-0 space-y-1">
+        <button onClick={handleLogout} className="w-full text-left px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors">
           ログアウト
         </button>
         <Link href="/" className="text-xs text-muted-foreground hover:underline flex items-center gap-1 px-3 py-2">
-          <ArrowLeft className="h-3 w-3" />
-          一般画面へ
+          <ArrowLeft className="h-3 w-3" />一般画面へ
         </Link>
       </div>
     </div>
@@ -99,13 +101,13 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-[100dvh] flex bg-sidebar text-foreground font-sans">
-      <aside className="hidden md:flex flex-col w-64 border-r border-border bg-card sticky top-0 h-[100dvh] shrink-0">
+      <aside className="hidden md:flex flex-col w-60 border-r border-border bg-card sticky top-0 h-[100dvh] shrink-0">
         <NavContent />
       </aside>
 
       {mobileOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
-          <div className="w-72 bg-card border-r border-border h-full shadow-xl overflow-y-auto flex flex-col">
+          <div className="w-64 bg-card border-r border-border h-full shadow-xl overflow-y-auto flex flex-col">
             <NavContent />
           </div>
           <div className="flex-1 bg-black/40" onClick={() => setMobileOpen(false)} />
@@ -114,10 +116,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
       <main className="flex-1 flex flex-col min-w-0">
         <header className="md:hidden h-14 border-b border-border bg-card flex items-center px-4 gap-3 shrink-0">
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="text-muted-foreground hover:text-foreground"
-          >
+          <button onClick={() => setMobileOpen(true)} className="text-muted-foreground hover:text-foreground">
             <Menu className="h-5 w-5" />
           </button>
           <Link href="/admin" className="flex items-center gap-2">
@@ -125,11 +124,8 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             <span className="text-xs text-muted-foreground">管理者</span>
           </Link>
         </header>
-
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="mx-auto max-w-6xl">
-            {children}
-          </div>
+          <div className="mx-auto max-w-6xl">{children}</div>
         </div>
       </main>
     </div>

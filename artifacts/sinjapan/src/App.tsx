@@ -20,6 +20,7 @@ const Settings      = lazy(() => import('@/pages/settings'));
 const Login         = lazy(() => import('@/pages/login'));
 const Register      = lazy(() => import('@/pages/register'));
 const Contact       = lazy(() => import('@/pages/contact'));
+const BreakdownPage = lazy(() => import('@/pages/breakdown'));
 
 // Admin Pages
 const AdminDashboard        = lazy(() => import('@/pages/admin/dashboard'));
@@ -30,22 +31,19 @@ const AdminRentalCompanies  = lazy(() => import('@/pages/admin/rental-companies'
 const AdminContracts        = lazy(() => import('@/pages/admin/contracts'));
 const AdminCustomers        = lazy(() => import('@/pages/admin/customers'));
 const AdminNotifications    = lazy(() => import('@/pages/admin/notifications'));
-const AdminInvoices         = lazy(() => import('@/pages/admin/invoices'));
-const AdminFinance          = lazy(() => import('@/pages/admin/finance'));
 const AdminPricing          = lazy(() => import('@/pages/admin/pricing'));
-const AdminEmailMarketing   = lazy(() => import('@/pages/admin/email-marketing'));
-const AdminBlog             = lazy(() => import('@/pages/admin/blog'));
-const AdminSeo              = lazy(() => import('@/pages/admin/seo'));
-const AdminContacts         = lazy(() => import('@/pages/admin/contacts'));
+// Chat VAN 固有管理画面
+const AdminInsurance        = lazy(() => import('@/pages/admin/insurance'));
+const AdminGps              = lazy(() => import('@/pages/admin/gps'));
+const AdminIncidents        = lazy(() => import('@/pages/admin/incidents'));
+const AdminRecovery         = lazy(() => import('@/pages/admin/recovery'));
+const AdminPayments         = lazy(() => import('@/pages/admin/payments-van'));
+const AdminScreening        = lazy(() => import('@/pages/admin/screening'));
+const AdminAuditLogs        = lazy(() => import('@/pages/admin/audit-logs'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      gcTime: 5 * 60_000,
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
+    queries: { staleTime: 30_000, gcTime: 5 * 60_000, retry: 1, refetchOnWindowFocus: false },
   },
 });
 
@@ -89,26 +87,30 @@ function Router() {
         <Route path="/admin/notifications">
           <AdminLayout><AdminNotifications /></AdminLayout>
         </Route>
-        <Route path="/admin/invoices">
-          <AdminLayout><AdminInvoices /></AdminLayout>
-        </Route>
-        <Route path="/admin/finance">
-          <AdminLayout><AdminFinance /></AdminLayout>
-        </Route>
         <Route path="/admin/pricing">
           <AdminLayout><AdminPricing /></AdminLayout>
         </Route>
-        <Route path="/admin/email-marketing">
-          <AdminLayout><AdminEmailMarketing /></AdminLayout>
+        {/* Chat VAN 固有 */}
+        <Route path="/admin/insurance">
+          <AdminLayout><AdminInsurance /></AdminLayout>
         </Route>
-        <Route path="/admin/blog">
-          <AdminLayout><AdminBlog /></AdminLayout>
+        <Route path="/admin/gps">
+          <AdminLayout><AdminGps /></AdminLayout>
         </Route>
-        <Route path="/admin/seo">
-          <AdminLayout><AdminSeo /></AdminLayout>
+        <Route path="/admin/incidents">
+          <AdminLayout><AdminIncidents /></AdminLayout>
         </Route>
-        <Route path="/admin/contacts">
-          <AdminLayout><AdminContacts /></AdminLayout>
+        <Route path="/admin/recovery">
+          <AdminLayout><AdminRecovery /></AdminLayout>
+        </Route>
+        <Route path="/admin/payments">
+          <AdminLayout><AdminPayments /></AdminLayout>
+        </Route>
+        <Route path="/admin/screening">
+          <AdminLayout><AdminScreening /></AdminLayout>
+        </Route>
+        <Route path="/admin/audit-logs">
+          <AdminLayout><AdminAuditLogs /></AdminLayout>
         </Route>
 
         {/* User Routes */}
@@ -129,6 +131,9 @@ function Router() {
         </Route>
         <Route path="/contact">
           <UserLayout><Contact /></UserLayout>
+        </Route>
+        <Route path="/breakdown">
+          <UserLayout><BreakdownPage /></UserLayout>
         </Route>
 
         <Route component={NotFound} />

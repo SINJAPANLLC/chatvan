@@ -6,16 +6,16 @@ import { vehiclesTable } from "./vehicles";
 import { vanApplicationsTable } from "./van_applications";
 import { rentalCompaniesTable } from "./rental_companies";
 
-export const vanContractStatusEnum = pgEnum("van_contract_status_en", [
-  "draft",              // 下書き
-  "pending_documents",  // 書類待ち
-  "pending_signature",  // 署名待ち
-  "pending_payment",    // 決済待ち
-  "active",             // 利用中
-  "payment_issue",      // 未払い問題
-  "return_pending",     // 返却予定
-  "completed",          // 契約終了
-  "cancelled",          // キャンセル
+export const vanContractStatusEnum = pgEnum("van_contract_status", [
+  "draft",
+  "pending_documents",
+  "pending_signature",
+  "pending_payment",
+  "active",
+  "payment_issue",
+  "return_pending",
+  "completed",
+  "cancelled",
 ]);
 
 export const CONTRACT_STATUS_LABELS: Record<string, string> = {
@@ -32,41 +32,30 @@ export const CONTRACT_STATUS_LABELS: Record<string, string> = {
 
 export const vanContractsTable = pgTable("van_contracts", {
   id: serial("id").primaryKey(),
-  contractNumber: text("contract_number"),             // 契約番号（例: CVN-2024-0001）
+  contractNumber: text("contract_number"),
   applicationId: integer("application_id").references(() => vanApplicationsTable.id),
   userId: integer("user_id").references(() => usersTable.id).notNull(),
   vehicleId: integer("vehicle_id").references(() => vehiclesTable.id).notNull(),
   rentalCompanyId: integer("rental_company_id").references(() => rentalCompaniesTable.id),
-
   // 契約主体（ハードコードしない）
   platformOperator: text("platform_operator").default("SIN JAPAN株式会社"),
-  contractProvider: text("contract_provider"),   // 契約名義（SIN JAPAN or レンタル会社）
-  vehicleProvider: text("vehicle_provider"),     // 車両提供者（レンタル会社名）
-
-  // 期間
+  contractProvider: text("contract_provider"),
+  vehicleProvider: text("vehicle_provider"),
   startDate: text("start_date"),
   plannedEndDate: text("planned_end_date"),
-  minimumTerm: integer("minimum_term"),           // 最低利用月数
-
-  // 料金
-  monthlyAmount: numeric("monthly_amount", { precision: 10, scale: 2 }).notNull(), // ユーザー支払額
-  rentalCompanyAmount: numeric("rental_company_amount", { precision: 10, scale: 2 }), // レンタル会社受取
-  chatVanFee: numeric("chat_van_fee", { precision: 10, scale: 2 }),
+  minimumTerm: integer("minimum_term"),
+  monthlyPrice: numeric("monthly_price", { precision: 10, scale: 2 }).notNull(),
+  sinJapanFee: numeric("sin_japan_fee", { precision: 10, scale: 2 }).default("0"),
   paymentDay: integer("payment_day").default(1),
-
   status: vanContractStatusEnum("status").notNull().default("draft"),
-
-  // 同意情報（証跡）
-  termsAgreedAt: timestamp("terms_agreed_at"),
-  signatureData: text("signature_data"),          // 同意時のIP/UA等 JSON
+  // 2本の契約書の同意記録
   platformContractAgreedAt: timestamp("platform_contract_agreed_at"),
   vehicleContractAgreedAt: timestamp("vehicle_contract_agreed_at"),
-
-  // 特記事項
+  termsAgreedAt: timestamp("terms_agreed_at"),
+  signatureData: text("signature_data"),
   specialTerms: text("special_terms"),
   terminationTerms: text("termination_terms"),
   returnTerms: text("return_terms"),
-
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
