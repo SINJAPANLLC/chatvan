@@ -25,7 +25,6 @@ const NAV_SECTIONS: Section[] = [
       { href: '/admin/customers',        label: 'ユーザー管理', icon: Users },
       { href: '/admin/rental-companies', label: 'レンタル会社', icon: Building2 },
       { href: '/admin/vehicles',         label: '車両管理',     icon: Car },
-      { href: '/admin/contracts',        label: '契約管理',     icon: FileText },
     ],
   },
   {
@@ -40,7 +39,6 @@ const NAV_SECTIONS: Section[] = [
     items: [
       { href: '/admin/email-marketing', label: 'メール営業', icon: Mail },
       { href: '/admin/blog',            label: 'ブログ管理', icon: BookOpen },
-      { href: '/admin/seo',             label: 'SEO設定',    icon: Search },
     ],
   },
   {
@@ -49,6 +47,7 @@ const NAV_SECTIONS: Section[] = [
       { href: '/admin/pricing',     label: 'AIプロンプト',   icon: Bot },
       { href: '/admin/notifications', label: '通知管理',     icon: Bell },
       { href: '/admin/audit-logs',  label: '監査ログ',       icon: ScrollText },
+      { href: '/admin/seo',         label: 'SEO設定',        icon: Search },
       { href: '/admin/contacts',    label: 'お問い合わせ',   icon: MessageCircle },
     ],
   },
