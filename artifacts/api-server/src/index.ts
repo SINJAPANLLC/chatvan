@@ -363,6 +363,18 @@ async function runMigrations() {
     logger.warn({ err: e.message }, "rental_company migration (non-fatal)");
   }
 
+  // 車両 — 絶対必要な追加フィールド
+  try {
+    await db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS inspection_certificate_owner TEXT`);
+    await db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS inspection_certificate_user  TEXT`);
+    await db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS insurance_company            TEXT`);
+    await db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS insurance_policy_number      TEXT`);
+    await db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS insurance_contact            TEXT`);
+    logger.info("migration: vehicle extra columns ready");
+  } catch (e: any) {
+    logger.warn({ err: e.message }, "vehicle extra columns migration (non-fatal)");
+  }
+
   // 契約チャット
   try {
     await db.execute(sql`

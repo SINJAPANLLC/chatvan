@@ -409,6 +409,70 @@ export default function AdminVehicles() {
                 /> バックカメラ
               </label>
             </div>
+
+            {/* ── 車検証 ── */}
+            <div className="col-span-2 pt-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">車検証</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">車検証 所有者欄</label>
+                  <input
+                    type="text"
+                    value={(formData as any).inspectionCertificateOwner ?? (formData as any).inspection_certificate_owner ?? ''}
+                    onChange={e => setFormData({...formData, inspection_certificate_owner: e.target.value} as any)}
+                    placeholder="例: 株式会社○○レンタカー"
+                    className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:border-foreground/50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">車検証 使用者欄</label>
+                  <input
+                    type="text"
+                    value={(formData as any).inspectionCertificateUser ?? (formData as any).inspection_certificate_user ?? ''}
+                    onChange={e => setFormData({...formData, inspection_certificate_user: e.target.value} as any)}
+                    placeholder="例: 田中 太郎"
+                    className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:border-foreground/50"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* ── 任意保険 ── */}
+            <div className="col-span-2 pt-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">任意保険</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">保険会社</label>
+                  <input
+                    type="text"
+                    value={(formData as any).insuranceCompany ?? (formData as any).insurance_company ?? ''}
+                    onChange={e => setFormData({...formData, insurance_company: e.target.value} as any)}
+                    placeholder="例: 東京海上日動"
+                    className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:border-foreground/50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">証券番号</label>
+                  <input
+                    type="text"
+                    value={(formData as any).insurancePolicyNumber ?? (formData as any).insurance_policy_number ?? ''}
+                    onChange={e => setFormData({...formData, insurance_policy_number: e.target.value} as any)}
+                    placeholder="例: AB-1234567890"
+                    className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:border-foreground/50"
+                  />
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <label className="text-sm font-medium">保険担当者</label>
+                  <input
+                    type="text"
+                    value={(formData as any).insuranceContact ?? (formData as any).insurance_contact ?? ''}
+                    onChange={e => setFormData({...formData, insurance_contact: e.target.value} as any)}
+                    placeholder="例: 山田 花子（090-0000-0000）"
+                    className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:border-foreground/50"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
           <div className="flex justify-end gap-3 mt-4">
             <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 border rounded-md text-sm font-medium hover:bg-muted">キャンセル</button>

@@ -48,8 +48,10 @@ export default function CompanyVehicles() {
 
   if (loading) return <div className="flex items-center justify-center h-40"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
 
+  const [detailVehicle, setDetailVehicle] = useState<any | null>(null);
+
   return (
-    <div className="space-y-4 max-w-4xl">
+    <div className="space-y-4 max-w-5xl">
       <div className="flex items-center gap-2">
         <Car className="h-5 w-5 text-primary" />
         <h1 className="text-xl font-bold">自社車両</h1>
@@ -77,7 +79,12 @@ export default function CompanyVehicles() {
             <tbody className="divide-y divide-border">
               {vehicles.map((v) => (
                 <tr key={v.id} className="hover:bg-muted/20">
-                  <td className="px-4 py-3 font-medium">{v.maker} {v.model}</td>
+                  <td className="px-4 py-3">
+                    <button onClick={() => setDetailVehicle(v)} className="font-medium hover:underline text-left">
+                      {v.maker} {v.model}
+                    </button>
+                    <div className="text-xs text-muted-foreground">{v.year ? `${v.year}年式` : ''}</div>
+                  </td>
                   <td className="px-4 py-3 font-mono text-xs">{v.licensePlate ?? v.license_plate}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs ${
@@ -128,6 +135,56 @@ export default function CompanyVehicles() {
           </table>
         )}
       </div>
+
+      {/* 詳細モーダル（車検証・保険情報） */}
+      {detailVehicle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setDetailVehicle(null)}>
+          <div className="bg-card border border-border rounded-xl shadow-xl w-full max-w-lg mx-4 p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold text-lg">{detailVehicle.maker} {detailVehicle.model}</h2>
+              <button onClick={() => setDetailVehicle(null)} className="p-1.5 rounded hover:bg-muted">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-sm">
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">車検証</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-muted/50 rounded-lg p-3">
+                    <p className="text-xs text-muted-foreground mb-0.5">所有者欄</p>
+                    <p className="font-medium">{detailVehicle.inspection_certificate_owner || '—'}</p>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-3">
+                    <p className="text-xs text-muted-foreground mb-0.5">使用者欄</p>
+                    <p className="font-medium">{detailVehicle.inspection_certificate_user || '—'}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">任意保険</p>
+                <div className="space-y-2">
+                  <div className="bg-muted/50 rounded-lg p-3 grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-0.5">保険会社</p>
+                      <p className="font-medium">{detailVehicle.insurance_company || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-0.5">証券番号</p>
+                      <p className="font-medium font-mono text-xs">{detailVehicle.insurance_policy_number || '—'}</p>
+                    </div>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-3">
+                    <p className="text-xs text-muted-foreground mb-0.5">保険担当者</p>
+                    <p className="font-medium">{detailVehicle.insurance_contact || '—'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
