@@ -28,8 +28,8 @@ router.get("/company/me", requireAuth, requireRentalCompany, async (req: Request
     const userId = req.session.userId;
     const raw = await db.execute(sql`
       SELECT u.id, u.email, u.name, u.phone, u.role, u.rental_company_id,
-        rc.name as company_name, rc.contact_person, rc.phone as company_phone,
-        rc.address, rc.service_area, rc.notes
+        rc.name as company_name, rc.contact_name, rc.phone as company_phone,
+        rc.address, rc.service_areas, rc.notes
       FROM users u
       LEFT JOIN rental_companies rc ON rc.id = u.rental_company_id
       WHERE u.id = ${userId}
@@ -47,32 +47,53 @@ router.get("/company/me", requireAuth, requireRentalCompany, async (req: Request
 router.get("/company/dashboard", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId;
-    const rcId = await getMyCompanyId(userId);
-    if (!rcId) return res.status(403).json({ error: "会社が紐付けられていません" });
+    const userRole = req.session.userRole;
+    const rcId = userRole === "admin" ? null : await getMyCompanyId(userId);
+    if (!rcId && userRole !== "admin") return res.status(403).json({ error: "会社が紐付けられていません" });
 
-    const statsRaw = await db.execute(sql`
-      SELECT
-        COUNT(DISTINCT v.id) as total_vehicles,
-        COUNT(DISTINCT v.id) FILTER (WHERE v.status = 'available') as available_vehicles,
-        COUNT(DISTINCT v.id) FILTER (WHERE v.status = 'rented') as rented_vehicles,
-        COUNT(DISTINCT vc.id) FILTER (WHERE vc.status = 'active') as active_contracts,
-        COUNT(DISTINCT vc.id) FILTER (WHERE vc.status = 'payment_issue') as payment_issues,
-        COUNT(DISTINCT vc.id) FILTER (WHERE vc.status = 'return_pending') as return_pending
-      FROM vehicles v
-      LEFT JOIN van_contracts vc ON vc.vehicle_id = v.id
-      WHERE v.rental_company_id = ${rcId}
-    `);
+    const statsRaw = rcId
+      ? await db.execute(sql`
+          SELECT
+            COUNT(DISTINCT v.id) as total_vehicles,
+            COUNT(DISTINCT v.id) FILTER (WHERE v.status = 'available') as available_vehicles,
+            COUNT(DISTINCT v.id) FILTER (WHERE v.status = 'rented') as rented_vehicles,
+            COUNT(DISTINCT vc.id) FILTER (WHERE vc.status = 'active') as active_contracts,
+            COUNT(DISTINCT vc.id) FILTER (WHERE vc.status = 'payment_issue') as payment_issues,
+            COUNT(DISTINCT vc.id) FILTER (WHERE vc.status = 'return_pending') as return_pending
+          FROM vehicles v
+          LEFT JOIN van_contracts vc ON vc.vehicle_id = v.id
+          WHERE v.rental_company_id = ${rcId}
+        `)
+      : await db.execute(sql`
+          SELECT
+            COUNT(DISTINCT v.id) as total_vehicles,
+            COUNT(DISTINCT v.id) FILTER (WHERE v.status = 'available') as available_vehicles,
+            COUNT(DISTINCT v.id) FILTER (WHERE v.status = 'rented') as rented_vehicles,
+            COUNT(DISTINCT vc.id) FILTER (WHERE vc.status = 'active') as active_contracts,
+            COUNT(DISTINCT vc.id) FILTER (WHERE vc.status = 'payment_issue') as payment_issues,
+            COUNT(DISTINCT vc.id) FILTER (WHERE vc.status = 'return_pending') as return_pending
+          FROM vehicles v
+          LEFT JOIN van_contracts vc ON vc.vehicle_id = v.id
+        `);
     const stats = toRow(statsRaw) ?? {};
 
     // 直近5件の契約
-    const recentRaw = await db.execute(sql`
-      SELECT vc.id, vc.status, vc.created_at, u.name as user_name, v.maker, v.model
-      FROM van_contracts vc
-      LEFT JOIN users u ON vc.user_id = u.id
-      LEFT JOIN vehicles v ON vc.vehicle_id = v.id
-      WHERE v.rental_company_id = ${rcId}
-      ORDER BY vc.created_at DESC LIMIT 5
-    `);
+    const recentRaw = rcId
+      ? await db.execute(sql`
+          SELECT vc.id, vc.status, vc.created_at, u.name as user_name, v.maker, v.model
+          FROM van_contracts vc
+          LEFT JOIN users u ON vc.user_id = u.id
+          LEFT JOIN vehicles v ON vc.vehicle_id = v.id
+          WHERE v.rental_company_id = ${rcId}
+          ORDER BY vc.created_at DESC LIMIT 5
+        `)
+      : await db.execute(sql`
+          SELECT vc.id, vc.status, vc.created_at, u.name as user_name, v.maker, v.model
+          FROM van_contracts vc
+          LEFT JOIN users u ON vc.user_id = u.id
+          LEFT JOIN vehicles v ON vc.vehicle_id = v.id
+          ORDER BY vc.created_at DESC LIMIT 5
+        `);
 
     return res.json({ stats, recentContracts: toRows(recentRaw) });
   } catch (err) {
@@ -81,15 +102,20 @@ router.get("/company/dashboard", requireAuth, requireRentalCompany, async (req: 
   }
 });
 
+// rcId を解決するヘルパー（admin は null = 全件）
+async function resolveRcId(userId: number, userRole: string): Promise<number | null> {
+  if (userRole === "admin") return null;
+  return getMyCompanyId(userId);
+}
+
 // ── GET /company/vehicles ───────────────────────────────────────────────────
 router.get("/company/vehicles", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
-    const userId = req.session.userId;
-    const rcId = await getMyCompanyId(userId);
-    if (!rcId) return res.json([]);
-    const rows = await db.select().from(vehiclesTable)
-      .where(eq(vehiclesTable.rentalCompanyId, rcId));
-    return res.json(rows);
+    const rcId = await resolveRcId(req.session.userId, req.session.userRole);
+    const raw = rcId
+      ? await db.execute(sql`SELECT * FROM vehicles WHERE rental_company_id = ${rcId} ORDER BY created_at DESC`)
+      : await db.execute(sql`SELECT * FROM vehicles ORDER BY created_at DESC`);
+    return res.json(toRows(raw));
   } catch (err) {
     return res.status(500).json({ error: "Internal error" });
   }
@@ -99,12 +125,15 @@ router.patch("/company/vehicles/:id", requireAuth, requireRentalCompany, async (
   try {
     const id = parseInt(String(req.params.id));
     const userId = req.session.userId;
-    const rcId = await getMyCompanyId(userId);
+    const userRole = req.session.userRole;
+    const rcId = await resolveRcId(userId, userRole);
 
-    const [vehicle] = await db.select({ rentalCompanyId: vehiclesTable.rentalCompanyId })
-      .from(vehiclesTable).where(eq(vehiclesTable.id, id)).limit(1);
-    if (!vehicle || vehicle.rentalCompanyId !== rcId) {
-      return res.status(403).json({ error: "権限がありません" });
+    if (rcId !== null) {
+      const [vehicle] = await db.select({ rentalCompanyId: vehiclesTable.rentalCompanyId })
+        .from(vehiclesTable).where(eq(vehiclesTable.id, id)).limit(1);
+      if (!vehicle || vehicle.rentalCompanyId !== rcId) {
+        return res.status(403).json({ error: "権限がありません" });
+      }
     }
 
     const { notes, monthlyPrice, prefecture, features } = req.body;
@@ -120,19 +149,25 @@ router.patch("/company/vehicles/:id", requireAuth, requireRentalCompany, async (
 // ── GET /company/contracts ──────────────────────────────────────────────────
 router.get("/company/contracts", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
-    const userId = req.session.userId;
-    const rcId = await getMyCompanyId(userId);
-    if (!rcId) return res.json([]);
-
-    const raw = await db.execute(sql`
-      SELECT vc.*, u.name as user_name, u.phone as user_phone, u.email as user_email,
-        v.maker, v.model, v.license_plate, v.prefecture
-      FROM van_contracts vc
-      LEFT JOIN users u ON vc.user_id = u.id
-      LEFT JOIN vehicles v ON vc.vehicle_id = v.id
-      WHERE v.rental_company_id = ${rcId}
-      ORDER BY vc.created_at DESC
-    `);
+    const rcId = await resolveRcId(req.session.userId, req.session.userRole);
+    const raw = rcId
+      ? await db.execute(sql`
+          SELECT vc.*, u.name as user_name, u.phone as user_phone, u.email as user_email,
+            v.maker, v.model, v.license_plate, v.prefecture
+          FROM van_contracts vc
+          LEFT JOIN users u ON vc.user_id = u.id
+          LEFT JOIN vehicles v ON vc.vehicle_id = v.id
+          WHERE v.rental_company_id = ${rcId}
+          ORDER BY vc.created_at DESC
+        `)
+      : await db.execute(sql`
+          SELECT vc.*, u.name as user_name, u.phone as user_phone, u.email as user_email,
+            v.maker, v.model, v.license_plate, v.prefecture
+          FROM van_contracts vc
+          LEFT JOIN users u ON vc.user_id = u.id
+          LEFT JOIN vehicles v ON vc.vehicle_id = v.id
+          ORDER BY vc.created_at DESC
+        `);
     return res.json(toRows(raw));
   } catch (err) {
     return res.status(500).json({ error: "Internal error" });
@@ -142,17 +177,21 @@ router.get("/company/contracts", requireAuth, requireRentalCompany, async (req: 
 // ── GET /company/insurance ──────────────────────────────────────────────────
 router.get("/company/insurance", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
-    const userId = req.session.userId;
-    const rcId = await getMyCompanyId(userId);
-    if (!rcId) return res.json([]);
-
-    const raw = await db.execute(sql`
-      SELECT ip.*, v.maker, v.model, v.license_plate
-      FROM insurance_policies ip
-      LEFT JOIN vehicles v ON ip.vehicle_id = v.id
-      WHERE v.rental_company_id = ${rcId}
-      ORDER BY ip.expiry_date ASC
-    `);
+    const rcId = await resolveRcId(req.session.userId, req.session.userRole);
+    const raw = rcId
+      ? await db.execute(sql`
+          SELECT ip.*, v.maker, v.model, v.license_plate
+          FROM insurance_policies ip
+          LEFT JOIN vehicles v ON ip.vehicle_id = v.id
+          WHERE v.rental_company_id = ${rcId}
+          ORDER BY ip.expiry_date ASC
+        `)
+      : await db.execute(sql`
+          SELECT ip.*, v.maker, v.model, v.license_plate
+          FROM insurance_policies ip
+          LEFT JOIN vehicles v ON ip.vehicle_id = v.id
+          ORDER BY ip.expiry_date ASC
+        `);
     return res.json(toRows(raw));
   } catch (err) {
     return res.status(500).json({ error: "Internal error" });
@@ -162,19 +201,25 @@ router.get("/company/insurance", requireAuth, requireRentalCompany, async (req: 
 // ── GET /company/gps ────────────────────────────────────────────────────────
 router.get("/company/gps", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
-    const userId = req.session.userId;
-    const rcId = await getMyCompanyId(userId);
-    if (!rcId) return res.json([]);
-
-    const raw = await db.execute(sql`
-      SELECT gd.*, v.maker, v.model, v.license_plate,
-        (SELECT row_to_json(gl) FROM gps_locations gl
-         WHERE gl.gps_device_id = gd.id ORDER BY gl.recorded_at DESC LIMIT 1) as last_location
-      FROM gps_devices gd
-      JOIN vehicles v ON gd.vehicle_id = v.id
-      WHERE v.rental_company_id = ${rcId}
-      ORDER BY gd.created_at DESC
-    `);
+    const rcId = await resolveRcId(req.session.userId, req.session.userRole);
+    const raw = rcId
+      ? await db.execute(sql`
+          SELECT gd.*, v.maker, v.model, v.license_plate,
+            (SELECT row_to_json(gl) FROM gps_locations gl
+             WHERE gl.gps_device_id = gd.id ORDER BY gl.recorded_at DESC LIMIT 1) as last_location
+          FROM gps_devices gd
+          JOIN vehicles v ON gd.vehicle_id = v.id
+          WHERE v.rental_company_id = ${rcId}
+          ORDER BY gd.created_at DESC
+        `)
+      : await db.execute(sql`
+          SELECT gd.*, v.maker, v.model, v.license_plate,
+            (SELECT row_to_json(gl) FROM gps_locations gl
+             WHERE gl.gps_device_id = gd.id ORDER BY gl.recorded_at DESC LIMIT 1) as last_location
+          FROM gps_devices gd
+          JOIN vehicles v ON gd.vehicle_id = v.id
+          ORDER BY gd.created_at DESC
+        `);
     return res.json(toRows(raw));
   } catch (err) {
     return res.status(500).json({ error: "Internal error" });
