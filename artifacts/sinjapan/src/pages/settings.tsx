@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useGetMe, useUpdateMe } from '@workspace/api-client-react';
+import { useGetMe, useUpdateUser } from '@workspace/api-client-react';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { getGetMeQueryKey } from '@workspace/api-client-react';
@@ -50,7 +50,7 @@ function SaveButton({ pending, disabled }: { pending: boolean; disabled?: boolea
 
 export default function Settings() {
   const { data: user } = useGetMe();
-  const updateMe = useUpdateMe();
+  const updateUser = useUpdateUser();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -76,8 +76,9 @@ export default function Settings() {
   }, [user]);
 
   const save = async (data: Record<string, string>) => {
+    if (!user?.id) return;
     try {
-      await updateMe.mutateAsync({ data });
+      await updateUser.mutateAsync({ id: user.id, data });
       queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
       toast({ title: '保存しました' });
     } catch (err: any) {
@@ -104,7 +105,7 @@ export default function Settings() {
       toast({ title: 'パスワードは8文字以上にしてください', variant: 'destructive' }); return;
     }
     try {
-      await updateMe.mutateAsync({ data: { currentPassword, newPassword } });
+      await updateUser.mutateAsync({ data: { currentPassword, newPassword } });
       setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
       toast({ title: 'パスワードを変更しました' });
     } catch (err: any) {
@@ -125,7 +126,7 @@ export default function Settings() {
             <Field label="会社名" value={companyName} onChange={setCompanyName} placeholder="株式会社〇〇" />
           </div>
           <Field label="電話番号" value={phone} onChange={setPhone} placeholder="090-0000-0000" type="tel" />
-          <SaveButton pending={updateMe.isPending} />
+          <SaveButton pending={updateUser.isPending} />
         </form>
       </Section>
 
@@ -140,7 +141,7 @@ export default function Settings() {
             onChange={setBillingAddress}
             placeholder="東京都渋谷区〇〇 1-2-3"
           />
-          <SaveButton pending={updateMe.isPending} />
+          <SaveButton pending={updateUser.isPending} />
         </form>
       </Section>
 
@@ -152,7 +153,7 @@ export default function Settings() {
           <Field label="現在のパスワード" value={currentPassword} onChange={setCurrentPassword} type="password" />
           <Field label="新しいパスワード" value={newPassword} onChange={setNewPassword} type="password" />
           <Field label="新しいパスワード（確認）" value={confirmPassword} onChange={setConfirmPassword} type="password" />
-          <SaveButton pending={updateMe.isPending} disabled={!currentPassword || !newPassword || !confirmPassword} />
+          <SaveButton pending={updateUser.isPending} disabled={!currentPassword || !newPassword || !confirmPassword} />
         </form>
       </Section>
 
