@@ -716,9 +716,15 @@ router.get("/van/applications/:id", requireAuth, async (req: Request, res: Respo
       ? { ...contractRow.contract, vehicle: contractRow.vehicle ? { ...contractRow.vehicle, rentalCompany: contractRow.company } : null }
       : null;
 
-    // pickup_photos / pickup_documents を JSON パース
+    // pickup_photos / pickup_documents / planned_end_date を JSON パース or 取得
+    let plannedEndDate: string | null = null;
+    if (contract) {
+      const raw = await db.execute(sql`SELECT planned_end_date FROM van_contracts WHERE id = ${(contract as any).id} LIMIT 1`);
+      plannedEndDate = ((raw as any).rows ?? raw)[0]?.planned_end_date ?? null;
+    }
     const contractWithParsed = contract ? {
       ...contract,
+      plannedEndDate,
       pickupPhotos: (() => { try { return JSON.parse((contract as any).pickupPhotos ?? '[]'); } catch { return []; } })(),
       pickupDocuments: (() => { try { return JSON.parse((contract as any).pickupDocuments ?? '[]'); } catch { return []; } })(),
     } : null;
