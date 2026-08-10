@@ -1153,6 +1153,10 @@ router.post("/van/applications/:id/confirm-pickup", requireAuth, async (req: Req
   try {
     const appId = parseInt(String(req.params.id));
     const userId: number | undefined = (req.session as any)?.userId;
+    const { pickupPhotos, pickupDocuments } = req.body as {
+      pickupPhotos?: string[];
+      pickupDocuments?: string[];
+    };
 
     const [app] = await db.select().from(vanApplicationsTable).where(eq(vanApplicationsTable.id, appId));
     if (!app) return res.status(404).json({ error: "Not found" });
@@ -1163,12 +1167,21 @@ router.post("/van/applications/:id/confirm-pickup", requireAuth, async (req: Req
       .set({ status: "active", updatedAt: new Date() })
       .where(eq(vanApplicationsTable.id, appId));
 
-    // 車両ステータスを貸出中に
+    // 車両ステータスを貸出中に・写真/書類を保存
     const [contract] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.applicationId, appId));
-    if (contract?.vehicleId) {
-      await db.update(vehiclesTable)
-        .set({ status: "rented", updatedAt: new Date() })
-        .where(eq(vehiclesTable.id, contract.vehicleId));
+    if (contract) {
+      await db.execute(sql`
+        UPDATE van_contracts SET
+          pickup_photos    = ${pickupPhotos ? JSON.stringify(pickupPhotos) : null},
+          pickup_documents = ${pickupDocuments ? JSON.stringify(pickupDocuments) : null},
+          updated_at = NOW()
+        WHERE id = ${contract.id}
+      `);
+      if (contract.vehicleId) {
+        await db.update(vehiclesTable)
+          .set({ status: "rented", updatedAt: new Date() })
+          .where(eq(vehiclesTable.id, contract.vehicleId));
+      }
     }
 
     await db.insert(notificationsTable).values({
@@ -2044,11 +2057,10 @@ router.delete("/van/vehicles/:id", requireAuth, requireAdmin, async (req: Reques
   }
 });
 
-// ── マイグレーション: selfie_photo 列追加 ─────────────────────────────────
-db.execute(sql`
-  ALTER TABLE identity_verifications
-  ADD COLUMN IF NOT EXISTS selfie_photo TEXT
-`).catch(() => {});
+// ── マイグレーション ───────────────────────────────────────────────────────
+db.execute(sql`ALTER TABLE identity_verifications ADD COLUMN IF NOT EXISTS selfie_photo TEXT`).catch(() => {});
+db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS pickup_photos TEXT`).catch(() => {});
+db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS pickup_documents TEXT`).catch(() => {});
 
 // ── 月額自動決済スケジューラー (毎日 JST 9:00 = UTC 0:00) ────────────────
 cron.schedule("0 0 * * *", async () => {
