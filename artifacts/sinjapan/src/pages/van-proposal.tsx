@@ -3,7 +3,7 @@ import { useRoute, useLocation } from 'wouter';
 import { useGetVanApplication, useAcceptVanProposal } from '@workspace/api-client-react';
 import {
   Loader2, CheckCircle2, ChevronLeft, Calendar, MapPin, JapaneseYen,
-  Check, Clock, ChevronRight, Gauge, Cigarette, CigaretteOff, CarFront,
+  Check, Clock, ChevronRight, Gauge, CarFront,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -193,41 +193,36 @@ export default function VanProposal() {
             return (
               <div key={v.id} className="border border-border rounded-2xl overflow-hidden shadow-sm">
                 {/* 写真ギャラリー */}
-                <div className="p-4 bg-muted/30">
+                <div className="px-4 pt-4 pb-3">
                   <PhotoGallery photos={photos} alt={`${v.maker} ${v.model}`} />
                 </div>
 
-                <div className="p-5">
-                  {/* 車両名・年式 */}
-                  <div className="mb-5">
-                    <h2 className="text-xl font-bold">{v.maker} {v.model}{v.grade ? ` ${v.grade}` : ''}</h2>
-                    {v.year && <p className="text-sm text-muted-foreground mt-0.5">{v.year}年式</p>}
-                  </div>
-
-                  {/* 月額料金 */}
-                  <div className="bg-foreground text-background rounded-xl px-5 py-4 mb-5">
-                    <p className="text-xs opacity-70 mb-1">月額料金（税込）</p>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-bold">{fmt(taxIn(v.userPrice))}</span>
-                      <span className="text-sm opacity-70">/ 月</span>
+                <div className="px-4 pb-4">
+                  {/* 車両名 + 月額を横並び */}
+                  <div className="flex items-start justify-between gap-3 mb-4">
+                    <div>
+                      <h2 className="text-base font-bold leading-snug">{v.maker} {v.model}{v.grade ? ` ${v.grade}` : ''}</h2>
                     </div>
-                    <p className="text-xs opacity-60 mt-1">税抜 {fmt(v.userPrice)}</p>
+                    <div className="text-right shrink-0">
+                      <p className="text-lg font-bold">{fmt(taxIn(v.userPrice))}<span className="text-xs font-normal text-muted-foreground ml-1">/月</span></p>
+                      <p className="text-xs text-muted-foreground">税抜 {fmt(v.userPrice)}</p>
+                    </div>
                   </div>
 
                   {/* 詳細スペック */}
                   <div className="divide-y divide-border/60 border border-border/60 rounded-xl overflow-hidden mb-5">
                     {[
-                      { icon: <MapPin className="h-4 w-4" />, label: 'エリア', value: v.prefecture || '指定なし' },
-                      { icon: <Calendar className="h-4 w-4" />, label: '最低利用期間', value: `${v.minPeriodMonths ?? 1}ヶ月〜` },
+                      v.year        && { icon: <CarFront className="h-4 w-4" />,  label: '年式',           value: `${v.year}年式` },
+                      v.mileage     && { icon: <Gauge className="h-4 w-4" />,     label: '走行距離',       value: `${v.mileage.toLocaleString()} km` },
+                      { icon: <MapPin className="h-4 w-4" />,    label: 'エリア',         value: v.prefecture || '指定なし' },
+                      { icon: <Calendar className="h-4 w-4" />,  label: '最低利用期間',   value: `${v.minPeriodMonths ?? 1}ヶ月〜` },
                       v.maxPeriodMonths && { icon: <Calendar className="h-4 w-4" />, label: '最長利用期間', value: `${v.maxPeriodMonths}ヶ月` },
-                      v.mileage && { icon: <Gauge className="h-4 w-4" />, label: '走行距離', value: `${v.mileage.toLocaleString()} km` },
-                      v.mileageLimit && { icon: <Gauge className="h-4 w-4" />, label: '月間走行上限', value: `${v.mileageLimit.toLocaleString()} km` },
+                      v.mileageLimit    && { icon: <Gauge className="h-4 w-4" />,    label: '月間走行上限', value: `${v.mileageLimit.toLocaleString()} km` },
                       v.excessMileageFee && { icon: <JapaneseYen className="h-4 w-4" />, label: '超過料金', value: `${fmt(v.excessMileageFee)} / km` },
-                      { icon: v.smokingPolicy === 'smoking_ok' ? <Cigarette className="h-4 w-4" /> : <CigaretteOff className="h-4 w-4" />, label: '喫煙', value: v.smokingPolicy === 'smoking_ok' ? '喫煙可' : '禁煙' },
-                      v.inspectionExpiry && { icon: <CarFront className="h-4 w-4" />, label: '車検満了', value: v.inspectionExpiry },
-                      v.availableFrom && { icon: <Calendar className="h-4 w-4" />, label: '利用開始可能日', value: v.availableFrom },
+                      v.inspectionExpiry && { icon: <CarFront className="h-4 w-4" />, label: '車検満了',    value: v.inspectionExpiry },
+                      v.availableFrom    && { icon: <Calendar className="h-4 w-4" />, label: '利用開始可能日', value: v.availableFrom },
                     ].filter(Boolean).map((row: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between px-4 py-3">
+                      <div key={i} className="flex items-center justify-between px-4 py-2.5">
                         <span className="flex items-center gap-2 text-sm text-muted-foreground">
                           {row.icon}{row.label}
                         </span>
