@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
+const BASE = import.meta.env.BASE_URL;
 const apiUrl = (p: string) => `${BASE}api${p}`;
 
 type VanApp = { id: number; status: string; area: string | null; createdAt: string };

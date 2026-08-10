@@ -4,8 +4,7 @@ import { useGetVanApplication } from '@workspace/api-client-react';
 import { Loader2, ChevronLeft, FileText, CheckCircle2, Clock, PenLine, RotateCcw, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, '');
-const apiUrl = (path: string) => `${BASE_URL}api${path}`;
+const apiUrl = (path: string) => `${import.meta.env.BASE_URL}api${path}`;
 const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem('sinjapan_auth_token') ?? ''}`,
   'Content-Type': 'application/json',

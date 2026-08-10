@@ -2,8 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Loader2, Upload, X, ScanFace, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
-const apiUrl = (p: string) => `${BASE}api${p}`;
+const apiUrl = (p: string) => `${import.meta.env.BASE_URL}api${p}`;
 const token = () => localStorage.getItem('sinjapan_auth_token') ?? '';
 
 interface UploadedImage { path: string; preview: string }
