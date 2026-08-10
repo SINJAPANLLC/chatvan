@@ -358,68 +358,72 @@ export default function ContractChat() {
         </div>
       </header>
 
-      {/* メッセージ一覧 */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {loading ? (
-          <div className="flex justify-center pt-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-3 pt-12 text-center">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-              <AlertTriangle className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <p className="font-medium text-sm">まだ報告はありません</p>
-            <p className="text-xs text-muted-foreground">下のカテゴリを選んで報告してください</p>
-          </div>
-        ) : (
-          messages.map(msg => {
-            const mine = isMine(msg);
-            return (
-              <div key={msg.id} className={`flex flex-col gap-1 ${mine ? 'items-end' : 'items-start'}`}>
-                {!mine && (
-                  <span className="text-xs font-medium text-muted-foreground px-1">
-                    {ROLE_LABELS[msg.sender_role_actual] ?? '担当者'}
-                  </span>
-                )}
-                <div className={`max-w-[78%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
-                  mine ? 'bg-foreground text-background rounded-br-sm' : 'bg-muted text-foreground rounded-bl-sm border border-border'
-                }`}>
-                  {msg.message}
-                </div>
-                <span className="text-xs text-muted-foreground/70 px-1">
-                  {new Date(msg.created_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </div>
-            );
-          })
-        )}
-        <div ref={bottomRef} />
-      </div>
-
-      {/* カテゴリ選択ボタン */}
-      <div className="shrink-0 border-t border-border bg-card px-4 py-3">
-        <p className="text-xs text-muted-foreground mb-2 font-medium">報告カテゴリを選択</p>
-        <div className="grid grid-cols-2 gap-2">
-          {CATEGORIES.map(cat => {
-            const Icon = cat.icon;
-            return (
-              <button
-                key={cat.id}
-                onClick={() => setActiveCategory(cat.id)}
-                className="flex items-center justify-between px-4 py-3 rounded-xl border border-border bg-background hover:bg-muted transition-colors text-left"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center border ${cat.color}`}>
-                    <Icon className="h-3.5 w-3.5" />
+      {/* メインコンテンツ */}
+      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
+        {/* カテゴリ選択 */}
+        <div>
+          <p className="text-sm font-semibold mb-3">報告カテゴリを選択</p>
+          <div className="grid grid-cols-2 gap-3">
+            {CATEGORIES.map(cat => {
+              const Icon = cat.icon;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setActiveCategory(cat.id)}
+                  className="flex flex-col items-start gap-3 px-4 py-4 rounded-2xl border border-border bg-background hover:bg-muted active:scale-[0.98] transition-all text-left"
+                >
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border ${cat.color}`}>
+                    <Icon className="h-5 w-5" />
                   </div>
-                  <span className="text-sm font-medium">{cat.label}</span>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </button>
-            );
-          })}
+                  <div>
+                    <p className="font-semibold text-sm">{cat.label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{cat.desc}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
+
+        {/* 過去の報告 */}
+        {!loading && messages.filter(m => isMine(m)).length > 0 && (
+          <div>
+            <p className="text-sm font-semibold mb-3">過去の報告</p>
+            <div className="space-y-2">
+              {messages.filter(m => isMine(m)).map(msg => {
+                const firstLine = msg.message.split('\n')[0] ?? '';
+                const date = new Date(msg.created_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                return (
+                  <div key={msg.id} className="px-4 py-3 rounded-xl bg-muted border border-border">
+                    <p className="text-sm font-medium">{firstLine}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{date}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* 担当者からの返信 */}
+        {!loading && messages.filter(m => !isMine(m)).length > 0 && (
+          <div>
+            <p className="text-sm font-semibold mb-3">担当者からの返信</p>
+            <div className="space-y-2">
+              {messages.filter(m => !isMine(m)).map(msg => {
+                const date = new Date(msg.created_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                return (
+                  <div key={msg.id} className="px-4 py-3 rounded-xl bg-card border border-border">
+                    <p className="text-xs text-muted-foreground font-medium mb-1">{ROLE_LABELS[msg.sender_role_actual] ?? '担当者'}</p>
+                    <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{date}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div ref={bottomRef} />
       </div>
 
       {/* 報告フォームシート */}
