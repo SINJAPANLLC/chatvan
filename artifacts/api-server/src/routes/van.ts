@@ -883,7 +883,17 @@ router.get("/van/contracts", requireAuth, async (req: Request, res: Response) =>
       .leftJoin(rentalCompaniesTable, eq(vehiclesTable.rentalCompanyId, rentalCompaniesTable.id))
       .where(and(user ? eq(vanContractsTable.userId, user) : undefined, status ? eq(vanContractsTable.status, status as any) : undefined))
       .orderBy(desc(vanContractsTable.createdAt));
-    return res.json(rows.map(({ contract, vehicle, company }) => ({ ...contract, vehicle: vehicle ? { ...vehicle, rentalCompany: company } : null })));
+    const ids = rows.map(r => r.contract.id);
+    let paymentMethods: Record<number, string> = {};
+    if (ids.length > 0) {
+      const pmRows = await db.execute(sql`SELECT id, payment_method FROM van_contracts WHERE id = ANY(ARRAY[${sql.raw(ids.join(','))}]::int[])`);
+      for (const r of ((pmRows as any).rows ?? pmRows)) paymentMethods[r.id] = r.payment_method ?? null;
+    }
+    return res.json(rows.map(({ contract, vehicle, company }) => ({
+      ...contract,
+      paymentMethod: paymentMethods[contract.id] ?? null,
+      vehicle: vehicle ? { ...vehicle, rentalCompany: company } : null,
+    })));
   } catch (err) {
     console.error("list contracts error:", err);
     return res.status(500).json({ error: "Internal error" });
@@ -1124,11 +1134,18 @@ router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request
     }
 
     // 決済成功 → contract/application/vehicle をアクティブに
-    await db.update(vanContractsTable).set({ status: "active" as any, updatedAt: new Date() }).where(eq(vanContractsTable.id, id));
+    await db.execute(sql`UPDATE van_contracts SET status = 'active', payment_method = 'card', updated_at = NOW() WHERE id = ${id}`);
     if (contract.applicationId) {
       await db.update(vanApplicationsTable).set({ status: "active", updatedAt: new Date() }).where(eq(vanApplicationsTable.id, contract.applicationId));
     }
     await db.update(vehiclesTable).set({ status: "rented", updatedAt: new Date() }).where(eq(vehiclesTable.id, contract.vehicleId));
+
+    // カード情報をユーザーに保存
+    const card = data.payment?.card_details?.card;
+    if (card && contract.userId) {
+      const expiry = card.exp_month && card.exp_year ? `${String(card.exp_month).padStart(2,'0')}/${String(card.exp_year).slice(-2)}` : null;
+      await db.execute(sql`UPDATE users SET card_brand = ${card.card_brand ?? null}, card_last4 = ${card.last_4 ?? null}, card_expiry = ${expiry} WHERE id = ${contract.userId}`);
+    }
 
     await db.insert(notificationsTable).values({
       userId: contract.userId,
@@ -1186,10 +1203,8 @@ router.post("/van/contracts/:id/pay", requireAuth, async (req: Request, res: Res
     const [contract] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.id, id));
     if (!contract) return res.status(404).json({ error: "Contract not found" });
 
-    // 契約をアクティブに・申込は「受け取り待ち」に
-    await db.update(vanContractsTable)
-      .set({ status: "active" as any, updatedAt: new Date() })
-      .where(eq(vanContractsTable.id, id));
+    // 契約をアクティブに・申込は「受け取り待ち」に・支払方法を記録
+    await db.execute(sql`UPDATE van_contracts SET status = 'active', payment_method = ${method ?? 'card'}, updated_at = NOW() WHERE id = ${id}`);
 
     if (contract.applicationId) {
       await db.update(vanApplicationsTable)

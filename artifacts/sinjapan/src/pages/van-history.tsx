@@ -27,6 +27,7 @@ const STATUS_LABEL: Record<string, string> = {
   application_received: '審査中', screening: '審査中', approved: '承認済み',
   contracting: '契約手続き', pending_payment: '決済待ち',
   active: '利用中', delivery_pending: '納車待ち', completed: '完了', rejected: '見送り',
+  payment_pending: '決済待ち', payment_issue: '支払い問題', return_pending: '解約申請中', cancelled: 'キャンセル',
 };
 
 const STATUS_STYLES: Record<string, string> = {
@@ -42,6 +43,10 @@ const STATUS_STYLES: Record<string, string> = {
   delivery_pending:     'bg-white text-foreground border-border',
   completed:            'bg-white text-muted-foreground border-border',
   rejected:             'bg-white text-muted-foreground border-border',
+  payment_pending:      'bg-white text-foreground border-border',
+  payment_issue:        'bg-white text-foreground border-border',
+  return_pending:       'bg-white text-muted-foreground border-border',
+  cancelled:            'bg-white text-muted-foreground border-border',
 };
 
 const DOT_STYLE = 'bg-foreground';

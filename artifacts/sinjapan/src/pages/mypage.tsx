@@ -212,7 +212,8 @@ export default function MyPage() {
 
   if (!user) return null;
 
-  const activeContracts = contracts?.filter(c => c.status !== 'completed' && c.status !== 'cancelled') || [];
+  const ACTIVE_STATUSES = ['active', 'delivery_pending', 'payment_issue', 'return_pending'];
+  const activeContracts = contracts?.filter(c => ACTIVE_STATUSES.includes(c.status as string)) || [];
   const formatPrice = (val: number) => new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY', maximumFractionDigits: 0 }).format(val);
   const totalWithTax = (c: (typeof activeContracts)[0]) =>
     Math.floor((Number(c.monthlyPrice) + Number((c as any).sinJapanFee ?? 0)) * 1.1);
@@ -248,17 +249,24 @@ export default function MyPage() {
                 <Card key={contract.id} className="overflow-hidden border-border shadow-sm">
                   <div className="flex flex-col sm:flex-row">
                     {/* 左: 車両サムネイル */}
-                    <div className="sm:w-1/3 bg-muted p-6 flex flex-col justify-center items-center border-b sm:border-b-0 sm:border-r border-border/50">
-                      <Car className="h-12 w-12 text-muted-foreground/50 mb-2" />
-                      <span className="font-bold text-lg text-center">
-                        {contract.vehicle?.maker} {contract.vehicle?.model}
-                      </span>
-                      {contract.vehicle?.year && (
-                        <span className="text-xs text-muted-foreground mt-0.5">{contract.vehicle.year}年式</span>
-                      )}
-                      <span className={`inline-block mt-2 px-2.5 py-0.5 text-xs font-semibold rounded-full ${st.color}`}>
-                        {st.label}
-                      </span>
+                    <div className="sm:w-1/3 bg-muted flex flex-col justify-center items-center border-b sm:border-b-0 sm:border-r border-border/50 overflow-hidden relative">
+                      {(() => {
+                        const photos = JSON.parse((contract.vehicle as any)?.photos || '[]');
+                        return photos[0]
+                          ? <img src={`${import.meta.env.BASE_URL}api/storage${photos[0]}`} alt="車両写真" className="w-full h-full object-cover absolute inset-0" />
+                          : <Car className="h-12 w-12 text-muted-foreground/50" />;
+                      })()}
+                      <div className="relative z-10 flex flex-col items-center p-4 bg-gradient-to-t from-black/60 via-transparent to-transparent w-full mt-auto">
+                        <span className="font-bold text-base text-center text-white drop-shadow">
+                          {contract.vehicle?.maker} {contract.vehicle?.model}
+                        </span>
+                        {contract.vehicle?.year && (
+                          <span className="text-xs text-white/80 mt-0.5">{contract.vehicle.year}年式</span>
+                        )}
+                        <span className={`inline-block mt-2 px-2.5 py-0.5 text-xs font-semibold rounded-full ${st.color}`}>
+                          {st.label}
+                        </span>
+                      </div>
                     </div>
 
                     {/* 右: 契約情報 */}
@@ -328,9 +336,9 @@ export default function MyPage() {
             <CardContent className="p-5 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className={`h-10 w-10 rounded-full flex items-center justify-center border ${
-                  idvStatus === 'verified'  ? 'bg-green-50 border-green-300 text-green-600' :
-                  idvStatus === 'submitted' ? 'bg-amber-50 border-amber-300 text-amber-600' :
-                  idvStatus === 'rejected'  ? 'bg-red-50 border-red-300 text-red-600' :
+                  idvStatus === 'verified'  ? 'bg-foreground border-foreground text-background' :
+                  idvStatus === 'submitted' ? 'bg-muted border-border text-foreground' :
+                  idvStatus === 'rejected'  ? 'bg-foreground/10 border-foreground text-foreground' :
                   'bg-muted border-border text-muted-foreground'
                 }`}>
                   {idvStatus === 'verified'  ? <BadgeCheck className="h-5 w-5" /> :
@@ -340,12 +348,7 @@ export default function MyPage() {
                 </div>
                 <div>
                   <h3 className="font-medium">免許証・本人確認</h3>
-                  <p className={`text-xs mt-0.5 ${
-                    idvStatus === 'verified'  ? 'text-green-600' :
-                    idvStatus === 'submitted' ? 'text-amber-600' :
-                    idvStatus === 'rejected'  ? 'text-red-600'   :
-                    'text-muted-foreground'
-                  }`}>
+                  <p className="text-xs mt-0.5 text-muted-foreground">
                     {idvStatus === 'verified'  ? '確認済み' :
                      idvStatus === 'submitted' ? '確認待ち' :
                      idvStatus === 'rejected'  ? '否認 — 再提出が必要です' :
@@ -360,6 +363,37 @@ export default function MyPage() {
       </section>
 
       <CardSection user={user} onUpdated={() => refetchUser()} />
+
+      {/* 法人請求書払い */}
+      {(() => {
+        const invoiceContracts = activeContracts.filter(c => (c as any).paymentMethod === 'invoice');
+        if (invoiceContracts.length === 0) return null;
+        return (
+          <section>
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <FileText className="h-5 w-5" />法人請求書払い
+            </h2>
+            <Card className="border-border shadow-sm">
+              <CardContent className="p-0 divide-y divide-border">
+                {invoiceContracts.map(c => (
+                  <div key={c.id} className="px-5 py-4 flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium">
+                        {c.vehicle?.maker} {c.vehicle?.model}
+                        {c.vehicle?.year ? <span className="text-muted-foreground font-normal ml-1">{c.vehicle.year}年式</span> : null}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        月額 {formatPrice(totalWithTax(c))} / 毎月{c.paymentDay}日請求
+                      </p>
+                    </div>
+                    <span className="text-xs bg-muted px-2.5 py-1 rounded-full whitespace-nowrap">請求書払い中</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </section>
+        );
+      })()}
 
     </div>
   );
