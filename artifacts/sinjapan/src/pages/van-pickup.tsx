@@ -164,7 +164,7 @@ export default function VanPickup() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto w-full px-4 pt-5 pb-24">
+    <div className="max-w-2xl mx-auto w-full px-4 pt-5 pb-4">
       <button onClick={() => setLocation(`/van/${applicationId}/status`)}
         className="flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors mb-4">
         <ChevronLeft className="h-4 w-4 mr-1" /> 進捗に戻る
@@ -373,25 +373,20 @@ export default function VanPickup() {
           </div>
         </div>
 
-      </div>
-
-      {/* 確認ボタン（画面下部固定） */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border px-4 py-3 z-10">
-        <div className="max-w-2xl mx-auto">
-          <button
-            onClick={handleConfirmPickup}
-            disabled={submitting || !allPhotosUploaded}
-            className="w-full py-2.5 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2"
-          >
-            {submitting
-              ? <><Loader2 className="h-4 w-4 animate-spin" />確認中…</>
-              : <><CheckCircle2 className="h-4 w-4" />受け取りました（{Object.values(photos).filter(Boolean).length}/4枚）</>
-            }
-          </button>
-          {!allPhotosUploaded && (
-            <p className="text-xs text-muted-foreground text-center mt-1.5">4方向すべての写真をアップロードすると確認できます</p>
-          )}
-        </div>
+        {/* 確認ボタン */}
+        <button
+          onClick={handleConfirmPickup}
+          disabled={submitting || !allPhotosUploaded}
+          className="w-full py-2.5 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2"
+        >
+          {submitting
+            ? <><Loader2 className="h-4 w-4 animate-spin" />確認中…</>
+            : <><CheckCircle2 className="h-4 w-4" />受け取りました（{Object.values(photos).filter(Boolean).length}/4枚）</>
+          }
+        </button>
+        {!allPhotosUploaded && (
+          <p className="text-xs text-muted-foreground text-center mt-1.5">4方向すべての写真をアップロードすると確認できます</p>
+        )}
       </div>
     </div>
   );
