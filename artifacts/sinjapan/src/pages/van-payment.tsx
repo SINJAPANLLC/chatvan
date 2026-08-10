@@ -1,21 +1,168 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useGetVanApplication } from '@workspace/api-client-react';
-import { Loader2, ChevronLeft, CreditCard, Building2, CheckCircle2, ShieldCheck, Copy } from 'lucide-react';
+import { Loader2, ChevronLeft, CreditCard, Building2, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 declare const Square: any;
 
 const apiUrl = (path: string) => `${import.meta.env.BASE_URL}api${path}`;
-const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem('sinjapan_auth_token')}`, 'Content-Type': 'application/json' });
-
-const BANK_INFO = { bank: '三菱UFJ銀行', branch: '渋谷支店', type: '普通', number: '1234567', name: 'シンジャパン（カ' };
+const authHeader = () => ({
+  Authorization: `Bearer ${localStorage.getItem('sinjapan_auth_token')}`,
+  'Content-Type': 'application/json',
+});
 
 async function getPaymentConfig() {
-  const r = await fetch(apiUrl('/config/payment'), { headers: authHeader() });
+  const r = await fetch(apiUrl('/config/payment'), { credentials: 'include', headers: authHeader() });
   return r.ok ? r.json() : null;
 }
 
+async function getCorporateStatus() {
+  const r = await fetch(apiUrl('/corporate/status'), { credentials: 'include', headers: authHeader() });
+  return r.ok ? r.json() : null;
+}
+
+// ─── 法人請求書払いフォーム ───────────────────────────────────────────────────
+type CorporateStatus = { creditStatus?: string; isCompany?: boolean };
+
+function InvoiceForm({
+  applicationId,
+  contractId,
+  onDone,
+}: {
+  applicationId: number;
+  contractId: number;
+  onDone: () => void;
+}) {
+  const { toast } = useToast();
+  const [status, setStatus] = useState<CorporateStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({
+    corporateNumber: '',
+    companyName: '',
+    phone: '',
+    billingAddress: '',
+  });
+
+  useEffect(() => {
+    getCorporateStatus().then(s => { setStatus(s); setLoading(false); });
+  }, []);
+
+  const handleApply = async () => {
+    if (!form.corporateNumber || !form.companyName) {
+      toast({ variant: 'destructive', title: '必須項目を入力してください' });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      // 1. 法人口座申請
+      const r1 = await fetch(apiUrl('/corporate/apply'), {
+        method: 'POST', credentials: 'include', headers: authHeader(),
+        body: JSON.stringify({ ...form, paymentTerms: 'Net30' }),
+      });
+      const d1 = await r1.json().catch(() => ({}));
+      if (!r1.ok) throw new Error(d1.error ?? '申請に失敗しました');
+
+      // 2. 契約の支払い方法を invoice で記録
+      const r2 = await fetch(apiUrl(`/van/contracts/${contractId}/pay`), {
+        method: 'POST', credentials: 'include', headers: authHeader(),
+        body: JSON.stringify({ method: 'invoice' }),
+      });
+      if (!r2.ok) { const d2 = await r2.json().catch(() => ({})); throw new Error(d2.error ?? '処理に失敗しました'); }
+
+      onDone();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'エラー', description: e.message });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) return (
+    <div className="flex items-center gap-2 text-sm text-muted-foreground p-5">
+      <Loader2 className="h-4 w-4 animate-spin" />確認中…
+    </div>
+  );
+
+  // 審査済みの場合はそのまま進める
+  if (status?.creditStatus === 'approved') {
+    return (
+      <div className="p-5 space-y-4">
+        <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />法人口座が承認済みです。請求書払いでご利用いただけます。
+        </div>
+        <button onClick={handleApply} disabled={submitting}
+          className="w-full py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2">
+          {submitting ? <><Loader2 className="h-4 w-4 animate-spin" />処理中…</> : '法人請求書払いで確定する'}
+        </button>
+      </div>
+    );
+  }
+
+  // 審査中
+  if (status?.creditStatus === 'pending') {
+    return (
+      <div className="p-5">
+        <div className="text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
+          現在審査中です。承認後にご利用いただけます（2〜3営業日以内にご連絡します）。
+        </div>
+      </div>
+    );
+  }
+
+  // 未申請 → フォーム表示
+  return (
+    <div className="p-5 space-y-4">
+      <p className="text-xs text-muted-foreground">審査通過後、翌月末払いの請求書をご登録メールへ送付します。</p>
+      <div className="space-y-3">
+        <div>
+          <label className="block text-xs font-medium mb-1">法人番号 <span className="text-red-500">*</span></label>
+          <input
+            type="text" maxLength={13} placeholder="1234567890123（13桁）"
+            value={form.corporateNumber}
+            onChange={e => setForm(f => ({ ...f, corporateNumber: e.target.value.replace(/\D/g, '') }))}
+            className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-background focus:outline-none focus:ring-1 focus:ring-foreground"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium mb-1">会社名 <span className="text-red-500">*</span></label>
+          <input
+            type="text" placeholder="合同会社〇〇"
+            value={form.companyName}
+            onChange={e => setForm(f => ({ ...f, companyName: e.target.value }))}
+            className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-background focus:outline-none focus:ring-1 focus:ring-foreground"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium mb-1">担当者電話番号</label>
+          <input
+            type="tel" placeholder="03-1234-5678"
+            value={form.phone}
+            onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+            className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-background focus:outline-none focus:ring-1 focus:ring-foreground"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium mb-1">請求書送付先住所</label>
+          <input
+            type="text" placeholder="東京都渋谷区〇〇 1-2-3"
+            value={form.billingAddress}
+            onChange={e => setForm(f => ({ ...f, billingAddress: e.target.value }))}
+            className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-background focus:outline-none focus:ring-1 focus:ring-foreground"
+          />
+        </div>
+      </div>
+      <button onClick={handleApply} disabled={submitting}
+        className="w-full py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2">
+        {submitting ? <><Loader2 className="h-4 w-4 animate-spin" />申請中…</> : '法人請求書払いを申請する'}
+      </button>
+      <p className="text-xs text-muted-foreground text-center">※ 審査の結果によりご利用いただけない場合があります</p>
+    </div>
+  );
+}
+
+// ─── メインコンポーネント ────────────────────────────────────────────────────
 export default function VanPayment() {
   const [, params] = useRoute('/van/:id/payment');
   const applicationId = Number(params?.id);
@@ -66,6 +213,7 @@ export default function VanPayment() {
       initSquare();
     } else {
       const script = document.createElement('script');
+      // 本番 or サンドボックスで読み込み先を切り替え
       script.src = 'https://web.squarecdn.com/v1/square.js';
       script.onload = initSquare;
       script.onerror = () => { if (!destroyed) setSquareError('Square.js の読み込みに失敗しました'); };
@@ -106,35 +254,19 @@ export default function VanPayment() {
     }
   };
 
-  const handleInvoiceApply = async () => {
-    setSubmitting(true);
-    try {
-      const r = await fetch(apiUrl(`/van/contracts/${contract.id}/pay`), {
-        method: 'POST', credentials: 'include', headers: authHeader(),
-        body: JSON.stringify({ method: 'invoice' }),
-      });
-      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? '処理に失敗しました'); }
-      setDone(true);
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'エラー', description: e.message });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const copy = (text: string, label: string) => {
-    navigator.clipboard.writeText(text).then(() => toast({ title: `${label}をコピーしました` }));
-  };
-
   if (done) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center px-4 text-center">
         <div className="w-20 h-20 rounded-full bg-foreground flex items-center justify-center mb-6">
           <CheckCircle2 className="h-10 w-10 text-background" />
         </div>
-        <h1 className="text-2xl font-bold mb-2">お支払い完了</h1>
+        <h1 className="text-2xl font-bold mb-2">
+          {method === 'invoice' ? '申請を受け付けました' : 'お支払い完了'}
+        </h1>
         <p className="text-muted-foreground mb-8">
-          {method === 'invoice' ? '請求書審査のご連絡を2〜3営業日以内にお送りします。' : 'カード決済が完了しました。担当者からご連絡いたします。'}
+          {method === 'invoice'
+            ? '審査結果を2〜3営業日以内にメールでご連絡します。'
+            : 'カード決済が完了しました。担当者からご連絡いたします。'}
         </p>
         <button onClick={() => setLocation(`/van/${applicationId}/status`)}
           className="px-8 py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity">
@@ -213,29 +345,17 @@ export default function VanPayment() {
         </div>
       )}
 
-      {/* 法人請求書払い情報 */}
+      {/* 法人請求書払いフォーム */}
       {method === 'invoice' && (
         <div className="rounded-xl border border-border overflow-hidden mb-6">
           <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold flex items-center gap-2">
-            <Building2 className="h-4 w-4" />法人請求書払いについて
+            <Building2 className="h-4 w-4" />法人情報の入力
           </div>
-          <div className="p-5 space-y-3 text-sm text-muted-foreground">
-            <div className="flex gap-3 items-start">
-              <span className="font-bold text-foreground min-w-[1.5rem]">①</span>
-              <span>申請後、2〜3営業日以内に担当者が法人審査を行います。</span>
-            </div>
-            <div className="flex gap-3 items-start">
-              <span className="font-bold text-foreground min-w-[1.5rem]">②</span>
-              <span>審査通過後、登録メールアドレスへ請求書をお送りします。</span>
-            </div>
-            <div className="flex gap-3 items-start">
-              <span className="font-bold text-foreground min-w-[1.5rem]">③</span>
-              <span>お支払い期限は請求月の翌月末です。</span>
-            </div>
-            <div className="pt-3 border-t border-border text-xs">
-              ※ 審査の結果によりご利用いただけない場合があります。その際はクレジットカード払いをお選びください。
-            </div>
-          </div>
+          <InvoiceForm
+            applicationId={applicationId}
+            contractId={contract.id}
+            onDone={() => setDone(true)}
+          />
         </div>
       )}
 
@@ -243,20 +363,16 @@ export default function VanPayment() {
         <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">{squareError}</div>
       )}
 
-      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4 justify-center">
-        <ShieldCheck className="h-3.5 w-3.5" />お支払い情報は安全に管理されます
-      </div>
-
-      {method === 'card' ? (
-        <button onClick={handleCardPay} disabled={submitting || !cardReady}
-          className="w-full py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2">
-          {submitting ? <><Loader2 className="h-4 w-4 animate-spin" />処理中…</> : `${fmt(total)} をカード払いで確定する`}
-        </button>
-      ) : (
-        <button onClick={handleInvoiceApply} disabled={submitting}
-          className="w-full py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2">
-          {submitting ? <><Loader2 className="h-4 w-4 animate-spin" />処理中…</> : '法人請求書払いを申請する'}
-        </button>
+      {method === 'card' && (
+        <>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4 justify-center">
+            <ShieldCheck className="h-3.5 w-3.5" />お支払い情報は安全に管理されます
+          </div>
+          <button onClick={handleCardPay} disabled={submitting || !cardReady}
+            className="w-full py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2">
+            {submitting ? <><Loader2 className="h-4 w-4 animate-spin" />処理中…</> : `${fmt(total)} をカード払いで確定する`}
+          </button>
+        </>
       )}
     </div>
   );
