@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useGetVanApplication } from '@workspace/api-client-react';
-import { Loader2, ChevronLeft, CreditCard, Building2, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { Loader2, ChevronLeft, CreditCard, Building2, CheckCircle2, ShieldCheck, MapPin, FileText as LicenseIcon, Umbrella } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 declare const Square: any;
@@ -174,6 +174,11 @@ export default function VanPayment() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [squareError, setSquareError] = useState<string | null>(null);
+
+  // オプション
+  const [blackNumber, setBlackNumber] = useState(false);
+  const [insuranceReferral, setInsuranceReferral] = useState(false);
+  const [gpsConsent, setGpsConsent] = useState(false);
   const cardRef = useRef<any>(null);
   const cardContainerRef = useRef<HTMLDivElement>(null);
 
@@ -229,9 +234,12 @@ export default function VanPayment() {
     return <div className="flex-1 flex items-center justify-center min-h-[50vh]"><p className="text-muted-foreground">契約情報が見つかりません</p></div>;
   }
 
+  const BLACK_NUMBER_FEE = 19800;
   const monthlyBase = Number(contract.monthlyPrice) + Number(contract.sinJapanFee ?? 0);
-  const tax   = Math.floor(monthlyBase * 0.1);
-  const total = monthlyBase + tax;
+  const monthlyTax  = Math.floor(monthlyBase * 0.1);
+  const monthlyTotal = monthlyBase + monthlyTax;
+  const optionsFee  = blackNumber ? BLACK_NUMBER_FEE : 0;
+  const total = monthlyTotal + optionsFee;
   const fmt   = (n: number) => `¥${Math.floor(n).toLocaleString()}`;
 
   const handleCardPay = async () => {
@@ -242,7 +250,12 @@ export default function VanPayment() {
       if (result.status !== 'OK') throw new Error(result.errors?.[0]?.message ?? 'カードのトークン化に失敗しました');
       const r = await fetch(apiUrl(`/van/contracts/${contract.id}/square-charge`), {
         method: 'POST', credentials: 'include', headers: authHeader(),
-        body: JSON.stringify({ sourceId: result.token }),
+        body: JSON.stringify({
+          sourceId: result.token,
+          blackNumberRequested: blackNumber,
+          insuranceReferralRequested: insuranceReferral,
+          gpsConsent,
+        }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error ?? '決済処理に失敗しました');
@@ -288,12 +301,93 @@ export default function VanPayment() {
         <p className="text-sm text-muted-foreground">最初の月額料金をお支払いください</p>
       </div>
 
+      {/* オプション選択 */}
+      <div className="rounded-xl border border-border overflow-hidden mb-6">
+        <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold">オプション（任意）</div>
+        <div className="divide-y divide-border">
+
+          {/* 黒ナンバー代理取得 */}
+          <label className="flex items-start gap-4 px-5 py-4 cursor-pointer hover:bg-muted/30 transition-colors">
+            <div className="mt-0.5">
+              <input
+                type="checkbox"
+                checked={blackNumber}
+                onChange={e => setBlackNumber(e.target.checked)}
+                className="w-4 h-4 accent-foreground cursor-pointer"
+              />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <LicenseIcon className="h-4 w-4 text-muted-foreground" />
+                  黒ナンバー代理取得
+                </div>
+                <span className="text-sm font-semibold">+¥19,800</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">軽貨物運送業に必要な黒ナンバー（事業用ナンバー）の取得手続きを代行します。</p>
+            </div>
+          </label>
+
+          {/* 保険紹介 */}
+          <label className="flex items-start gap-4 px-5 py-4 cursor-pointer hover:bg-muted/30 transition-colors">
+            <div className="mt-0.5">
+              <input
+                type="checkbox"
+                checked={insuranceReferral}
+                onChange={e => setInsuranceReferral(e.target.checked)}
+                className="w-4 h-4 accent-foreground cursor-pointer"
+              />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Umbrella className="h-4 w-4 text-muted-foreground" />
+                  保険紹介
+                </div>
+                <span className="text-xs text-muted-foreground">担当者より案内</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">軽貨物に適した保険プランをご紹介します。担当者から個別にご連絡します。</p>
+            </div>
+          </label>
+
+          {/* GPS許可 */}
+          <label className="flex items-start gap-4 px-5 py-4 cursor-pointer hover:bg-muted/30 transition-colors">
+            <div className="mt-0.5">
+              <input
+                type="checkbox"
+                checked={gpsConsent}
+                onChange={e => setGpsConsent(e.target.checked)}
+                className="w-4 h-4 accent-foreground cursor-pointer"
+              />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  GPS位置情報の取得を許可する
+                </div>
+                <span className="text-xs text-muted-foreground">無料</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">車両の位置情報を常時取得することに同意します。安全管理・緊急時対応・不正利用防止に使用します。</p>
+            </div>
+          </label>
+        </div>
+      </div>
+
       {/* 請求内訳 */}
       <div className="rounded-xl border border-border overflow-hidden mb-6">
-        <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold">ご請求内訳</div>
+        <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold">ご請求内訳（初回）</div>
         <div className="p-5 space-y-3 text-sm">
-          <div className="flex justify-between"><span className="text-muted-foreground">月額料金</span><span>{fmt(monthlyBase)}</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">消費税（10%）</span><span>{fmt(tax)}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">月額料金（税抜）</span><span>{fmt(monthlyBase)}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">消費税（10%）</span><span>{fmt(monthlyTax)}</span></div>
+          {blackNumber && (
+            <div className="flex justify-between text-foreground">
+              <span className="text-muted-foreground flex items-center gap-1">
+                <LicenseIcon className="h-3.5 w-3.5" />黒ナンバー代理取得
+              </span>
+              <span>{fmt(BLACK_NUMBER_FEE)}</span>
+            </div>
+          )}
           <div className="flex justify-between pt-3 border-t border-border font-bold text-base">
             <span>合計</span><span className="text-xl">{fmt(total)}</span>
           </div>

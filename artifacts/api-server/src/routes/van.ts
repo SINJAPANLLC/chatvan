@@ -1056,15 +1056,33 @@ router.post("/van/contracts/:id/sign", requireAuth, async (req: Request, res: Re
 router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request, res: Response) => {
   try {
     const id = parseInt(String(req.params.id));
-    const { sourceId } = req.body as { sourceId: string };
+    const { sourceId, blackNumberRequested, insuranceReferralRequested, gpsConsent } = req.body as {
+      sourceId: string;
+      blackNumberRequested?: boolean;
+      insuranceReferralRequested?: boolean;
+      gpsConsent?: boolean;
+    };
     if (!sourceId) return res.status(400).json({ error: "sourceId required" });
 
     const [contract] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.id, id));
     if (!contract) return res.status(404).json({ error: "Contract not found" });
 
     const monthlyBase = Number(contract.monthlyPrice) + Number(contract.sinJapanFee ?? 0);
-    const totalAmount = Math.round(monthlyBase * 1.1);
+    const BLACK_NUMBER_FEE = 19800;
+    const optionsFee = blackNumberRequested ? BLACK_NUMBER_FEE : 0;
+    const totalAmount = Math.round(monthlyBase * 1.1) + optionsFee;
     if (totalAmount <= 0) return res.status(400).json({ error: "金額が設定されていません" });
+
+    // オプションを先に保存
+    await db.execute(sql`
+      UPDATE van_contracts SET
+        black_number_requested = ${blackNumberRequested ?? false},
+        insurance_referral_requested = ${insuranceReferralRequested ?? false},
+        gps_consent = ${gpsConsent ?? false},
+        options_fee = ${optionsFee},
+        updated_at = NOW()
+      WHERE id = ${id}
+    `);
 
     const squareRes = await squareFetch("/v2/payments", "POST", {
       source_id: sourceId,
@@ -1072,7 +1090,7 @@ router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request
       amount_money: { amount: totalAmount, currency: "JPY" },
       location_id: process.env.SQUARE_LOCATION_ID,
       autocomplete: true,
-      note: `Chat VAN 月額 契約#${id}`,
+      note: `Chat VAN 初回決済 契約#${id}${blackNumberRequested ? " +黒ナンバー代理取得" : ""}`,
     });
 
     const data = await squareRes.json() as any;
@@ -2068,6 +2086,10 @@ router.delete("/van/vehicles/:id", requireAuth, requireAdmin, async (req: Reques
 db.execute(sql`ALTER TABLE identity_verifications ADD COLUMN IF NOT EXISTS selfie_photo TEXT`).catch(() => {});
 db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS pickup_photos TEXT`).catch(() => {});
 db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS pickup_documents TEXT`).catch(() => {});
+db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS black_number_requested BOOLEAN DEFAULT false`).catch(() => {});
+db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS insurance_referral_requested BOOLEAN DEFAULT false`).catch(() => {});
+db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS gps_consent BOOLEAN DEFAULT false`).catch(() => {});
+db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS options_fee NUMERIC(10,2) DEFAULT 0`).catch(() => {});
 db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS inspection_doc TEXT`).catch(() => {});
 db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS compulsory_insurance_doc TEXT`).catch(() => {});
 

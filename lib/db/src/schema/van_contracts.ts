@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, numeric, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, numeric, timestamp, boolean, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -57,6 +57,11 @@ export const vanContractsTable = pgTable("van_contracts", {
   terminationTerms: text("termination_terms"),
   returnTerms: text("return_terms"),
   notes: text("notes"),
+  // オプション
+  blackNumberRequested: boolean("black_number_requested").default(false),
+  insuranceReferralRequested: boolean("insurance_referral_requested").default(false),
+  gpsConsent: boolean("gps_consent").default(false),
+  optionsFee: numeric("options_fee", { precision: 10, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
