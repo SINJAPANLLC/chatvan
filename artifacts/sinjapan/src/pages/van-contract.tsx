@@ -477,14 +477,12 @@ export default function VanContract() {
                   <span className="text-sm font-semibold">+¥19,800</span>
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  元行政書士のスタッフが申請を代行します。初回のみ加算。<br />
+                  提携行政書士が申請手続きを代行します。初回のみ加算。<br />
                   <span className="text-amber-600 font-medium">※ 取得手続きのため納車まで数日〜1週間程度お時間をいただきます。</span>
                 </p>
                 <div className="mt-2 bg-muted/50 rounded-lg px-3 py-2 text-xs text-muted-foreground leading-relaxed">
                   <span className="font-medium text-foreground">必要書類（チェックイン時にご持参ください）</span><br />
-                  ・運転免許証（原本）<br />
-                  ・住民票（発行3ヶ月以内）<br />
-                  ・貨物軽自動車運送事業の届出書（当社にて準備）
+                  ・住民票（発行3ヶ月以内）
                 </div>
               </div>
             </label>
