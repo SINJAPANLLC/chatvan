@@ -158,8 +158,8 @@ function Router() {
         <Route path="/">
           <UserLayout><Home /></UserLayout>
         </Route>
-        <Route path="/van/:id">
-          <UserLayout><VanChat /></UserLayout>
+        <Route path="/van/history">
+          <UserLayout><VanHistory /></UserLayout>
         </Route>
         <Route path="/van/:id/proposal">
           <UserLayout><VanProposal /></UserLayout>
@@ -176,8 +176,8 @@ function Router() {
         <Route path="/van/:id/pickup">
           <UserLayout><VanPickup /></UserLayout>
         </Route>
-        <Route path="/van/history">
-          <UserLayout><VanHistory /></UserLayout>
+        <Route path="/van/:id">
+          <UserLayout><VanChat /></UserLayout>
         </Route>
         <Route path="/mypage">
           <UserLayout><MyPage /></UserLayout>

@@ -26,30 +26,44 @@ import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { randomUUID } from "crypto";
 import { squareFetch } from "../lib/square-authorize";
+import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
+
+const objectStorage = new ObjectStorageService();
 
 // ── eKYC AI自動判定 ─────────────────────────────────────────────────────────
 async function runAIeKYC(verificationId: number, data: {
   fullName: string; birthDate: string; licenseNumber: string;
   licenseExpiry: string; licenseType: string;
+  licenseFront: string; licenseBack: string;
   userId: number; applicationId: number;
 }) {
   try {
+    // 免許証画像をサーバーサイドで取得してbase64化
+    const fetchImageBase64 = async (objectPath: string): Promise<string | null> => {
+      try {
+        const file = await objectStorage.getObjectEntityFile(objectPath);
+        const response = await objectStorage.downloadObject(file);
+        const buffer = await response.arrayBuffer();
+        return Buffer.from(buffer).toString("base64");
+      } catch (err) {
+        console.warn("[eKYC] 画像取得失敗:", objectPath, err instanceof ObjectNotFoundError ? "not found" : err);
+        return null;
+      }
+    };
+
+    const [frontB64, backB64] = await Promise.all([
+      fetchImageBase64(data.licenseFront),
+      fetchImageBase64(data.licenseBack),
+    ]);
+
     const today = new Date().toISOString().slice(0, 10);
     const birthYear = parseInt(data.birthDate?.slice(0, 4) ?? "0");
     const age = new Date().getFullYear() - birthYear;
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `あなたは日本の運転免許証を審査するeKYCシステムです。
-提出されたデータを検証し、以下のJSONのみ返してください:
-{"result": "verified" | "rejected", "reason": "理由（日本語、20文字以内）"}`
-        },
-        {
-          role: "user",
-          content: `【提出データ】
+    const userContent: any[] = [
+      {
+        type: "text",
+        text: `【提出データ】
 氏名: ${data.fullName}
 生年月日: ${data.birthDate}（年齢: ${age}歳）
 免許番号: ${data.licenseNumber}
@@ -60,10 +74,25 @@ async function runAIeKYC(verificationId: number, data: {
 チェック項目:
 1. 年齢が18歳以上か（${age}歳）
 2. 有効期限が本日（${today}）以降か
-3. 免許番号が12桁の数字か（形式チェック）
+3. 免許番号が12桁の数字か
 4. 氏名が実在しそうな日本人名か
-5. 免許種別が有効な値か（普通、中型、大型、普通二輪、大型二輪、原付等）`
-        }
+5. 免許種別が有効な値か（普通・中型・大型・普通二輪・大型二輪・原付等）
+${frontB64 || backB64 ? "6. 免許証画像と提出データが一致しているか（画像内の氏名・番号・有効期限を確認）" : "※ 画像未取得のためテキストのみで判定"}`
+      },
+    ];
+    if (frontB64) userContent.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${frontB64}`, detail: "high" } });
+    if (backB64)  userContent.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${backB64}`,  detail: "high" } });
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `あなたは日本の運転免許証を審査するeKYCシステムです。
+提出されたデータ（と免許証画像）を照合し、以下のJSONのみ返してください:
+{"result": "verified" | "rejected", "reason": "理由（日本語、25文字以内）"}`
+        },
+        { role: "user", content: userContent }
       ],
       response_format: { type: "json_object" },
     });
@@ -1127,6 +1156,7 @@ router.post("/van/applications/:id/identity-verification", requireAuth, async (r
       fullName: b.full_name, birthDate: b.birth_date,
       licenseNumber: b.license_number, licenseExpiry: b.license_expiry,
       licenseType: b.license_type,
+      licenseFront: b.license_front, licenseBack: b.license_back,
       userId: userId!, applicationId: appId,
     }));
 

@@ -116,14 +116,12 @@ export function UserLayout({ children }: { children: React.ReactNode }) {
         )}
 
         {user && (
-          <div className="mt-3">
-            <Link href="/mypage" onClick={onClose}>
-              <button className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${pathname === '/mypage' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}>
-                <UserIcon className="h-4 w-4 shrink-0" />
-                マイページ
-              </button>
-            </Link>
-          </div>
+          <Link href="/mypage" onClick={onClose}>
+            <button className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${pathname === '/mypage' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}>
+              <UserIcon className="h-4 w-4 shrink-0" />
+              マイページ
+            </button>
+          </Link>
         )}
       </nav>
 
