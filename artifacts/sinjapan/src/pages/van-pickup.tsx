@@ -164,7 +164,7 @@ export default function VanPickup() {
   }
 
   return (
-    <div className="flex-1 max-w-2xl mx-auto w-full px-4 py-8">
+    <div className="max-w-2xl mx-auto w-full px-4 pt-8 pb-16">
       <button onClick={() => setLocation(`/van/${applicationId}/status`)}
         className="flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors mb-8">
         <ChevronLeft className="h-4 w-4 mr-1" /> 進捗に戻る
