@@ -1,9 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useListVanContracts, useGetMe } from '@workspace/api-client-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Car, JapaneseYen, Calendar, CreditCard, ChevronRight, MessageSquare, BadgeCheck, AlertCircle, Clock } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Loader2, Car, JapaneseYen, Calendar, CreditCard, ChevronRight, MessageSquare, BadgeCheck, AlertCircle, Clock, FileText, Truck } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { format } from 'date-fns';
+
+const STATUS_LABEL: Record<string, { label: string; color: string }> = {
+  active:          { label: '利用中',       color: 'bg-foreground text-background' },
+  delivery_pending:{ label: '受け取り待ち', color: 'bg-amber-100 text-amber-800 border border-amber-300' },
+  payment_issue:   { label: '支払い問題',   color: 'bg-red-100 text-red-800 border border-red-300' },
+  return_pending:  { label: '解約申請中',   color: 'bg-orange-100 text-orange-800 border border-orange-300' },
+  completed:       { label: '利用終了',     color: 'bg-muted text-muted-foreground' },
+  cancelled:       { label: 'キャンセル',   color: 'bg-muted text-muted-foreground' },
+};
 
 const API = (p: string) => `${import.meta.env.BASE_URL}api${p}`;
 const tok = () => localStorage.getItem('sinjapan_auth_token') ?? '';
@@ -38,8 +47,10 @@ export default function MyPage() {
 
   if (!user) return null;
 
-  const activeContracts = contracts?.filter(c => c.status !== '契約終了' && c.status !== '解約') || [];
+  const activeContracts = contracts?.filter(c => c.status !== 'completed' && c.status !== 'cancelled') || [];
   const formatPrice = (val: number) => new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY', maximumFractionDigits: 0 }).format(val);
+  const totalWithTax = (c: (typeof activeContracts)[0]) =>
+    Math.floor((Number(c.monthlyPrice) + Number((c as any).sinJapanFee ?? 0)) * 1.1);
 
   return (
     <div className="flex-1 max-w-4xl mx-auto w-full px-4 py-8 space-y-8">
@@ -65,43 +76,83 @@ export default function MyPage() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {activeContracts.map((contract) => (
-              <Card key={contract.id} className="overflow-hidden border-border shadow-sm">
-                <div className="flex flex-col sm:flex-row">
-                  <div className="sm:w-1/3 bg-muted p-6 flex flex-col justify-center items-center border-b sm:border-b-0 sm:border-r border-border/50">
-                    <Car className="h-12 w-12 text-muted-foreground/50 mb-2" />
-                    <span className="font-bold text-lg text-center">
-                      {contract.vehicle?.maker} {contract.vehicle?.model}
-                    </span>
-                    <span className="inline-block mt-2 px-2.5 py-0.5 bg-background border border-border text-xs font-semibold rounded-full text-foreground">
-                      {contract.status}
-                    </span>
-                  </div>
-                  <div className="sm:w-2/3 p-6 flex flex-col justify-between gap-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1 flex items-center"><JapaneseYen className="h-3.5 w-3.5 mr-1"/>月額料金</p>
-                        <p className="font-semibold text-lg">{formatPrice(contract.monthlyPrice)}</p>
+            {activeContracts.map((contract) => {
+              const st = STATUS_LABEL[contract.status] ?? { label: contract.status, color: 'bg-muted text-muted-foreground' };
+              const appId = (contract as any).applicationId;
+              return (
+                <Card key={contract.id} className="overflow-hidden border-border shadow-sm">
+                  <div className="flex flex-col sm:flex-row">
+                    {/* 左: 車両サムネイル */}
+                    <div className="sm:w-1/3 bg-muted p-6 flex flex-col justify-center items-center border-b sm:border-b-0 sm:border-r border-border/50">
+                      <Car className="h-12 w-12 text-muted-foreground/50 mb-2" />
+                      <span className="font-bold text-lg text-center">
+                        {contract.vehicle?.maker} {contract.vehicle?.model}
+                      </span>
+                      {contract.vehicle?.year && (
+                        <span className="text-xs text-muted-foreground mt-0.5">{contract.vehicle.year}年式</span>
+                      )}
+                      <span className={`inline-block mt-2 px-2.5 py-0.5 text-xs font-semibold rounded-full ${st.color}`}>
+                        {st.label}
+                      </span>
+                    </div>
+
+                    {/* 右: 契約情報 */}
+                    <div className="sm:w-2/3 p-6 flex flex-col justify-between gap-5">
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                            <JapaneseYen className="h-3.5 w-3.5" />月額料金（税込）
+                          </p>
+                          <p className="font-bold text-xl">{formatPrice(totalWithTax(contract))}</p>
+                          <p className="text-xs text-muted-foreground">
+                            内訳: 車両{formatPrice(Number(contract.monthlyPrice))}
+                            {Number((contract as any).sinJapanFee) > 0 && ` + 管理${formatPrice(Number((contract as any).sinJapanFee))}`}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                            <Calendar className="h-3.5 w-3.5" />利用開始日
+                          </p>
+                          <p className="font-medium">
+                            {contract.startDate ? format(new Date(contract.startDate), 'yyyy年M月d日') : '未定'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                            <CreditCard className="h-3.5 w-3.5" />次回支払日
+                          </p>
+                          <p className="font-medium">毎月 {contract.paymentDay}日</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                            <Calendar className="h-3.5 w-3.5" />最低利用期間
+                          </p>
+                          <p className="font-medium">{(contract as any).minimumTerm ?? 1}ヶ月</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1 flex items-center"><Calendar className="h-3.5 w-3.5 mr-1"/>利用開始日</p>
-                        <p className="font-medium">{contract.startDate ? format(new Date(contract.startDate), 'yyyy年MM月dd日') : '未定'}</p>
-                      </div>
-                      <div className="sm:col-span-2">
-                        <p className="text-xs text-muted-foreground mb-1 flex items-center"><CreditCard className="h-3.5 w-3.5 mr-1"/>次回お支払い日</p>
-                        <p className="font-medium">毎月 {contract.paymentDay}日</p>
+
+                      {/* アクションボタン */}
+                      <div className="flex flex-wrap gap-2">
+                        {appId && (
+                          <Link href={`/van/${appId}/status`}>
+                            <button className="flex items-center gap-2 px-4 py-2 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity">
+                              <FileText className="h-4 w-4" />
+                              契約詳細・利用状況
+                            </button>
+                          </Link>
+                        )}
+                        <Link href={`/contract-chat/${contract.id}`}>
+                          <button className="flex items-center gap-2 px-4 py-2 border border-border rounded-full text-sm hover:bg-muted transition-colors">
+                            <MessageSquare className="h-4 w-4" />
+                            担当者にメッセージ
+                          </button>
+                        </Link>
                       </div>
                     </div>
-                    <Link href={`/contract-chat/${contract.id}`}>
-                      <button className="flex items-center gap-2 px-4 py-2 border border-border rounded-lg text-sm hover:bg-muted transition-colors">
-                        <MessageSquare className="h-4 w-4" />
-                        協力会社にメッセージ
-                      </button>
-                    </Link>
                   </div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         )}
       </section>
