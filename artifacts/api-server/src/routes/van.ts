@@ -1295,20 +1295,29 @@ router.post("/van/applications/:id/request-return", requireAuth, async (req: Req
       return res.status(400).json({ error: "利用中または支払い問題の状態のみ解約申請できます" });
     }
 
-    // 契約終了日 = 申請翌日
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const endDateStr = tomorrow.toISOString().split('T')[0]; // YYYY-MM-DD
-
     await db.update(vanApplicationsTable)
       .set({ status: "return_pending", updatedAt: new Date() })
       .where(eq(vanApplicationsTable.id, appId));
 
-    // 契約終了日をセット
-    await db.execute(sql`
-      UPDATE van_contracts SET planned_end_date = ${endDateStr}, updated_at = NOW()
-      WHERE application_id = ${appId}
-    `);
+    // 契約終了日 = 解約申請時点での現在の請求期間の終了日
+    // start_date から1ヶ月ずつ加算し、今日より未来になる最初の日
+    const contractForEnd = await db.execute(sql`SELECT start_date FROM van_contracts WHERE application_id = ${appId} LIMIT 1`);
+    const startDateStr = ((contractForEnd as any).rows ?? contractForEnd)[0]?.start_date;
+    if (startDateStr) {
+      const startDate = new Date(startDateStr);
+      const today = new Date();
+      // 第1期終了日（start + 1ヶ月）から始め、今日より未来になるまで繰り上げ
+      const endDate = new Date(startDate);
+      endDate.setMonth(endDate.getMonth() + 1);
+      while (endDate <= today) {
+        endDate.setMonth(endDate.getMonth() + 1);
+      }
+      const endDateStr = endDate.toISOString().split('T')[0];
+      await db.execute(sql`
+        UPDATE van_contracts SET planned_end_date = ${endDateStr}, updated_at = NOW()
+        WHERE application_id = ${appId}
+      `);
+    }
 
     await db.insert(notificationsTable).values({
       userId: app.userId,
