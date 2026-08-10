@@ -22,7 +22,7 @@ import {
   paymentRetriesTable,
 } from "@workspace/db";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
-import { requireAuth, requireAdmin } from "../middlewares/auth";
+import { requireAuth, requireAdmin, optionalAuth } from "../middlewares/auth";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { randomUUID } from "crypto";
 import { squareFetch } from "../lib/square-authorize";
@@ -292,7 +292,7 @@ function cleanText(text: string): string {
 }
 
 // ── POST /van/start ────────────────────────────────────────────────────────
-router.post("/van/start", async (req: Request, res: Response) => {
+router.post("/van/start", optionalAuth, async (req: Request, res: Response) => {
   try {
     const { message } = req.body as { message: string };
     if (!message?.trim()) return res.status(400).json({ error: "message required" });
@@ -386,7 +386,7 @@ router.get("/van/applications/:id/messages", async (req: Request, res: Response)
 });
 
 // ── POST /van/applications/:id/messages ───────────────────────────────────
-router.post("/van/applications/:id/messages", async (req: Request, res: Response) => {
+router.post("/van/applications/:id/messages", optionalAuth, async (req: Request, res: Response) => {
   try {
     const appId = parseInt(String(req.params.id));
     const { message } = req.body as { message: string };

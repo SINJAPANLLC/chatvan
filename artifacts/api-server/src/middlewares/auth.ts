@@ -19,6 +19,11 @@ async function resolveUser(req: Request): Promise<boolean> {
   return false;
 }
 
+// 認証必須ではないが、トークンがあれば session に反映する
+export function optionalAuth(req: Request, res: Response, next: NextFunction): void {
+  resolveUser(req).then(() => next()).catch(() => next());
+}
+
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   resolveUser(req).then(ok => {
     if (!ok) { res.status(401).json({ error: "認証が必要です" }); return; }
