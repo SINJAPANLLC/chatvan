@@ -92,7 +92,7 @@ export function UserLayout({ children }: { children: React.ReactNode }) {
         )}
       </div>
 
-      <nav className="flex-1 px-2 py-2 overflow-y-auto">
+      <nav className="px-2 py-2">
         {user && (
           <Link href="/" onClick={onClose}>
             <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-foreground hover:bg-muted transition-colors">
