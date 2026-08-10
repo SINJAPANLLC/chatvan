@@ -91,7 +91,7 @@ function InvoiceForm({
   if (status?.creditStatus === 'approved') {
     return (
       <div className="p-5 space-y-4">
-        <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+        <div className="flex items-center gap-2 text-sm text-foreground bg-muted border border-border rounded-lg px-4 py-3">
           <CheckCircle2 className="h-4 w-4 shrink-0" />法人口座が承認済みです。請求書払いでご利用いただけます。
         </div>
         <button onClick={handleApply} disabled={submitting}
