@@ -480,6 +480,24 @@ export default function VanStatus() {
             </div>
           )}
 
+          {/* 契約書 */}
+          {contract?.signatureData !== undefined && (
+            <div className="rounded-xl border border-border overflow-hidden mb-4">
+              <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold flex items-center gap-2">
+                <FileText className="h-4 w-4" />契約書
+              </div>
+              <div className="px-5 py-4 flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">締結済み電子契約書</span>
+                <button
+                  onClick={() => setLocation(`/van/${applicationId}/contract`)}
+                  className="flex items-center gap-1.5 px-4 py-1.5 border border-border rounded-full text-sm hover:bg-muted transition-colors"
+                >
+                  <FileText className="h-3.5 w-3.5" />確認する
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* レンタル会社 */}
           {company && (
             <div className="rounded-xl border border-border overflow-hidden mb-6">

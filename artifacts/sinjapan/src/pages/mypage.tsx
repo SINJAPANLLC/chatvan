@@ -1,9 +1,177 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useListVanContracts, useGetMe } from '@workspace/api-client-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, Car, JapaneseYen, Calendar, CreditCard, ChevronRight, MessageSquare, BadgeCheck, AlertCircle, Clock, FileText } from 'lucide-react';
+import { Loader2, Car, JapaneseYen, Calendar, CreditCard, ChevronRight, MessageSquare, BadgeCheck, AlertCircle, Clock, FileText, Pencil, ShieldCheck, PlusCircle } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
+
+declare const Square: any;
+
+const API = (p: string) => `${import.meta.env.BASE_URL}api${p}`;
+const tok = () => localStorage.getItem('sinjapan_auth_token') ?? '';
+const hdr = () => ({ Authorization: `Bearer ${tok()}`, 'Content-Type': 'application/json' });
+
+const CARD_BRAND: Record<string, string> = {
+  VISA: 'Visa', MASTERCARD: 'Mastercard', AMERICAN_EXPRESS: 'Amex',
+  DISCOVER: 'Discover', JCB: 'JCB', CHINA_UNIONPAY: 'UnionPay',
+};
+
+// ─── カード管理セクション ────────────────────────────────────────────────────
+function CardSection({ user, onUpdated }: { user: any; onUpdated: () => void }) {
+  const { toast } = useToast();
+  const [showForm, setShowForm] = useState(false);
+  const [cardReady, setCardReady] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [squareError, setSquareError] = useState<string | null>(null);
+  const cardRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const hasCard = !!user?.squareCardId;
+
+  useEffect(() => {
+    if (!showForm) return;
+    let card: any = null;
+    let destroyed = false;
+    setCardReady(false);
+    setSquareError(null);
+
+    const init = async () => {
+      try {
+        const cfg = await fetch(API('/config/payment'), { credentials: 'include', headers: hdr() }).then(r => r.ok ? r.json() : null);
+        if (!cfg?.squareApplicationId) { setSquareError('Square設定が不足しています'); return; }
+        const payments = Square.payments(cfg.squareApplicationId, cfg.squareLocationId);
+        card = await payments.card({
+          style: {
+            input: { fontSize: '14px' },
+            '.input-container': { borderColor: '#e2e8f0', borderRadius: '8px' },
+            '.input-container.is-focus': { borderColor: '#1a202c' },
+          },
+        });
+        if (destroyed) return;
+        if (containerRef.current) await card.attach(containerRef.current);
+        cardRef.current = card;
+        setCardReady(true);
+      } catch (e: any) {
+        if (!destroyed) setSquareError(`フォームの初期化に失敗しました: ${e.message}`);
+      }
+    };
+
+    if (typeof Square !== 'undefined') {
+      init();
+    } else {
+      const s = document.createElement('script');
+      s.src = 'https://web.squarecdn.com/v1/square.js';
+      s.onload = init;
+      s.onerror = () => { if (!destroyed) setSquareError('Square.jsの読み込みに失敗しました'); };
+      document.head.appendChild(s);
+    }
+    return () => { destroyed = true; card?.destroy?.(); cardRef.current = null; };
+  }, [showForm]);
+
+  const handleSubmit = async () => {
+    if (!cardRef.current) return;
+    setSubmitting(true); setSquareError(null);
+    try {
+      const result = await cardRef.current.tokenize();
+      if (result.status !== 'OK') throw new Error(result.errors?.[0]?.message ?? 'トークン化に失敗しました');
+      const r = await fetch(API('/square/register-card'), {
+        method: 'POST', credentials: 'include', headers: hdr(),
+        body: JSON.stringify({ sourceId: result.token }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? 'カードの登録に失敗しました');
+      setShowForm(false);
+      onUpdated();
+      toast({ title: 'カード情報を更新しました' });
+    } catch (e: any) {
+      setSquareError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <section>
+      <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+        <CreditCard className="h-5 w-5" />お支払いカード
+      </h2>
+
+      <Card className="border-border shadow-sm">
+        <CardContent className="p-5 space-y-4">
+          {/* 登録済みカード表示 */}
+          {hasCard && !showForm && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-muted border border-border flex items-center justify-center">
+                  <CreditCard className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm">
+                    {CARD_BRAND[user.cardBrand] ?? user.cardBrand ?? 'カード'} ****{user.cardLast4}
+                  </p>
+                  {user.cardExpiry && (
+                    <p className="text-xs text-muted-foreground">有効期限 {user.cardExpiry}</p>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setShowForm(true)}
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Pencil className="h-3.5 w-3.5" />変更
+              </button>
+            </div>
+          )}
+
+          {/* カード未登録 */}
+          {!hasCard && !showForm && (
+            <button
+              onClick={() => setShowForm(true)}
+              className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-border rounded-xl text-sm text-muted-foreground hover:border-foreground/40 hover:text-foreground transition-colors"
+            >
+              <PlusCircle className="h-4 w-4" />クレジットカードを登録する
+            </button>
+          )}
+
+          {/* Square カードフォーム */}
+          {showForm && (
+            <div className="space-y-4">
+              <div ref={containerRef} className="min-h-[48px]" />
+              {!cardReady && !squareError && (
+                <div className="flex justify-center py-2">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              )}
+              {squareError && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{squareError}</p>
+              )}
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <ShieldCheck className="h-3.5 w-3.5 shrink-0" />カード情報はSquareが直接処理します。当社サーバーには保存されません。
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowForm(false)}
+                  disabled={submitting}
+                  className="flex-1 py-2.5 border border-border text-sm rounded-full hover:bg-muted transition-colors"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={!cardReady || submitting}
+                  className="flex-1 py-2.5 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2"
+                >
+                  {submitting ? <><Loader2 className="h-4 w-4 animate-spin" />登録中…</> : '登録する'}
+                </button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
 
 const STATUS_LABEL: Record<string, { label: string; color: string }> = {
   active:          { label: '利用中',       color: 'bg-foreground text-background' },
@@ -14,13 +182,10 @@ const STATUS_LABEL: Record<string, { label: string; color: string }> = {
   cancelled:       { label: 'キャンセル',   color: 'bg-muted text-muted-foreground' },
 };
 
-const API = (p: string) => `${import.meta.env.BASE_URL}api${p}`;
-const tok = () => localStorage.getItem('sinjapan_auth_token') ?? '';
-
 type IDVStatus = 'not_started' | 'submitted' | 'verified' | 'rejected' | 'expired';
 
 export default function MyPage() {
-  const { data: user, isLoading: isUserLoading } = useGetMe();
+  const { data: user, isLoading: isUserLoading, refetch: refetchUser } = useGetMe();
   const [, setLocation] = useLocation();
   const [idvStatus, setIdvStatus] = useState<IDVStatus | null>(null);
 
@@ -193,6 +358,8 @@ export default function MyPage() {
           </Card>
         </Link>
       </section>
+
+      <CardSection user={user} onUpdated={() => refetchUser()} />
 
     </div>
   );
