@@ -481,7 +481,7 @@ export default function VanContract() {
                   <span className="text-amber-600 font-medium">※ 取得手続きのため納車まで数日〜1週間程度お時間をいただきます。</span>
                 </p>
                 <div className="mt-2 bg-muted/50 rounded-lg px-3 py-2 text-xs text-muted-foreground leading-relaxed">
-                  <span className="font-medium text-foreground">必要書類（チェックイン時にご持参ください）</span><br />
+                  <span className="font-medium text-foreground">必要書類（郵送にてお送りください）</span><br />
                   ・住民票（発行3ヶ月以内）
                 </div>
               </div>
