@@ -362,7 +362,29 @@ export default function MyPage() {
         </Link>
       </section>
 
-      <CardSection user={user} onUpdated={() => refetchUser()} />
+      {/* お支払いカード */}
+      <section>
+        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <CreditCard className="h-5 w-5" />お支払いカード
+        </h2>
+        <Card className="border-border shadow-sm">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className={`h-10 w-10 rounded-full flex items-center justify-center border ${
+              user?.squareCardId ? 'bg-foreground border-foreground text-background' : 'bg-muted border-border text-muted-foreground'
+            }`}>
+              <CreditCard className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-medium text-sm">クレジットカード</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {user?.squareCardId
+                  ? `登録済み${user.cardBrand ? `（${CARD_BRAND[user.cardBrand] ?? user.cardBrand} ****${user.cardLast4}）` : ''}`
+                  : '未登録'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
 
       {/* 法人請求書払い */}
       {(() => {
