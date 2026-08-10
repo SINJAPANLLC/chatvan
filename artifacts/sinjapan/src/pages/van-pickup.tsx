@@ -1,8 +1,18 @@
 import React from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useGetVanApplication } from '@workspace/api-client-react';
-import { Loader2, ChevronLeft, MapPin, Phone, Clock, AlertCircle, Truck, Copy, ExternalLink } from 'lucide-react';
+import { Loader2, ChevronLeft, MapPin, Phone, Clock, AlertCircle, Truck, Copy, ExternalLink, CalendarDays } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+  } catch {
+    return dateStr;
+  }
+}
 
 export default function VanPickup() {
   const [, params] = useRoute('/van/:id/pickup');
@@ -28,6 +38,7 @@ export default function VanPickup() {
 
   const contract = (application as any)?.contract as any;
   const company = contract?.vehicle?.rentalCompany as any;
+  const pickupDate = contract?.startDate ?? contract?.start_date;
 
   if (!contract || !company) {
     return (
@@ -60,6 +71,22 @@ export default function VanPickup() {
         <p className="text-sm text-muted-foreground">担当のレンタル会社にお越しください</p>
       </div>
 
+      {/* 受け取り予定日 */}
+      {pickupDate && (
+        <div className="rounded-xl border-2 border-foreground overflow-hidden mb-6">
+          <div className="px-5 py-3 bg-foreground text-background text-sm font-semibold flex items-center gap-2">
+            <CalendarDays className="h-4 w-4" />受け取り予定日
+          </div>
+          <div className="px-5 py-4 flex items-center gap-3">
+            <CalendarDays className="h-5 w-5 text-muted-foreground shrink-0" />
+            <p className="text-xl font-bold">{formatDate(pickupDate)}</p>
+          </div>
+          <div className="px-5 pb-4">
+            <p className="text-xs text-muted-foreground">※ 正確な時間は事前にレンタル会社へお電話でご確認ください</p>
+          </div>
+        </div>
+      )}
+
       {/* 受け取り手順 */}
       <div className="rounded-xl border border-border overflow-hidden mb-6">
         <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold flex items-center gap-2">
@@ -68,7 +95,7 @@ export default function VanPickup() {
         <div className="p-5 space-y-3">
           {[
             '事前にレンタル会社へ電話でご連絡ください',
-            '受け取り日時を担当者と調整してください',
+            pickupDate ? `${formatDate(pickupDate)}に担当者と時間を確認してください` : '受け取り日時を担当者と調整してください',
             '当日は本人確認書類（免許証）をお持ちください',
             '車両の状態を担当者と確認してから受け取りください',
           ].map((step, i) => (
