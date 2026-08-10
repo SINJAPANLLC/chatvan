@@ -1000,7 +1000,12 @@ router.post("/van/contracts/:id/sign", requireAuth, async (req: Request, res: Re
   try {
     const id = parseInt(String(req.params.id));
     const userId: number | undefined = (req.session as any)?.userId;
-    const { signatureData } = req.body as { signatureData?: string };
+    const { signatureData, blackNumberRequested, insuranceReferralRequested, gpsConsent } = req.body as {
+      signatureData?: string;
+      blackNumberRequested?: boolean;
+      insuranceReferralRequested?: boolean;
+      gpsConsent?: boolean;
+    };
 
     const [contract] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.id, id));
     if (!contract) return res.status(404).json({ error: "Not found" });
@@ -1013,6 +1018,9 @@ router.post("/van/contracts/:id/sign", requireAuth, async (req: Request, res: Re
       hasSignature: !!signatureData,
     });
 
+    const BLACK_NUMBER_FEE = 19800;
+    const optionsFee = blackNumberRequested ? BLACK_NUMBER_FEE : 0;
+
     const now = new Date();
     const [updated] = await db.update(vanContractsTable).set({
       platformContractAgreedAt: now,
@@ -1022,6 +1030,16 @@ router.post("/van/contracts/:id/sign", requireAuth, async (req: Request, res: Re
       status: "pending_payment",
       updatedAt: now,
     }).where(eq(vanContractsTable.id, id)).returning();
+
+    // オプションをRAW SQLで保存（Drizzle schema反映前のカラム対応）
+    await db.execute(sql`
+      UPDATE van_contracts SET
+        black_number_requested = ${!!blackNumberRequested},
+        insurance_referral_requested = ${!!insuranceReferralRequested},
+        gps_consent = ${!!gpsConsent},
+        options_fee = ${optionsFee}
+      WHERE id = ${id}
+    `);
 
     // アプリ側ステータスを payment_pending へ
     if (updated.applicationId) {
@@ -1056,33 +1074,18 @@ router.post("/van/contracts/:id/sign", requireAuth, async (req: Request, res: Re
 router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request, res: Response) => {
   try {
     const id = parseInt(String(req.params.id));
-    const { sourceId, blackNumberRequested, insuranceReferralRequested, gpsConsent } = req.body as {
-      sourceId: string;
-      blackNumberRequested?: boolean;
-      insuranceReferralRequested?: boolean;
-      gpsConsent?: boolean;
-    };
+    const { sourceId } = req.body as { sourceId: string };
     if (!sourceId) return res.status(400).json({ error: "sourceId required" });
 
     const [contract] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.id, id));
     if (!contract) return res.status(404).json({ error: "Contract not found" });
 
     const monthlyBase = Number(contract.monthlyPrice) + Number(contract.sinJapanFee ?? 0);
-    const BLACK_NUMBER_FEE = 19800;
-    const optionsFee = blackNumberRequested ? BLACK_NUMBER_FEE : 0;
+    // optionsFee は契約署名時に保存済み（raw SQL で読む）
+    const optionsRow = await db.execute(sql`SELECT options_fee FROM van_contracts WHERE id = ${id}`);
+    const optionsFee = Number((optionsRow as any)?.rows?.[0]?.options_fee ?? 0);
     const totalAmount = Math.round(monthlyBase * 1.1) + optionsFee;
     if (totalAmount <= 0) return res.status(400).json({ error: "金額が設定されていません" });
-
-    // オプションを先に保存
-    await db.execute(sql`
-      UPDATE van_contracts SET
-        black_number_requested = ${blackNumberRequested ?? false},
-        insurance_referral_requested = ${insuranceReferralRequested ?? false},
-        gps_consent = ${gpsConsent ?? false},
-        options_fee = ${optionsFee},
-        updated_at = NOW()
-      WHERE id = ${id}
-    `);
 
     const squareRes = await squareFetch("/v2/payments", "POST", {
       source_id: sourceId,
@@ -1090,7 +1093,7 @@ router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request
       amount_money: { amount: totalAmount, currency: "JPY" },
       location_id: process.env.SQUARE_LOCATION_ID,
       autocomplete: true,
-      note: `Chat VAN 初回決済 契約#${id}${blackNumberRequested ? " +黒ナンバー代理取得" : ""}`,
+      note: `Chat VAN 初回決済 契約#${id}${optionsFee > 0 ? " +オプション" : ""}`,
     });
 
     const data = await squareRes.json() as any;

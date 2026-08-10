@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useGetVanApplication } from '@workspace/api-client-react';
-import { Loader2, ChevronLeft, FileText, CheckCircle2, Clock, PenLine, RotateCcw, ChevronDown } from 'lucide-react';
+import { Loader2, ChevronLeft, FileText, CheckCircle2, Clock, PenLine, RotateCcw, ChevronDown, MapPin, Umbrella } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const apiUrl = (path: string) => `${import.meta.env.BASE_URL}api${path}`;
@@ -334,6 +334,11 @@ export default function VanContract() {
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // オプション選択
+  const [blackNumber, setBlackNumber] = useState(false);
+  const [insuranceReferral, setInsuranceReferral] = useState(false);
+  const [gpsConsent, setGpsConsent] = useState(false);
+
   const { data: application, isLoading } = useGetVanApplication(applicationId, {
     query: { enabled: !!applicationId, refetchInterval: 5000 },
   });
@@ -383,7 +388,12 @@ export default function VanContract() {
         method: 'POST',
         credentials: 'include',
         headers: authHeaders(),
-        body: JSON.stringify({ signatureData }),
+        body: JSON.stringify({
+          signatureData,
+          blackNumberRequested: blackNumber,
+          insuranceReferralRequested: insuranceReferral,
+          gpsConsent,
+        }),
       });
       if (!res.ok) {
         let errMsg = '署名に失敗しました';
@@ -523,6 +533,58 @@ export default function VanContract() {
               onRead={() => handleRead(i)}
             />
           ))}
+
+          {/* オプション選択 */}
+          <div className={`rounded-xl border border-border overflow-hidden mb-6 transition-opacity ${allRead ? '' : 'opacity-40 pointer-events-none'}`}>
+            <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold">オプション（任意）</div>
+            <div className="divide-y divide-border">
+
+              {/* 黒ナンバー代理取得 */}
+              <label className="flex items-start gap-4 px-5 py-4 cursor-pointer hover:bg-muted/30 transition-colors">
+                <input type="checkbox" checked={blackNumber} onChange={e => setBlackNumber(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-foreground cursor-pointer shrink-0" />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />黒ナンバー代理取得
+                    </span>
+                    <span className="text-sm font-semibold">+¥19,800</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">軽貨物運送業に必要な黒ナンバーの取得手続きを代行します。初回のみ加算されます。</p>
+                </div>
+              </label>
+
+              {/* 保険紹介 */}
+              <label className="flex items-start gap-4 px-5 py-4 cursor-pointer hover:bg-muted/30 transition-colors">
+                <input type="checkbox" checked={insuranceReferral} onChange={e => setInsuranceReferral(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-foreground cursor-pointer shrink-0" />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium flex items-center gap-2">
+                      <Umbrella className="h-4 w-4 text-muted-foreground" />保険紹介
+                    </span>
+                    <span className="text-xs text-muted-foreground">担当者より案内</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">軽貨物に適した保険プランを担当者から個別にご紹介します。</p>
+                </div>
+              </label>
+
+              {/* GPS許可 */}
+              <label className="flex items-start gap-4 px-5 py-4 cursor-pointer hover:bg-muted/30 transition-colors">
+                <input type="checkbox" checked={gpsConsent} onChange={e => setGpsConsent(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-foreground cursor-pointer shrink-0" />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />GPS位置情報の取得を許可する
+                    </span>
+                    <span className="text-xs text-muted-foreground">無料</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">車両の位置情報を常時取得することに同意します。安全管理・緊急時対応に使用します。</p>
+                </div>
+              </label>
+            </div>
+          </div>
 
           {/* 署名欄 */}
           <div className={`rounded-xl border-2 p-5 mb-6 transition-colors ${allRead ? 'border-foreground' : 'border-border opacity-50 pointer-events-none'}`}>
