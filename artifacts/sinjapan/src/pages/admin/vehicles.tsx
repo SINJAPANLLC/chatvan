@@ -94,7 +94,7 @@ export default function AdminVehicles() {
     setFormData({
       maker: '', model: '', year: 2020, prefecture: '',
       monthlyPrice: 30000, sinJapanFee: 5000, minPeriodMonths: 1,
-      status: '募集中', hasEtc: false, hasDashcam: false, hasBackupCam: false,
+      status: 'available', hasEtc: false, hasDashcam: false, hasBackupCam: false,
       rentalCompanyId: undefined
     } as any);
     setPhotoPath('');
@@ -152,10 +152,28 @@ export default function AdminVehicles() {
   };
 
   const statusColors: Record<string, string> = {
-    '募集中': 'bg-blue-50 text-blue-700',
-    '商談中': 'bg-yellow-50 text-yellow-700',
-    '貸出中': 'bg-green-50 text-green-700',
-    '掲載停止': 'bg-gray-100 text-gray-600',
+    draft:           'bg-gray-100 text-gray-600',
+    reviewing:       'bg-orange-50 text-orange-700',
+    available:       'bg-blue-50 text-blue-700',
+    proposed:        'bg-purple-50 text-purple-700',
+    reserved:        'bg-yellow-50 text-yellow-700',
+    rented:          'bg-green-50 text-green-700',
+    return_pending:  'bg-amber-50 text-amber-700',
+    maintenance:     'bg-red-50 text-red-700',
+    suspended:       'bg-gray-100 text-gray-600',
+    unavailable:     'bg-gray-100 text-gray-400',
+  };
+  const statusLabel: Record<string, string> = {
+    draft:           '下書き',
+    reviewing:       '審査中',
+    available:       '募集中',
+    proposed:        '提案済',
+    reserved:        '予約済',
+    rented:          '貸出中',
+    return_pending:  '返却予定',
+    maintenance:     '整備中',
+    suspended:       '掲載停止',
+    unavailable:     '利用不可',
   };
 
   return (
@@ -206,7 +224,7 @@ export default function AdminVehicles() {
                 </td>
                 <td className="px-6 py-4">
                   <span className={`px-2 py-1 text-xs font-semibold rounded ${statusColors[v.status] || 'bg-gray-100'}`}>
-                    {v.status}
+                    {statusLabel[v.status] ?? v.status}
                   </span>
                 </td>
                 <td className="px-6 py-4">
@@ -360,17 +378,18 @@ export default function AdminVehicles() {
             <div className="space-y-2">
               <label className="text-sm font-medium">ステータス</label>
               <select 
-                value={formData.status || '募集中'} 
+                value={formData.status || 'available'} 
                 onChange={e => setFormData({...formData, status: e.target.value as any})}
                 className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:border-foreground/50 bg-background"
               >
-                <option value="募集中">募集中</option>
-                <option value="商談中">商談中</option>
-                <option value="契約予定">契約予定</option>
-                <option value="貸出中">貸出中</option>
-                <option value="返却予定">返却予定</option>
-                <option value="整備中">整備中</option>
-                <option value="掲載停止">掲載停止</option>
+                <option value="available">募集中</option>
+                <option value="proposed">提案済</option>
+                <option value="reserved">予約済</option>
+                <option value="rented">貸出中</option>
+                <option value="return_pending">返却予定</option>
+                <option value="maintenance">整備中</option>
+                <option value="suspended">掲載停止</option>
+                <option value="unavailable">利用不可</option>
               </select>
             </div>
             <div className="col-span-2 space-y-2">

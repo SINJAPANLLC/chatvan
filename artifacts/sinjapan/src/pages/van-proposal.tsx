@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useGetVanApplication, useAcceptVanProposal } from '@workspace/api-client-react';
-import { Loader2, CheckCircle2, ChevronLeft, Calendar, MapPin, JapaneseYen, Check } from 'lucide-react';
+import { Loader2, CheckCircle2, ChevronLeft, Calendar, MapPin, JapaneseYen, Check, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -11,11 +11,19 @@ export default function VanProposal() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const { data: application, isLoading } = useGetVanApplication(applicationId, {
+  const { data: application, isLoading, refetch } = useGetVanApplication(applicationId, {
     query: { enabled: !!applicationId }
   });
 
   const acceptProposal = useAcceptVanProposal();
+
+  // ステータスが proposed になるまで30秒ごとにポーリング
+  useEffect(() => {
+    if (!application) return;
+    if (application.status === 'proposed') return;
+    const timer = setInterval(() => refetch(), 30000);
+    return () => clearInterval(timer);
+  }, [application?.status, refetch]);
 
   if (isLoading) {
     return (
@@ -35,6 +43,7 @@ export default function VanProposal() {
   }
 
   const vehicles = application.proposedVehicles || [];
+  const isWaiting = application.status !== 'proposed' && application.status !== 'application_received' && vehicles.length === 0;
 
   const handleAccept = async (vehicleId: number) => {
     try {
@@ -64,13 +73,38 @@ export default function VanProposal() {
         >
           <ChevronLeft className="h-4 w-4 mr-1" /> チャットに戻る
         </button>
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-2">提案された車両</h1>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-2">
+          {isWaiting ? 'ヒアリング完了' : '提案された車両'}
+        </h1>
         <p className="text-muted-foreground">
-          ご希望の条件に合う車両が見つかりました。以下の車両からお選びください。
+          {isWaiting
+            ? 'ご希望の条件を受け付けました。担当者が条件に合う車両を選定中です。'
+            : 'ご希望の条件に合う車両が見つかりました。以下の車両からお選びください。'}
         </p>
       </div>
 
-      {vehicles.length === 0 ? (
+      {isWaiting ? (
+        <Card className="border-2 p-10 text-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+              <Clock className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="font-semibold text-lg mb-1">担当者が車両を選定中です</p>
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                通常1〜2営業日以内にご提案いたします。<br />
+                提案が届くとチャット画面に通知が表示されます。
+              </p>
+            </div>
+            <button
+              onClick={() => setLocation(`/van/${applicationId}`)}
+              className="mt-2 px-5 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors"
+            >
+              チャット画面に戻る
+            </button>
+          </div>
+        </Card>
+      ) : vehicles.length === 0 ? (
         <Card className="bg-muted border-dashed border-2 p-12 text-center">
           <p className="text-muted-foreground">現在提案中の車両はありません。</p>
         </Card>
