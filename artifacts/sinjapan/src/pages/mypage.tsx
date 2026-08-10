@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useListVanContracts, useGetMe } from '@workspace/api-client-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, Car, JapaneseYen, Calendar, CreditCard, ChevronRight, MessageSquare, BadgeCheck, AlertCircle, Clock, FileText, Truck } from 'lucide-react';
+import { Loader2, Car, JapaneseYen, Calendar, CreditCard, ChevronRight, MessageSquare, BadgeCheck, AlertCircle, Clock, FileText } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { format } from 'date-fns';
 
@@ -194,44 +194,6 @@ export default function MyPage() {
         </Link>
       </section>
 
-      <section>
-        <h2 className="text-lg font-semibold mb-4">アカウントメニュー</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Link href="/">
-            <Card className="hover:bg-muted transition-colors cursor-pointer border-border shadow-sm group">
-              <CardContent className="p-5 flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="h-10 w-10 bg-background border border-border rounded-full flex items-center justify-center mr-4 group-hover:bg-foreground group-hover:text-background transition-colors">
-                    <Car className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium">Chat VANに相談</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">新しい車両を探す</p>
-                  </div>
-                </div>
-                <ChevronRight className="h-5 w-5 text-muted-foreground" />
-              </CardContent>
-            </Card>
-          </Link>
-          
-          <Link href="/settings">
-            <Card className="hover:bg-muted transition-colors cursor-pointer border-border shadow-sm group">
-              <CardContent className="p-5 flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="h-10 w-10 bg-background border border-border rounded-full flex items-center justify-center mr-4 group-hover:bg-foreground group-hover:text-background transition-colors">
-                    <CreditCard className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium">お支払い・登録情報</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">カード情報・パスワード変更</p>
-                  </div>
-                </div>
-                <ChevronRight className="h-5 w-5 text-muted-foreground" />
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-      </section>
     </div>
   );
 }
