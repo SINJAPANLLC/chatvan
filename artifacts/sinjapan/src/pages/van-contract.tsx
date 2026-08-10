@@ -499,7 +499,7 @@ export default function VanContract() {
                   </span>
                   <span className="text-xs text-muted-foreground">担当者より案内</span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">軽貨物に適した保険プランを担当者が個別にご紹介します。</p>
+                <p className="text-xs text-muted-foreground mt-1">ご契約の車両（黒ナンバー・黄色ナンバー）に応じた保険プランを担当者が個別にご紹介します。</p>
               </div>
             </label>
           </div>
