@@ -446,17 +446,43 @@ export default function VanContract() {
       </div>
 
       {alreadySigned ? (
-        <div className="rounded-xl border-2 border-foreground p-6 text-center">
-          <CheckCircle2 className="h-10 w-10 text-foreground mx-auto mb-3" />
-          <p className="font-semibold mb-1">電子署名が完了しています</p>
-          <p className="text-sm text-muted-foreground mb-4">
-            署名日時: {new Date(contract.platformContractAgreedAt).toLocaleString('ja-JP')}
-          </p>
-          <button onClick={() => setLocation(`/van/${applicationId}/payment`)}
-            className="px-6 py-2.5 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity">
-            お支払いへ進む
-          </button>
-        </div>
+        <>
+          {/* 署名済みバナー */}
+          <div className="rounded-xl border-2 border-foreground px-5 py-4 flex items-center gap-3 mb-6">
+            <CheckCircle2 className="h-6 w-6 text-foreground shrink-0" />
+            <div>
+              <p className="font-semibold text-sm">電子署名が完了しています</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                署名日時: {new Date(contract.platformContractAgreedAt).toLocaleString('ja-JP')}
+              </p>
+            </div>
+          </div>
+
+          {/* 契約書全文（読み取り専用） */}
+          {DOCS.map((doc, i) => (
+            <div key={i} className="rounded-xl border border-border overflow-hidden mb-4">
+              <div className="px-5 py-3 flex items-center gap-2 border-b bg-muted/40 text-sm font-semibold">
+                <FileText className="h-4 w-4" />
+                {i + 1}. {doc.title}
+              </div>
+              <div className="p-5 h-52 overflow-y-auto text-xs leading-relaxed text-foreground whitespace-pre-wrap font-mono bg-muted/20">
+                {doc.content}
+              </div>
+            </div>
+          ))}
+
+          {/* 署名画像 */}
+          {contract.signatureData && (
+            <div className="rounded-xl border border-border overflow-hidden mb-6">
+              <div className="px-5 py-3 border-b bg-muted/40 text-sm font-semibold flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4" />電子署名
+              </div>
+              <div className="p-5 bg-white flex justify-center">
+                <img src={contract.signatureData} alt="電子署名" className="max-h-24 object-contain opacity-80" />
+              </div>
+            </div>
+          )}
+        </>
       ) : (
         <>
           {/* 進捗インジケーター */}
