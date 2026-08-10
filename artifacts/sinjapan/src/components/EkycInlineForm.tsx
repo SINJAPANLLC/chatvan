@@ -22,6 +22,7 @@ function ImageUploader({ label, value, onChange, accept }: {
     try {
       const res = await fetch(apiUrl('/storage/user-uploads/request-url'), {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
         body: JSON.stringify({ name: file.name, contentType: file.type }),
       });
@@ -41,7 +42,7 @@ function ImageUploader({ label, value, onChange, accept }: {
       <p className="text-xs font-medium text-muted-foreground mb-1.5">{label}</p>
       <div
         className={`relative border-2 border-dashed rounded-xl flex flex-col items-center justify-center p-3 cursor-pointer hover:bg-muted transition-colors
-          ${value ? 'border-green-400 bg-green-50' : 'border-border'}`}
+          ${value ? 'border-foreground bg-muted/40' : 'border-border'}`}
         style={{ minHeight: 90 }}
         onClick={() => !uploading && inputRef.current?.click()}
       >
@@ -110,6 +111,7 @@ export default function EkycInlineForm({ applicationId, rejectionReason, onSubmi
     try {
       const res = await fetch(apiUrl(`/van/applications/${applicationId}/identity-verification`), {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
         body: JSON.stringify({
           full_name: fullName, birth_date: birthDate, address, phone,

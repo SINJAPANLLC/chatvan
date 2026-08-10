@@ -20,8 +20,8 @@ const STEPS: Step[] = [
 ];
 
 function getStep(status: string) {
-  if (['new', 'hearing', 'proposed', 'application_received', 'screening', 'approved'].includes(status)) return 0;
-  if (status === 'contracting') return 1;
+  if (['new', 'hearing', 'proposed', 'application_received', 'screening'].includes(status)) return 0;
+  if (status === 'approved' || status === 'contracting') return 1;
   if (status === 'pending_payment') return 2;
   if (status === 'active' || status === 'completed') return 3;
   return 0;
@@ -42,7 +42,7 @@ export default function VanStatus() {
   // eKYCステータスを取得（applicationIdが変わっても呼べるよう useCallback）
   const fetchEkyc = useCallback(() => {
     if (!applicationId) return;
-    fetch(apiUrl(`/van/applications/${applicationId}/identity-verification`), { headers: authHeader() })
+    fetch(apiUrl(`/van/applications/${applicationId}/identity-verification`), { credentials: 'include', headers: authHeader() })
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (d?.status) {
@@ -102,8 +102,8 @@ export default function VanStatus() {
 
       {isRejected ? (
         <div className="text-center py-12">
-          <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
-            <XCircle className="h-8 w-8 text-red-500" />
+          <div className="w-16 h-16 rounded-full bg-muted border-2 border-border flex items-center justify-center mx-auto mb-4">
+            <XCircle className="h-8 w-8 text-foreground" />
           </div>
           <h1 className="text-2xl font-bold mb-2">審査結果のご連絡</h1>
           <p className="text-muted-foreground mb-6">
@@ -141,9 +141,9 @@ export default function VanStatus() {
                       }`}>
                         {done ? <CheckCircle2 className="h-5 w-5" /> : step.icon}
                       </div>
-                      <span className={`text-xs mt-2 font-medium text-center leading-tight ${
+                      <span className={`text-xs mt-2 font-medium text-center leading-tight whitespace-nowrap ${
                         done ? 'text-foreground' : active ? 'text-foreground' : 'text-muted-foreground'
-                      }`} style={{ maxWidth: '60px' }}>
+                      }`}>
                         {step.label}
                       </span>
                     </div>
@@ -167,12 +167,12 @@ export default function VanStatus() {
                       <div className="text-center">
                         {ekycStatus === 'rejected' ? (
                           <>
-                            <div className="w-14 h-14 rounded-full bg-red-50 border-2 border-red-200 flex items-center justify-center mx-auto mb-4">
-                              <AlertCircle className="h-7 w-7 text-red-500" />
+                            <div className="w-14 h-14 rounded-full bg-muted border-2 border-border flex items-center justify-center mx-auto mb-4">
+                              <AlertCircle className="h-7 w-7 text-foreground" />
                             </div>
                             <h2 className="text-lg font-bold mb-2">本人確認が確認できませんでした</h2>
                             {ekycRejReason && (
-                              <p className="text-sm text-red-600 bg-red-50 rounded-lg px-4 py-2 mb-4 max-w-sm mx-auto">{ekycRejReason}</p>
+                              <p className="text-sm text-muted-foreground border border-border rounded-lg px-4 py-2 mb-4 max-w-sm mx-auto">{ekycRejReason}</p>
                             )}
                             <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
                               免許証の画像を確認のうえ、再度アップロードしてください。
@@ -180,8 +180,8 @@ export default function VanStatus() {
                           </>
                         ) : (
                           <>
-                            <div className="w-14 h-14 rounded-full bg-blue-50 border-2 border-blue-200 flex items-center justify-center mx-auto mb-4">
-                              <ScanFace className="h-7 w-7 text-blue-600" />
+                            <div className="w-14 h-14 rounded-full bg-muted border-2 border-border flex items-center justify-center mx-auto mb-4">
+                              <ScanFace className="h-7 w-7 text-foreground" />
                             </div>
                             <h2 className="text-lg font-bold mb-2">本人確認（eKYC）を行ってください</h2>
                             <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
@@ -222,40 +222,36 @@ export default function VanStatus() {
                 {/* ── 提出済み・AI確認中 ── */}
                 {ekycStatus === 'submitted' && (
                   <div className="text-center">
-                    <div className="w-14 h-14 rounded-full bg-yellow-50 border-2 border-yellow-200 flex items-center justify-center mx-auto mb-4">
-                      <Clock className="h-7 w-7 text-yellow-600" />
+                    <div className="w-14 h-14 rounded-full bg-muted border-2 border-border flex items-center justify-center mx-auto mb-4">
+                      <Clock className="h-7 w-7 text-foreground" />
                     </div>
                     <h2 className="text-lg font-bold mb-2">本人確認書類を確認中です</h2>
                     <p className="text-sm text-muted-foreground max-w-sm mx-auto">
                       提出いただいた免許証・顔写真をAIが確認しています。通常数分で完了します。
                     </p>
                     <div className="mt-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                      <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-foreground/40 animate-pulse" />
                       10秒ごとに自動更新
                     </div>
                   </div>
                 )}
 
-                {/* ── eKYC 完了 → 審査中 or 承認済み ── */}
-                {(ekycStatus === 'verified' || (ekycStatus === 'not_started' && status === 'approved')) && (
+                {/* ── eKYC 完了 → AI審査中（approvedはstep1へ遷移済み） ── */}
+                {ekycStatus === 'verified' && (
                   <div className="text-center">
-                    <div className="w-14 h-14 rounded-full bg-yellow-50 border-2 border-yellow-200 flex items-center justify-center mx-auto mb-4">
-                      <Clock className="h-7 w-7 text-yellow-600" />
+                    <div className="w-14 h-14 rounded-full bg-muted border-2 border-border flex items-center justify-center mx-auto mb-4">
+                      <Clock className="h-7 w-7 text-foreground" />
                     </div>
                     <div className="flex items-center justify-center gap-2 mb-4">
-                      <CheckCircle2 className="h-4 w-4 text-green-500" />
-                      <span className="text-xs text-green-600 font-medium">本人確認完了</span>
+                      <CheckCircle2 className="h-4 w-4 text-foreground" />
+                      <span className="text-xs text-foreground font-medium">本人確認完了</span>
                     </div>
-                    <h2 className="text-lg font-bold mb-2">
-                      {status === 'approved' ? '審査通過しました！契約書を準備中です…' : 'AI自動審査中です'}
-                    </h2>
+                    <h2 className="text-lg font-bold mb-2">AI自動審査中です</h2>
                     <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                      {status === 'approved'
-                        ? '担当者が契約書を準備しています。しばらくお待ちください。'
-                        : '申込内容をAIが審査しています。通常数分で完了します。'}
+                      申込内容をAIが審査しています。通常数分で完了します。
                     </p>
                     <div className="mt-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                      <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-foreground/40 animate-pulse" />
                       10秒ごとに自動更新
                     </div>
                   </div>
@@ -265,13 +261,12 @@ export default function VanStatus() {
 
             {currentStep === 1 && (
               <div className="text-center">
-                <div className="w-14 h-14 rounded-full bg-blue-50 border-2 border-blue-200 flex items-center justify-center mx-auto mb-4">
-                  <FileText className="h-7 w-7 text-blue-600" />
+                <div className="w-14 h-14 rounded-full bg-muted border-2 border-border flex items-center justify-center mx-auto mb-4">
+                  <FileText className="h-7 w-7 text-foreground" />
                 </div>
                 <h2 className="text-lg font-bold mb-2">契約書のご確認・署名</h2>
                 <p className="text-sm text-muted-foreground mb-6">
-                  プラットフォーム利用契約と車両貸渡契約の内容をご確認いただき、
-                  同意のうえ署名をお願いいたします。
+                  契約書の内容をご確認のうえ、電子署名をお願いします。
                 </p>
                 <button
                   onClick={() => setLocation(`/van/${applicationId}/contract`)}
@@ -284,8 +279,8 @@ export default function VanStatus() {
 
             {currentStep === 2 && (
               <div className="text-center">
-                <div className="w-14 h-14 rounded-full bg-green-50 border-2 border-green-200 flex items-center justify-center mx-auto mb-4">
-                  <CreditCard className="h-7 w-7 text-green-600" />
+                <div className="w-14 h-14 rounded-full bg-muted border-2 border-border flex items-center justify-center mx-auto mb-4">
+                  <CreditCard className="h-7 w-7 text-foreground" />
                 </div>
                 <h2 className="text-lg font-bold mb-2">最初のお支払い</h2>
                 <p className="text-sm text-muted-foreground mb-2">

@@ -184,14 +184,71 @@ async function runAIScreening(appId: number) {
       status: result, updatedAt: new Date(),
     }).where(eq(vanApplicationsTable.id, appId));
 
-    // ユーザーに通知
-    await db.insert(notificationsTable).values({
-      userId: app.userId!,
-      title: result === "approved" ? "Chat VAN - 審査通過" : "Chat VAN - 審査結果",
-      message: result === "approved"
-        ? "審査が通過しました！担当者が契約書を準備します。"
-        : `審査の結果、今回はお断りとさせていただきました。${reason}`,
-    });
+    if (result === "approved") {
+      // ── 審査通過 → 契約書を自動生成 ────────────────────────────────────
+      try {
+        const [latestProposal] = await db
+          .select().from(vanProposalsTable)
+          .where(eq(vanProposalsTable.applicationId, appId))
+          .orderBy(desc(vanProposalsTable.createdAt))
+          .limit(1);
+
+        if (latestProposal) {
+          const vehicleIds: number[] = JSON.parse(latestProposal.vehicleIds || "[]");
+          const vehicleId = vehicleIds[0];
+          if (vehicleId) {
+            const [vehicle] = await db.select().from(vehiclesTable)
+              .where(eq(vehiclesTable.id, vehicleId));
+            if (vehicle) {
+              const contractNumber = `CVN-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+              const [contract] = await db.insert(vanContractsTable).values({
+                applicationId: appId,
+                userId: app.userId!,
+                vehicleId: vehicle.id,
+                rentalCompanyId: vehicle.rentalCompanyId ?? undefined,
+                monthlyPrice: vehicle.monthlyPrice,
+                sinJapanFee: vehicle.sinJapanFee ?? "0",
+                startDate: app.startDate ?? null,
+                minimumTerm: vehicle.minPeriodMonths ?? 1,
+                contractNumber,
+                platformOperator: "SIN JAPAN株式会社",
+                status: "draft",
+              }).returning();
+
+              await db.update(vanApplicationsTable)
+                .set({ status: "contracting", updatedAt: new Date() })
+                .where(eq(vanApplicationsTable.id, appId));
+
+              await db.insert(notificationsTable).values({
+                userId: app.userId!,
+                title: "Chat VAN - 審査通過・契約書が届きました",
+                message: "審査が通過しました！契約書の内容をご確認のうえ、電子署名をお願いします。",
+              });
+            }
+          }
+        } else {
+          // 提案なしの場合はシンプル通知
+          await db.insert(notificationsTable).values({
+            userId: app.userId!,
+            title: "Chat VAN - 審査通過",
+            message: "審査が通過しました！担当者が契約書を準備しています。",
+          });
+        }
+      } catch (contractErr) {
+        console.error("[AI Screening] 契約自動生成エラー:", contractErr);
+        await db.insert(notificationsTable).values({
+          userId: app.userId!,
+          title: "Chat VAN - 審査通過",
+          message: "審査が通過しました！担当者が契約書を準備しています。",
+        });
+      }
+    } else {
+      await db.insert(notificationsTable).values({
+        userId: app.userId!,
+        title: "Chat VAN - 審査結果",
+        message: `審査の結果、今回はお断りとさせていただきました。${reason}`,
+      });
+    }
   } catch (err) {
     console.error("[AI Screening] エラー:", err);
   }
@@ -462,7 +519,7 @@ router.post("/van/applications/:id/messages", optionalAuth, async (req: Request,
         .where(eq(vehiclesTable.status, "available"));
 
       type ScoredVehicle = typeof allVehicles[0] & { score: number };
-      const scored: ScoredVehicle[] = allVehicles.map(row => {
+      const allScored: ScoredVehicle[] = allVehicles.map(row => {
         const totalPrice = Number(row.vehicle.monthlyPrice)
           + Number(row.vehicle.sinJapanFee ?? 0)
           + Number(row.vehicle.insuranceFee ?? 0);
@@ -474,31 +531,32 @@ router.post("/van/applications/:id/messages", optionalAuth, async (req: Request,
 
         // 予算内（10%超過まで許容）
         if (budget > 0 && totalPrice <= budget * 1.10) score += 25;
-        else if (budget > 0) score -= 20; // 予算オーバーはマイナス
+        else if (budget > 0) score -= 10;
 
         // 最低利用期間をユーザーが満たしているか
         const minPeriod = row.vehicle.minPeriodMonths ?? 1;
         if (duration > 0 && duration >= minPeriod) score += 20;
-        else if (duration > 0) score -= 10;
+        else if (duration > 0) score -= 5;
 
         // 価格が予算に近いほど高スコア（コスパ優先）
         if (budget > 0 && totalPrice <= budget) {
-          score += Math.round((1 - totalPrice / budget) * 10); // 予算より安いほど+
+          score += Math.round((1 - totalPrice / budget) * 10);
         }
 
         return { ...row, score };
-      })
-        .filter(r => r.score > 0)                        // スコアがプラスのもののみ
-        .sort((a, b) => b.score - a.score)               // スコア降順
-        .slice(0, 3);                                    // 最大3台
+      }).sort((a, b) => b.score - a.score);
+
+      // スコア上位3台を提案（条件不一致でも全台から選ぶ）
+      const scored = allScored.slice(0, 3);
 
       if (scored.length > 0) {
-        // ── マッチする車両あり → 自動提案 ──────────────────────────────────
+        // ── 常に自動提案 ────────────────────────────────────────────────────
         const vehicleIds = scored.map(r => r.vehicle.id);
+        const isGoodMatch = scored[0].score > 0;
         await db.insert(vanProposalsTable).values({
           applicationId: appId,
           vehicleIds: JSON.stringify(vehicleIds),
-          message: "AI自動マッチングによる提案",
+          message: isGoodMatch ? "AI自動マッチングによる提案" : "条件近似による自動提案",
         });
         await db.update(vanApplicationsTable)
           .set({ status: "proposed", updatedAt: new Date() })
@@ -519,22 +577,14 @@ router.post("/van/applications/:id/messages", optionalAuth, async (req: Request,
           const price = Number(v.monthlyPrice) + Number(v.sinJapanFee ?? 0) + Number(v.insuranceFee ?? 0);
           return `▼ ${v.maker} ${v.model}（${v.prefecture ?? ""}）\n月額: ¥${price.toLocaleString()}/月\n最低期間: ${v.minPeriodMonths}ヶ月以上`;
         }).join("\n\n");
-        const proposalMsg = `条件に合う車両が見つかりました！以下の車両をご提案します。\n\n${vehicleText}\n\n「提案された車両を確認する」ボタンから詳細をご覧ください。`;
+        const proposalMsg = isGoodMatch
+          ? `条件に合う車両が見つかりました！以下の車両をご提案します。\n\n${vehicleText}\n\n「提案された車両を確認する」ボタンから詳細をご覧ください。`
+          : `現在ご希望のエリアに空き車両の確保が完了次第すぐご案内できるよう、最も近い条件の車両をご提案します。\n\n${vehicleText}\n\n「提案された車両を確認する」ボタンから詳細をご覧ください。`;
         await db.insert(vanMessagesTable).values({
           vanApplicationId: appId,
           role: "assistant",
           content: proposalMsg,
         });
-      } else {
-        // ── マッチする車両なし → 管理者に手動提案を依頼 ───────────────────
-        const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
-        for (const admin of admins) {
-          await db.insert(notificationsTable).values({
-            userId: admin.id,
-            message: `軽バン相談が完了しました（ID: ${appId} / ${inquiry.applicantName}様）自動マッチングなし。手動提案をお願いします。`,
-            title: 'Chat VAN相談（要手動提案）',
-          });
-        }
       }
     }
 
@@ -871,6 +921,63 @@ router.post("/van/contracts/:id/agree-vehicle", requireAuth, async (req: Request
     return res.json(updated);
   } catch (err) {
     console.error("agree vehicle error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── POST /van/contracts/:id/sign  電子署名（一括同意） ─────────────────────
+router.post("/van/contracts/:id/sign", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(String(req.params.id));
+    const userId: number | undefined = (req.session as any)?.userId;
+    const { signatureData } = req.body as { signatureData?: string };
+
+    const [contract] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.id, id));
+    if (!contract) return res.status(404).json({ error: "Not found" });
+    if (contract.userId !== userId) return res.status(403).json({ error: "Forbidden" });
+
+    const meta = JSON.stringify({
+      ip: req.ip,
+      ua: req.headers["user-agent"],
+      agreedAt: new Date().toISOString(),
+      hasSignature: !!signatureData,
+    });
+
+    const now = new Date();
+    const [updated] = await db.update(vanContractsTable).set({
+      platformContractAgreedAt: now,
+      vehicleContractAgreedAt: now,
+      termsAgreedAt: now,
+      signatureData: signatureData ? JSON.stringify({ meta, signature: signatureData }) : meta,
+      status: "pending_payment",
+      updatedAt: now,
+    }).where(eq(vanContractsTable.id, id)).returning();
+
+    // アプリ側ステータスを pending_payment へ
+    if (updated.applicationId) {
+      await db.update(vanApplicationsTable)
+        .set({ status: "pending_payment", updatedAt: now })
+        .where(eq(vanApplicationsTable.id, updated.applicationId));
+    }
+
+    // 管理者・ユーザーに通知
+    const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
+    for (const admin of admins) {
+      await db.insert(notificationsTable).values({
+        userId: admin.id,
+        title: "Chat VAN - 契約署名完了",
+        message: `契約書への電子署名が完了しました（契約ID: ${id}）。`,
+      });
+    }
+    await db.insert(notificationsTable).values({
+      userId: userId!,
+      title: "Chat VAN - 署名受付完了",
+      message: "電子署名を受け付けました。次はお支払い手続きへお進みください。",
+    });
+
+    return res.json({ ok: true, contract: updated });
+  } catch (err) {
+    console.error("sign contract error:", err);
     return res.status(500).json({ error: "Internal error" });
   }
 });

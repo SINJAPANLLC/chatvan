@@ -1,65 +1,327 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useGetVanApplication } from '@workspace/api-client-react';
-import { Loader2, ChevronLeft, FileText, CheckCircle2, Clock } from 'lucide-react';
+import { Loader2, ChevronLeft, FileText, CheckCircle2, Clock, PenLine, RotateCcw, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, '');
 const apiUrl = (path: string) => `${BASE_URL}api${path}`;
-const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem('sinjapan_auth_token')}`, 'Content-Type': 'application/json' });
+const authHeaders = () => ({
+  Authorization: `Bearer ${localStorage.getItem('sinjapan_auth_token') ?? ''}`,
+  'Content-Type': 'application/json',
+});
 
-const PLATFORM_TERMS = `【プラットフォーム利用規約】
+// ─────────────────────────────────────────────────────────────────────────────
+// 契約書テキスト（3本）
+// ─────────────────────────────────────────────────────────────────────────────
+
+const PLATFORM_TERMS = `プラットフォーム利用規約
 
 第1条（目的）
-本規約は、SIN JAPAN株式会社（以下「当社」）が運営する Chat VAN サービス（以下「本サービス」）の利用条件を定めるものです。
+本規約は、SIN JAPAN株式会社（以下「当社」）が運営する Chat VAN サービス（以下「本サービス」）の利用条件を定めるものです。本規約に同意いただいた方のみが本サービスをご利用いただけます。
 
-第2条（利用申込）
-本サービスの利用を希望する方は、本規約に同意のうえ、当社が定める方法により申込みを行うものとします。
+第2条（定義）
+(1)「ユーザー」とは、本規約に同意のうえ本サービスを利用する個人または法人をいいます。
+(2)「協力会社」とは、当社と提携し車両を提供するレンタル会社をいいます。
+(3)「車両」とは、協力会社が提供する軽バンをいいます。
+(4)「月額料金」とは、プラットフォーム利用料および車両貸渡料を合算した金額をいいます。
 
-第3条（サービス内容）
-当社は、軽バンのレンタルマッチングプラットフォームを提供します。マッチングにより成立した貸渡契約は、ユーザーと協力会社（レンタル会社）との間で締結されます。
+第3条（利用申込と承認）
+(1) 本サービスの利用を希望するユーザーは、当社が定める方法により申込みを行うものとします。
+(2) 当社は、申込内容の審査を行い、承認または不承認の通知を行います。
+(3) 以下に該当する場合、当社は申込みを承認しないことができます。
+　・申込情報に虚偽が含まれる場合
+　・反社会的勢力に該当する場合
+　・過去に当社との契約を違反したことがある場合
+　・その他当社が不適当と判断した場合
 
-第4条（月額料金）
-ユーザーは、当社が定める月額料金（税込）を毎月所定の日までにお支払いいただきます。
+第4条（サービス内容）
+(1) 当社は、軽バンのレンタルマッチングプラットフォームを提供します。
+(2) 当社はAIによる自動審査・車両マッチングを行いますが、最終的な判断は当社担当者が行う場合があります。
+(3) マッチングにより成立した車両貸渡契約は、ユーザーと協力会社との間で締結されます。
 
-第5条（禁止事項）
-・違法行為または公序良俗に反する行為
-・本サービスの運営を妨害する行為
-・第三者への転貸
+第5条（月額料金と支払）
+(1) ユーザーは、契約書に定める月額料金（税込）を毎月所定の支払日までにお支払いいただきます。
+(2) 支払方法はクレジットカード払いとし、毎月自動引き落としとなります。
+(3) 支払日を過ぎても入金がない場合、年14.6%の遅延損害金が発生します。
+(4) 2ヶ月以上の未払いが続いた場合、当社は本契約を解除するとともに、残存する未払い料金を一括請求できるものとします。
 
-第6条（免責事項）
-当社は、本サービスを通じて成立したレンタル契約に関して、車両の瑕疵、事故等について責任を負いません。
+第6条（禁止事項）
+ユーザーは以下の行為を行ってはなりません。
+(1) 法令または公序良俗に反する行為
+(2) 本サービスの運営を妨害する行為
+(3) 他のユーザーまたは第三者の権利を侵害する行為
+(4) 車両の第三者への転貸し
+(5) 申告した利用目的以外への使用
+(6) 違法改造または無断改装
+(7) 危険物・違法物品の輸送
+(8) 飲酒・薬物等の影響下での運転
 
-第7条（契約解除）
-月額料金の未払いが2ヶ月以上続いた場合、当社は本契約を解除することができます。`;
+第7条（免責事項）
+(1) 当社は、本サービスを通じて成立したレンタル契約に関して、車両の性能・瑕疵・事故等について一切の責任を負いません。
+(2) 天災・不可抗力・通信障害等によりサービスが停止した場合、当社はその損害について責任を負いません。
+(3) ユーザーが第三者に与えた損害については、ユーザー自身が責任を負うものとします。
 
-const VEHICLE_TERMS = `【車両貸渡契約書】
+第8条（個人情報の取扱い）
+当社は、本サービス利用に関して取得した個人情報を、別途定める「個人情報の取扱いについて」に従い適切に管理します。
 
-第1条（貸渡の目的）
-貸主（協力会社）は、借主（ユーザー）に対し、下記の車両を貸し渡し、借主はこれを借り受けます。
+第9条（契約期間と解除）
+(1) 本規約は、ユーザーが申込みを行い当社が承認した日から、車両を返却し全ての費用精算が完了するまで有効とします。
+(2) ユーザーは当社に対し30日前までに書面または電子メールで通知することにより、本契約を解除できます。ただし最低利用期間中の解約は解約金が発生します。
+(3) ユーザーが本規約に違反した場合、当社は即時に本契約を解除できます。
+
+第10条（準拠法・管轄）
+本規約は日本法を準拠法とし、本サービスに関する紛争については東京地方裁判所を第一審の専属的合意管轄裁判所とします。
+
+第11条（規約の変更）
+当社は、法令変更その他合理的な理由がある場合、本規約を変更することができます。変更内容は本サービス上に掲載し、掲載から2週間後に効力を生じるものとします。`;
+
+const PRIVACY_POLICY = `個人情報の取扱いについて
+
+SIN JAPAN株式会社（以下「当社」）は、ユーザーの個人情報を以下のとおり取り扱います。
+
+第1条（収集する個人情報）
+当社は、本サービスの提供にあたり、以下の情報を収集します。
+(1) 氏名・生年月日・住所・電話番号・メールアドレス
+(2) 運転免許証情報（種別・番号・有効期限）
+(3) 顔写真（本人確認用）
+(4) 利用目的・利用エリア・利用期間等の申込情報
+(5) 支払情報（クレジットカード情報は決済代行業者が管理し当社は保持しません）
+(6) 位置情報（車両に搭載されたGPS機器からの情報）
+(7) アクセスログ・端末情報・Cookie等の技術情報
+
+第2条（利用目的）
+収集した個人情報は、以下の目的で利用します。
+(1) 本人確認・申込審査
+(2) 車両マッチング・契約書の作成・管理
+(3) 月額料金の請求・支払処理
+(4) サービスに関するお知らせ・連絡
+(5) AI審査・マッチングアルゴリズムの精度向上（匿名化処理後）
+(6) 法令に基づく対応・行政機関への届出
+(7) 不正利用・事故発生時の対応
+
+第3条（第三者提供）
+当社は、以下の場合を除き、個人情報を第三者に提供しません。
+(1) ユーザーの同意がある場合
+(2) 車両貸渡に必要な範囲で協力会社（レンタル会社）に提供する場合
+(3) 法令に基づき行政機関・裁判所等への提供が必要な場合
+(4) 人の生命・身体・財産の保護のため緊急に必要な場合
+
+第4条（個人情報の管理）
+(1) 当社は、個人情報の漏洩・滅失・毀損の防止のため適切なセキュリティ対策を講じます。
+(2) 個人情報へのアクセスは必要最小限の従業員に限定し、適切に管理します。
+(3) 取得した本人確認書類（免許証画像等）は、暗号化された安全なストレージに保管します。
+
+第5条（保存期間）
+個人情報は、契約終了後5年間保存し、その後適切に廃棄します。法令により保存が義務付けられている情報はこの限りではありません。
+
+第6条（開示・訂正・削除の請求）
+ユーザーは当社に対し、保有する自己の個人情報の開示・訂正・削除を請求できます。お問い合わせ窓口：info@sinjapan.jp
+
+第7条（Cookieおよびアクセス解析）
+本サービスでは、サービス改善のためCookieおよびアクセス解析ツールを使用しています。ブラウザの設定によりCookieを無効化できますが、一部サービスが利用できなくなる場合があります。
+
+第8条（改定）
+本方針は、法令変更その他合理的な理由がある場合に改定することがあります。`;
+
+const vehicleTerms = (contract: any) => `軽バン車両貸渡契約書
+
+契約番号: ${contract?.contractNumber ?? `CVN-${contract?.id}`}
+
+貸主（以下「甲」）: ${contract?.contractProvider ?? contract?.vehicle?.rentalCompany?.name ?? '協力会社'}（SIN JAPAN株式会社提携）
+借主（以下「乙」）: 本契約申込人
+
+第1条（貸渡の目的と車両）
+甲は乙に対し、以下の車両を本契約に基づき貸し渡し、乙はこれを借り受けます。
+車両詳細は別紙（車両情報シート）のとおりとし、受け取り時に確認するものとします。
 
 第2条（貸渡期間）
-契約書に記載の開始日から終了日までとします。最低利用期間を下回る解約の場合、違約金が発生する場合があります。
+(1) 利用開始日: ${contract?.startDate ?? '車両受取日'}
+(2) 最低利用期間: ${contract?.minimumTerm ?? 1}ヶ月以上
+(3) 契約は最低利用期間満了後、乙が解約の意思表示を行わない限り自動更新されます。
 
-第3条（使用目的）
-申込時に申告した利用目的（軽貨物配送業務等）に限り使用できます。
+第3条（使用目的と方法）
+(1) 乙は、申込時に申告した利用目的（軽貨物配送業務等）に限り車両を使用できます。
+(2) 乙は善良な管理者の注意をもって車両を使用・保管するものとします。
+(3) 乙は車両の定期点検・日常点検を実施し、異常を発見した場合は速やかに甲に連絡するものとします。
 
-第4条（禁止事項）
-・貸主の承諾なき改造・改装
-・危険物・違法物品の運搬
-・第三者への転貸し
-・飲酒運転その他の法令違反
+第4条（月額料金と支払）
+(1) 月額料金（税抜）: ¥${(Number(contract?.monthlyPrice ?? 0) + Number(contract?.sinJapanFee ?? 0)).toLocaleString()}/月
+(2) 月額料金（税込）: ¥${Math.floor((Number(contract?.monthlyPrice ?? 0) + Number(contract?.sinJapanFee ?? 0)) * 1.1).toLocaleString()}/月
+(3) 支払日: 毎月${contract?.paymentDay ?? 1}日（自動引き落とし）
+(4) 料金にはプラットフォーム利用料（¥${Number(contract?.sinJapanFee ?? 0).toLocaleString()}）を含みます。
 
-第5条（事故・損害）
-事故が発生した場合は直ちに貸主および当社に報告してください。
-修理費用はユーザーが加入する保険の適用範囲で処理します。
+第5条（禁止事項）
+乙は以下の行為を行ってはなりません。
+(1) 甲の書面による承諾なき車両の改造・改装・装飾変更
+(2) 危険物・違法物品の運搬
+(3) 第三者への転貸し（サブリース禁止）
+(4) 飲酒・薬物等の影響下での運転
+(5) 法定速度・道路交通法に違反する行為
+(6) 車両を担保に供する行為
 
-第6条（車両の返却）
-契約終了時には、貸渡時と同等の状態で返却するものとします。
-通常損耗を超える損傷は借主の負担とします。
+第6条（事故・損害）
+(1) 乙は、事故・盗難・損傷が発生した場合は直ちに甲および当社に報告するとともに、警察に届け出るものとします。
+(2) 車両の損傷・事故による修理費用は、乙が加入する保険の適用範囲内で処理します。
+(3) 保険適用外の費用・免責額・修理費超過分は乙が負担します。
+(4) 乙の故意・重過失による損害については、保険の有無にかかわらず乙が全額負担します。
 
-第7条（月額料金の支払）
-毎月の支払日までに所定の口座へ月額料金を振り込むものとします。`;
+第7条（保険）
+(1) 乙は、車両利用前に対人・対物・車両保険（任意保険）に加入するものとします。
+(2) 黒ナンバー車両の場合は事業用自動車保険に加入するものとします。
+(3) 保険未加入の場合、甲は乙への車両引き渡しを拒否できます。
+
+第8条（車両の返却）
+(1) 乙は、契約終了時に甲の指定する場所へ、貸渡時と同等の状態で車両を返却するものとします。
+(2) 通常損耗（走行距離に応じた自然劣化）を超える損傷は乙の費用負担とします。
+(3) 所定の日時までに返却されない場合、乙は1日あたり月額料金の1/30相当額を延滞料として支払うものとします。
+
+第9条（解約と違約金）
+(1) 乙は甲に対し30日前までに書面または電子メールで通知することにより、本契約を解約できます。
+(2) 最低利用期間内に解約する場合、乙は残存期間分の月額料金相当額を違約金として支払うものとします。
+(3) 甲は、乙が本契約に違反した場合または月額料金を2ヶ月以上未払いの場合、即時に本契約を解除できます。
+
+${contract?.returnTerms ? `第10条（特別返却条件）\n${contract.returnTerms}\n\n` : ''}${contract?.terminationTerms ? `第11条（特別解約条件）\n${contract.terminationTerms}\n\n` : ''}${contract?.specialTerms ? `特記事項\n${contract.specialTerms}\n\n` : ''}以上の内容に乙が電子署名することにより、本契約が成立します。`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 手書き署名キャンバス
+// ─────────────────────────────────────────────────────────────────────────────
+
+function SignatureCanvas({ onSign }: { onSign: (data: string | null) => void }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [drawing, setDrawing] = useState(false);
+  const [hasContent, setHasContent] = useState(false);
+  const lastPos = useRef<{ x: number; y: number } | null>(null);
+
+  const getPos = (e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    if ('touches' in e) {
+      const t = e.touches[0];
+      return { x: (t.clientX - rect.left) * scaleX, y: (t.clientY - rect.top) * scaleY };
+    }
+    return { x: ((e as React.MouseEvent).clientX - rect.left) * scaleX, y: ((e as React.MouseEvent).clientY - rect.top) * scaleY };
+  };
+
+  const startDraw = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const pos = getPos(e, canvas);
+    lastPos.current = pos;
+    setDrawing(true);
+  };
+
+  const draw = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    if (!drawing) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx || !lastPos.current) return;
+    const pos = getPos(e, canvas);
+    ctx.beginPath();
+    ctx.moveTo(lastPos.current.x, lastPos.current.y);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    lastPos.current = pos;
+    setHasContent(true);
+    onSign(canvas.toDataURL('image/png'));
+  };
+
+  const endDraw = () => {
+    setDrawing(false);
+    lastPos.current = null;
+  };
+
+  const clear = () => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setHasContent(false);
+    onSign(null);
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm font-medium flex items-center gap-1.5"><PenLine className="h-4 w-4" />電子署名（手書き）</p>
+        {hasContent && (
+          <button type="button" onClick={clear} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <RotateCcw className="h-3 w-3" />やり直す
+          </button>
+        )}
+      </div>
+      <div className="border-2 border-border rounded-xl overflow-hidden bg-white" style={{ touchAction: 'none' }}>
+        <canvas
+          ref={canvasRef}
+          width={600}
+          height={160}
+          className="w-full"
+          style={{ cursor: 'crosshair', display: 'block' }}
+          onMouseDown={startDraw}
+          onMouseMove={draw}
+          onMouseUp={endDraw}
+          onMouseLeave={endDraw}
+          onTouchStart={startDraw}
+          onTouchMove={draw}
+          onTouchEnd={endDraw}
+        />
+      </div>
+      {!hasContent && (
+        <p className="text-xs text-muted-foreground mt-1.5 text-center">上の枠内に署名してください</p>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// スクロール読了チェック付き契約セクション
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ContractSection({ index, title, content, onRead }: {
+  index: number;
+  title: string;
+  content: string;
+  onRead: () => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [read, setRead] = useState(false);
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || read) return;
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
+    if (atBottom) { setRead(true); onRead(); }
+  }, [read, onRead]);
+
+  return (
+    <div className={`rounded-xl border overflow-hidden mb-4 transition-colors ${read ? 'border-foreground' : 'border-border'}`}>
+      <div className={`px-5 py-3 flex items-center gap-2 border-b text-sm font-semibold ${read ? 'bg-foreground text-background border-foreground' : 'bg-muted/40 border-border text-foreground'}`}>
+        <FileText className="h-4 w-4" />
+        <span>{index}. {title}</span>
+        {read && <CheckCircle2 className="h-4 w-4 ml-auto" />}
+        {!read && <span className="ml-auto text-xs font-normal opacity-60 flex items-center gap-1"><ChevronDown className="h-3 w-3" />最後までスクロールして確認</span>}
+      </div>
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="p-5 h-52 overflow-y-auto text-xs leading-relaxed text-foreground whitespace-pre-wrap font-mono bg-muted/20"
+      >
+        {content}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// メインコンポーネント
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function VanContract() {
   const [, params] = useRoute('/van/:id/contract');
@@ -67,15 +329,60 @@ export default function VanContract() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const [platformAgreed, setPlatformAgreed] = useState(false);
-  const [vehicleAgreed, setVehicleAgreed] = useState(false);
+  const [readCount, setReadCount] = useState(0);
+  const [signatureData, setSignatureData] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const { data: application, isLoading } = useGetVanApplication(applicationId, {
-    query: { enabled: !!applicationId },
+    query: { enabled: !!applicationId, refetchInterval: 5000 },
   });
 
   const contract = (application as any)?.contract as any;
+  const alreadySigned = !!(contract?.platformContractAgreedAt && contract?.vehicleContractAgreedAt);
+
+  const DOCS = [
+    { title: 'プラットフォーム利用規約', content: PLATFORM_TERMS },
+    { title: '個人情報の取扱いについて', content: PRIVACY_POLICY },
+    { title: '軽バン車両貸渡契約書',    content: vehicleTerms(contract) },
+  ];
+  const allRead = readCount >= DOCS.length;
+
+  const handleSign = async () => {
+    if (!allRead) {
+      toast({ variant: 'destructive', title: '確認が必要です', description: 'すべての書類を最後までお読みください。' });
+      return;
+    }
+    if (!signatureData) {
+      toast({ variant: 'destructive', title: '署名が必要です', description: '電子署名欄に署名してください。' });
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(apiUrl(`/van/contracts/${contract.id}/sign`), {
+        method: 'POST',
+        credentials: 'include',
+        headers: authHeaders(),
+        body: JSON.stringify({ signatureData }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? '署名に失敗しました');
+      }
+      toast({ title: '電子署名が完了しました', description: 'お支払い手続きへ進みます。' });
+      setLocation(`/van/${applicationId}/payment`);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'エラー', description: e.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const readFlags = useRef(new Set<number>());
+  const handleRead = useCallback((i: number) => {
+    if (readFlags.current.has(i)) return;
+    readFlags.current.add(i);
+    setReadCount(readFlags.current.size);
+  }, []);
 
   if (isLoading) {
     return (
@@ -85,168 +392,115 @@ export default function VanContract() {
     );
   }
 
-  // 契約書がまだ作成されていない
   if (!contract) {
     return (
       <div className="flex-1 max-w-2xl mx-auto w-full px-4 py-8">
-        <button
-          onClick={() => setLocation(`/van/${applicationId}/status`)}
-          className="flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors mb-8"
-        >
+        <button onClick={() => setLocation(`/van/${applicationId}/status`)}
+          className="flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors mb-8">
           <ChevronLeft className="h-4 w-4 mr-1" /> 進捗に戻る
         </button>
         <div className="text-center py-16">
-          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 rounded-full bg-muted border-2 border-border flex items-center justify-center mx-auto mb-4">
             <Clock className="h-8 w-8 text-muted-foreground" />
           </div>
-          <h2 className="text-lg font-bold mb-2">契約書を作成中です</h2>
-          <p className="text-sm text-muted-foreground">担当者が契約書を準備しています。しばらくお待ちください。</p>
+          <h2 className="text-lg font-bold mb-2">契約書を準備中です</h2>
+          <p className="text-sm text-muted-foreground">審査完了後、自動的に契約書が作成されます。</p>
         </div>
       </div>
     );
   }
 
-  const alreadyAgreedPlatform = !!contract.platformContractAgreedAt;
-  const alreadyAgreedVehicle  = !!contract.vehicleContractAgreedAt;
-  const bothAgreed = alreadyAgreedPlatform && alreadyAgreedVehicle;
-
-  const handleAgree = async () => {
-    if (!platformAgreed || !vehicleAgreed) {
-      toast({ variant: 'destructive', title: '確認が必要です', description: '両方の契約書に同意してください。' });
-      return;
-    }
-    setLoading(true);
-    try {
-      if (!alreadyAgreedPlatform) {
-        const r = await fetch(apiUrl(`/van/contracts/${contract.id}/agree-platform`), { method: 'POST', headers: authHeader() });
-        if (!r.ok) throw new Error('プラットフォーム契約の同意に失敗しました');
-      }
-      if (!alreadyAgreedVehicle) {
-        const r = await fetch(apiUrl(`/van/contracts/${contract.id}/agree-vehicle`), { method: 'POST', headers: authHeader() });
-        if (!r.ok) throw new Error('車両貸渡契約の同意に失敗しました');
-      }
-      toast({ title: '同意が完了しました', description: 'お支払い手続きへ進みます。' });
-      setLocation(`/van/${applicationId}/payment`);
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'エラー', description: e.message });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fmt = (n: number) => `¥${Math.floor(n).toLocaleString()}`;
-  const monthlyBase = Number(contract.monthlyPrice) + Number(contract.sinJapanFee ?? 0);
+  const monthlyBase = Number(contract.monthlyPrice ?? 0) + Number(contract.sinJapanFee ?? 0);
   const monthlyTax  = Math.floor(monthlyBase * 1.1);
 
   return (
     <div className="flex-1 max-w-2xl mx-auto w-full px-4 py-8">
-      <button
-        onClick={() => setLocation(`/van/${applicationId}/status`)}
-        className="flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors mb-8"
-      >
+      <button onClick={() => setLocation(`/van/${applicationId}/status`)}
+        className="flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors mb-8">
         <ChevronLeft className="h-4 w-4 mr-1" /> 進捗に戻る
       </button>
 
       <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight mb-1">契約書の確認・署名</h1>
-        <p className="text-sm text-muted-foreground">契約番号: {contract.contractNumber ?? `#${contract.id}`}</p>
+        <h1 className="text-2xl font-bold tracking-tight mb-1">契約書の確認・電子署名</h1>
+        <p className="text-sm text-muted-foreground">契約番号: {contract.contractNumber ?? `CVN-${contract.id}`}</p>
       </div>
 
       {/* 契約概要 */}
       <div className="rounded-xl border border-border overflow-hidden mb-6">
         <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold">契約概要</div>
-        <div className="p-5 space-y-3 text-sm">
-          <div className="flex justify-between"><span className="text-muted-foreground">月額料金（税込）</span><span className="font-bold text-base">{fmt(monthlyTax)}/月</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">税抜</span><span>{fmt(monthlyBase)}/月</span></div>
-          {contract.startDate  && <div className="flex justify-between"><span className="text-muted-foreground">開始日</span><span>{contract.startDate}</span></div>}
+        <div className="p-5 space-y-2.5 text-sm">
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">月額料金（税込）</span>
+            <span className="font-bold text-lg">¥{monthlyTax.toLocaleString()}<span className="text-xs font-normal text-muted-foreground ml-1">/月</span></span>
+          </div>
+          <div className="flex justify-between"><span className="text-muted-foreground">税抜</span><span>¥{monthlyBase.toLocaleString()}/月</span></div>
+          {contract.startDate && <div className="flex justify-between"><span className="text-muted-foreground">開始日</span><span>{contract.startDate}</span></div>}
           {contract.minimumTerm && <div className="flex justify-between"><span className="text-muted-foreground">最低利用期間</span><span>{contract.minimumTerm}ヶ月</span></div>}
           <div className="flex justify-between"><span className="text-muted-foreground">支払日</span><span>毎月{contract.paymentDay ?? 1}日</span></div>
         </div>
       </div>
 
-      {bothAgreed ? (
-        <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-center">
-          <CheckCircle2 className="h-10 w-10 text-green-600 mx-auto mb-3" />
-          <p className="font-semibold text-green-900">両方の契約書に同意済みです</p>
-          <button
-            onClick={() => setLocation(`/van/${applicationId}/payment`)}
-            className="mt-4 px-6 py-2.5 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity"
-          >
+      {alreadySigned ? (
+        <div className="rounded-xl border-2 border-foreground p-6 text-center">
+          <CheckCircle2 className="h-10 w-10 text-foreground mx-auto mb-3" />
+          <p className="font-semibold mb-1">電子署名が完了しています</p>
+          <p className="text-sm text-muted-foreground mb-4">
+            署名日時: {new Date(contract.platformContractAgreedAt).toLocaleString('ja-JP')}
+          </p>
+          <button onClick={() => setLocation(`/van/${applicationId}/payment`)}
+            className="px-6 py-2.5 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity">
             お支払いへ進む
           </button>
         </div>
       ) : (
         <>
-          {/* プラットフォーム利用規約 */}
-          <ContractSection
-            title="① プラットフォーム利用規約"
-            content={contract.specialTerms ? `${PLATFORM_TERMS}\n\n【特記事項】\n${contract.specialTerms}` : PLATFORM_TERMS}
-            agreed={alreadyAgreedPlatform || platformAgreed}
-            locked={alreadyAgreedPlatform}
-            onAgree={() => !alreadyAgreedPlatform && setPlatformAgreed(v => !v)}
-          />
-
-          {/* 車両貸渡契約 */}
-          <ContractSection
-            title="② 車両貸渡契約書"
-            content={[
-              VEHICLE_TERMS,
-              contract.terminationTerms ? `\n【解約条件】\n${contract.terminationTerms}` : '',
-              contract.returnTerms      ? `\n【返却条件】\n${contract.returnTerms}` : '',
-            ].join('')}
-            agreed={alreadyAgreedVehicle || vehicleAgreed}
-            locked={alreadyAgreedVehicle}
-            onAgree={() => !alreadyAgreedVehicle && setVehicleAgreed(v => !v)}
-          />
-
-          <div className="mt-6">
-            <p className="text-xs text-muted-foreground mb-4 text-center">
-              ご同意いただくと、電子署名として記録されます（日時・IPアドレス）
-            </p>
-            <button
-              onClick={handleAgree}
-              disabled={loading || !platformAgreed || !vehicleAgreed}
-              className="w-full py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2"
-            >
-              {loading ? <><Loader2 className="h-4 w-4 animate-spin" />送信中…</> : '両方の契約書に同意して次へ'}
-            </button>
+          {/* 進捗インジケーター */}
+          <div className="flex items-center gap-2 mb-5 text-sm">
+            <div className={`h-2 flex-1 rounded-full ${readCount >= 1 ? 'bg-foreground' : 'bg-border'}`} />
+            <div className={`h-2 flex-1 rounded-full ${readCount >= 2 ? 'bg-foreground' : 'bg-border'}`} />
+            <div className={`h-2 flex-1 rounded-full ${readCount >= 3 ? 'bg-foreground' : 'bg-border'}`} />
+            <span className="text-xs text-muted-foreground whitespace-nowrap">{readCount}/3 確認済み</span>
           </div>
+
+          {/* 3つの契約書 */}
+          {DOCS.map((doc, i) => (
+            <ContractSection
+              key={i}
+              index={i + 1}
+              title={doc.title}
+              content={doc.content}
+              onRead={() => handleRead(i)}
+            />
+          ))}
+
+          {/* 署名欄 */}
+          <div className={`rounded-xl border-2 p-5 mb-6 transition-colors ${allRead ? 'border-foreground' : 'border-border opacity-50 pointer-events-none'}`}>
+            <SignatureCanvas onSign={setSignatureData} />
+          </div>
+          {!allRead && (
+            <p className="text-xs text-muted-foreground text-center mb-4">
+              すべての書類を最後までスクロールすると署名できます
+            </p>
+          )}
+
+          {/* 同意テキスト */}
+          <p className="text-xs text-muted-foreground text-center mb-4">
+            ご同意・電子署名いただくと、署名日時・IPアドレス・端末情報が記録されます。
+            電子署名は「電子署名及び認証業務に関する法律」に基づき、自筆署名と同等の法的効力を持ちます。
+          </p>
+
+          <button
+            onClick={handleSign}
+            disabled={loading || !allRead || !signatureData}
+            className="w-full py-3.5 bg-foreground text-background font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-30 flex items-center justify-center gap-2 text-sm"
+          >
+            {loading
+              ? <><Loader2 className="h-4 w-4 animate-spin" />送信中…</>
+              : <><PenLine className="h-4 w-4" />全書類に同意して電子署名する</>
+            }
+          </button>
         </>
       )}
-    </div>
-  );
-}
-
-function ContractSection({ title, content, agreed, locked, onAgree }: {
-  title: string;
-  content: string;
-  agreed: boolean;
-  locked: boolean;
-  onAgree: () => void;
-}) {
-  return (
-    <div className={`rounded-xl border overflow-hidden mb-4 transition-colors ${agreed ? 'border-green-300' : 'border-border'}`}>
-      <div className={`px-5 py-3 flex items-center gap-2 border-b text-sm font-semibold ${agreed ? 'bg-green-50 border-green-200' : 'bg-muted/40 border-border'}`}>
-        <FileText className="h-4 w-4" />
-        {title}
-        {agreed && <CheckCircle2 className="h-4 w-4 text-green-600 ml-auto" />}
-      </div>
-      <div className="p-5">
-        <div className="bg-muted/30 rounded-lg p-4 h-48 overflow-y-auto text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap font-mono border border-border/50 mb-4">
-          {content}
-        </div>
-        <label className={`flex items-start gap-3 cursor-pointer ${locked ? 'opacity-60 cursor-not-allowed' : ''}`}>
-          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${agreed ? 'bg-foreground border-foreground' : 'border-border bg-background'}`}
-            onClick={onAgree}
-          >
-            {agreed && <CheckCircle2 className="h-3.5 w-3.5 text-background" />}
-          </div>
-          <span className="text-sm leading-relaxed" onClick={onAgree}>
-            上記の内容を読み、同意します
-            {locked && <span className="ml-2 text-xs text-green-600 font-medium">（署名済み）</span>}
-          </span>
-        </label>
-      </div>
     </div>
   );
 }

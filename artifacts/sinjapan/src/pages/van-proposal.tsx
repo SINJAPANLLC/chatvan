@@ -43,6 +43,7 @@ export default function VanProposal() {
   }
 
   const vehicles = application.proposedVehicles || [];
+
   const isWaiting = application.status !== 'proposed' && application.status !== 'application_received' && vehicles.length === 0;
 
   const handleAccept = async (vehicleId: number) => {
@@ -81,27 +82,23 @@ export default function VanProposal() {
         >
           <ChevronLeft className="h-4 w-4 mr-1" /> チャットに戻る
         </button>
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-2">
-          {isWaiting ? 'ヒアリング完了' : '提案された車両'}
-        </h1>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-2">提案された車両</h1>
         <p className="text-muted-foreground">
-          {isWaiting
-            ? 'ご希望の条件を受け付けました。担当者が条件に合う車両を選定中です。'
-            : 'ご希望の条件に合う車両が見つかりました。以下の車両からお選びください。'}
+          ご希望の条件に合わせてAIが自動で選定しました。以下の車両からお選びください。
         </p>
       </div>
 
-      {isWaiting ? (
+      {vehicles.length === 0 ? (
         <Card className="border-2 p-10 text-center">
           <div className="flex flex-col items-center gap-4">
             <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
               <Clock className="h-8 w-8 text-muted-foreground" />
             </div>
             <div>
-              <p className="font-semibold text-lg mb-1">担当者が車両を選定中です</p>
+              <p className="font-semibold text-lg mb-1">車両を準備中です</p>
               <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                通常1〜2営業日以内にご提案いたします。<br />
-                提案が届くとチャット画面に通知が表示されます。
+                まもなく提案が届きます。<br />
+                チャット画面に通知が表示されます。
               </p>
             </div>
             <button
@@ -111,10 +108,6 @@ export default function VanProposal() {
               チャット画面に戻る
             </button>
           </div>
-        </Card>
-      ) : vehicles.length === 0 ? (
-        <Card className="bg-muted border-dashed border-2 p-12 text-center">
-          <p className="text-muted-foreground">現在提案中の車両はありません。</p>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
