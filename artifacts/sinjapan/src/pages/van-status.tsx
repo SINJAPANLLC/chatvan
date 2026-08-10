@@ -1,15 +1,15 @@
 import React, { useEffect } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useGetVanApplication } from '@workspace/api-client-react';
-import { Loader2, CheckCircle2, Clock, FileText, CreditCard, Truck, XCircle, ChevronLeft } from 'lucide-react';
+import { Loader2, CheckCircle2, Clock, FileText, CreditCard, Truck, XCircle, ChevronLeft, ShieldCheck, MapPin } from 'lucide-react';
 
 type Step = { label: string; description: string; icon: React.ReactNode };
 
 const STEPS: Step[] = [
-  { label: '審査中',   description: '申込内容を確認しています',   icon: <Clock className="h-5 w-5" /> },
-  { label: '契約署名', description: '契約書の内容をご確認ください', icon: <FileText className="h-5 w-5" /> },
-  { label: 'お支払い', description: '最初の月額料金をお支払いください', icon: <CreditCard className="h-5 w-5" /> },
-  { label: '利用開始', description: '軽バンのご利用を開始できます',  icon: <Truck className="h-5 w-5" /> },
+  { label: 'eKYC・審査', description: '本人確認と審査を自動で行います',  icon: <Clock className="h-5 w-5" /> },
+  { label: '契約署名',   description: '契約書の内容をご確認ください',    icon: <FileText className="h-5 w-5" /> },
+  { label: 'お支払い',   description: '最初の月額料金をお支払いください', icon: <CreditCard className="h-5 w-5" /> },
+  { label: '受け取り',   description: 'レンタル会社で車両を受け取ります', icon: <Truck className="h-5 w-5" /> },
 ];
 
 function getStep(status: string) {
@@ -195,17 +195,25 @@ export default function VanStatus() {
                 <div className="w-14 h-14 rounded-full bg-foreground flex items-center justify-center mx-auto mb-4">
                   <CheckCircle2 className="h-7 w-7 text-background" />
                 </div>
-                <h2 className="text-lg font-bold mb-2">ご利用開始</h2>
+                <h2 className="text-lg font-bold mb-2">車両を受け取ってください</h2>
                 <p className="text-sm text-muted-foreground mb-6">
                   すべての手続きが完了しました。<br />
-                  担当者からお引き渡しのご連絡をいたします。
+                  担当のレンタル会社へ連絡して車両を受け取ってください。
                 </p>
-                <button
-                  onClick={() => setLocation('/mypage')}
-                  className="px-8 py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity"
-                >
-                  マイページへ
-                </button>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <button
+                    onClick={() => setLocation(`/van/${applicationId}/pickup`)}
+                    className="px-8 py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                  >
+                    <MapPin className="h-4 w-4" />受け取り情報を見る
+                  </button>
+                  <button
+                    onClick={() => setLocation('/mypage')}
+                    className="px-8 py-3 border border-border text-sm font-medium rounded-full hover:bg-muted transition-colors"
+                  >
+                    マイページへ
+                  </button>
+                </div>
               </div>
             )}
           </div>

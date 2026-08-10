@@ -24,6 +24,129 @@ import {
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { openai } from "@workspace/integrations-openai-ai-server";
+import { randomUUID } from "crypto";
+import { squareFetch } from "../lib/square-authorize";
+
+// ── eKYC AI自動判定 ─────────────────────────────────────────────────────────
+async function runAIeKYC(verificationId: number, data: {
+  fullName: string; birthDate: string; licenseNumber: string;
+  licenseExpiry: string; licenseType: string;
+  userId: number; applicationId: number;
+}) {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const birthYear = parseInt(data.birthDate?.slice(0, 4) ?? "0");
+    const age = new Date().getFullYear() - birthYear;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `あなたは日本の運転免許証を審査するeKYCシステムです。
+提出されたデータを検証し、以下のJSONのみ返してください:
+{"result": "verified" | "rejected", "reason": "理由（日本語、20文字以内）"}`
+        },
+        {
+          role: "user",
+          content: `【提出データ】
+氏名: ${data.fullName}
+生年月日: ${data.birthDate}（年齢: ${age}歳）
+免許番号: ${data.licenseNumber}
+免許種別: ${data.licenseType}
+有効期限: ${data.licenseExpiry}
+本日: ${today}
+
+チェック項目:
+1. 年齢が18歳以上か（${age}歳）
+2. 有効期限が本日（${today}）以降か
+3. 免許番号が12桁の数字か（形式チェック）
+4. 氏名が実在しそうな日本人名か
+5. 免許種別が有効な値か（普通、中型、大型、普通二輪、大型二輪、原付等）`
+        }
+      ],
+      response_format: { type: "json_object" },
+    });
+    const parsed = JSON.parse(completion.choices[0]?.message?.content ?? "{}");
+    const result: "verified" | "rejected" = parsed.result === "rejected" ? "rejected" : "verified";
+    const reason: string = parsed.reason ?? "";
+
+    await db.update(identityVerificationsTable).set({
+      status: result as any,
+      ...(result === "rejected" ? { rejectionReason: reason } : {}),
+      updatedAt: new Date(),
+    }).where(eq(identityVerificationsTable.id, verificationId));
+
+    // ユーザーに通知
+    await db.insert(notificationsTable).values({
+      userId: data.userId,
+      title: result === "verified" ? "Chat VAN - 本人確認完了" : "Chat VAN - 本人確認 要再提出",
+      message: result === "verified"
+        ? "本人確認（eKYC）が完了しました。次のステップに進みます。"
+        : `本人確認が確認できませんでした: ${reason}。再度アップロードしてください。`,
+    });
+  } catch (err) {
+    console.error("[eKYC] AI判定エラー:", err);
+  }
+}
+
+// ── AI自動審査 ──────────────────────────────────────────────────────────────
+async function runAIScreening(appId: number) {
+  try {
+    const [app] = await db.select().from(vanApplicationsTable).where(eq(vanApplicationsTable.id, appId));
+    if (!app || app.status !== "application_received") return;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `あなたは軽バンレンタルサービスの審査AIです。
+申込データを分析し、以下のJSONのみ返してください:
+{"result": "approved" | "rejected", "reason": "理由（日本語、50文字以内）"}`
+        },
+        {
+          role: "user",
+          content: `【申込データ】
+エリア: ${app.area ?? "未記入"}
+月額予算: ${app.monthlyBudget ? `¥${Number(app.monthlyBudget).toLocaleString()}` : "未記入"}
+利用目的: ${app.purpose ?? "未記入"}
+利用期間: ${app.durationMonths ?? "未記入"}ヶ月
+保険状況: ${app.insuranceStatus ?? "未記入"}
+黒ナンバー: ${app.hasBlackNumber ? "取得済み" : "未取得"}
+配送経験: ${app.hasDeliveryExperience ? "あり" : "なし"}
+
+審査基準:
+- 月額予算が15,000円以上
+- 利用目的が法令に反しない（違法薬物輸送等でない）
+- 保険未加入でも利用目的が個人・軽貨物なら許可
+- 軽貨物業目的で黒ナンバー未取得でも仮承認可
+- 明らかに虚偽・悪意のある申込は否決`
+        }
+      ],
+      response_format: { type: "json_object" },
+    });
+
+    const parsed = JSON.parse(completion.choices[0]?.message?.content ?? "{}");
+    const result: "approved" | "rejected" = parsed.result === "rejected" ? "rejected" : "approved";
+    const reason: string = parsed.reason ?? "";
+
+    await db.update(vanApplicationsTable).set({
+      status: result, updatedAt: new Date(),
+    }).where(eq(vanApplicationsTable.id, appId));
+
+    // ユーザーに通知
+    await db.insert(notificationsTable).values({
+      userId: app.userId!,
+      title: result === "approved" ? "Chat VAN - 審査通過" : "Chat VAN - 審査結果",
+      message: result === "approved"
+        ? "審査が通過しました！担当者が契約書を準備します。"
+        : `審査の結果、今回はお断りとさせていただきました。${reason}`,
+    });
+  } catch (err) {
+    console.error("[AI Screening] エラー:", err);
+  }
+}
 
 const router: IRouter = Router();
 
@@ -492,6 +615,9 @@ router.post("/van/applications/:id/accept", requireAuth, async (req: Request, re
         title: 'Chat VAN - 申込受付',
       });
     }
+    // AI自動審査をバックグラウンドで実行（レスポンスをブロックしない）
+    setImmediate(() => runAIScreening(appId));
+
     return res.json(app);
   } catch (err) {
     console.error("accept error:", err);
@@ -689,6 +815,63 @@ router.post("/van/contracts/:id/agree-vehicle", requireAuth, async (req: Request
     return res.json(updated);
   } catch (err) {
     console.error("agree vehicle error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── POST /van/contracts/:id/square-charge  Square決済 ─────────────────────
+router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(String(req.params.id));
+    const { sourceId } = req.body as { sourceId: string };
+    if (!sourceId) return res.status(400).json({ error: "sourceId required" });
+
+    const [contract] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.id, id));
+    if (!contract) return res.status(404).json({ error: "Contract not found" });
+
+    const monthlyBase = Number(contract.monthlyPrice) + Number(contract.sinJapanFee ?? 0);
+    const totalAmount = Math.round(monthlyBase * 1.1);
+    if (totalAmount <= 0) return res.status(400).json({ error: "金額が設定されていません" });
+
+    const squareRes = await squareFetch("/v2/payments", "POST", {
+      source_id: sourceId,
+      idempotency_key: randomUUID(),
+      amount_money: { amount: totalAmount, currency: "JPY" },
+      location_id: process.env.SQUARE_LOCATION_ID,
+      autocomplete: true,
+      note: `Chat VAN 月額 契約#${id}`,
+    });
+
+    const data = await squareRes.json() as any;
+    if (!squareRes.ok) {
+      const errMsg = (() => {
+        const code = data.errors?.[0]?.code ?? "";
+        const msgs: Record<string, string> = {
+          INVALID_CARD_DATA: "カード情報が無効です", PAN_FAILURE: "カード番号が正しくありません",
+          CARD_EXPIRED: "カードの有効期限が切れています", INSUFFICIENT_FUNDS: "残高が不足しています",
+          GENERIC_DECLINE: "カードが拒否されました",
+        };
+        return msgs[code] ?? "決済処理中にエラーが発生しました";
+      })();
+      return res.status(502).json({ error: errMsg });
+    }
+
+    // 決済成功 → contract/application/vehicle をアクティブに
+    await db.update(vanContractsTable).set({ status: "active" as any, updatedAt: new Date() }).where(eq(vanContractsTable.id, id));
+    if (contract.applicationId) {
+      await db.update(vanApplicationsTable).set({ status: "active", updatedAt: new Date() }).where(eq(vanApplicationsTable.id, contract.applicationId));
+    }
+    await db.update(vehiclesTable).set({ status: "rented", updatedAt: new Date() }).where(eq(vehiclesTable.id, contract.vehicleId));
+
+    await db.insert(notificationsTable).values({
+      userId: contract.userId,
+      title: "Chat VAN - 決済完了・ご利用開始",
+      message: `カード決済が完了しました（¥${totalAmount.toLocaleString()}）。レンタル会社から受け取り案内が届きます。`,
+    });
+
+    return res.json({ ok: true, paymentId: data.payment?.id });
+  } catch (err) {
+    console.error("square-charge error:", err);
     return res.status(500).json({ error: "Internal error" });
   }
 });
@@ -938,6 +1121,15 @@ router.post("/van/applications/:id/identity-verification", requireAuth, async (r
         message: `免許証の確認依頼が届きました（相談ID: ${appId}）`,
       });
     }
+
+    // eKYC AI自動判定をバックグラウンドで実行
+    setImmediate(() => runAIeKYC(result.id, {
+      fullName: b.full_name, birthDate: b.birth_date,
+      licenseNumber: b.license_number, licenseExpiry: b.license_expiry,
+      licenseType: b.license_type,
+      userId: userId!, applicationId: appId,
+    }));
+
     return res.status(201).json(result);
   } catch (err) {
     console.error("submit id verification error:", err);

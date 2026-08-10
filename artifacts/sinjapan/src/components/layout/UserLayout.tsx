@@ -102,31 +102,17 @@ export function UserLayout({ children }: { children: React.ReactNode }) {
           </Link>
         )}
 
-        {/* 相談履歴 */}
-        {user && history.length > 0 && (
-          <div className="mt-3">
-            <p className="px-3 py-1 text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-              <History className="h-3 w-3" />相談履歴
-            </p>
-            <div className="mt-1 space-y-0.5">
-              {history.map(app => {
-                const link = appLink(app);
-                const isActive = pathname === link || pathname.startsWith(`/van/${app.id}`);
-                const label = app.area || `相談 #${app.id}`;
-                const statusLabel = STATUS_LABEL[app.status] ?? app.status;
-                const dot = STATUS_DOT[app.status] ?? 'bg-gray-400';
-                return (
-                  <Link key={app.id} href={link} onClick={onClose}>
-                    <button className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors ${isActive ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
-                      <span className="flex-1 text-xs truncate">{label}</span>
-                      <span className="text-[10px] shrink-0 opacity-70">{statusLabel}</span>
-                    </button>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
+        {/* 相談履歴リンク */}
+        {user && (
+          <Link href="/van/history" onClick={onClose}>
+            <button className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${pathname === '/van/history' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}>
+              <History className="h-4 w-4 shrink-0" />
+              相談履歴
+              {history.length > 0 && (
+                <span className="ml-auto text-xs bg-muted-foreground/15 text-muted-foreground rounded-full px-2 py-0.5">{history.length}</span>
+              )}
+            </button>
+          </Link>
         )}
 
         {user && (
