@@ -35,10 +35,11 @@ async function runAIeKYC(verificationId: number, data: {
   fullName: string; birthDate: string; licenseNumber: string;
   licenseExpiry: string; licenseType: string;
   licenseFront: string; licenseBack: string;
+  selfiePhoto?: string;
   userId: number; applicationId: number;
 }) {
   try {
-    // 免許証画像をサーバーサイドで取得してbase64化
+    // 画像をサーバーサイドで取得してbase64化
     const fetchImageBase64 = async (objectPath: string): Promise<string | null> => {
       try {
         const file = await objectStorage.getObjectEntityFile(objectPath);
@@ -51,14 +52,17 @@ async function runAIeKYC(verificationId: number, data: {
       }
     };
 
-    const [frontB64, backB64] = await Promise.all([
+    const [frontB64, backB64, selfieB64] = await Promise.all([
       fetchImageBase64(data.licenseFront),
       fetchImageBase64(data.licenseBack),
+      data.selfiePhoto ? fetchImageBase64(data.selfiePhoto) : Promise.resolve(null),
     ]);
 
     const today = new Date().toISOString().slice(0, 10);
     const birthYear = parseInt(data.birthDate?.slice(0, 4) ?? "0");
     const age = new Date().getFullYear() - birthYear;
+    const hasImages = !!(frontB64 || backB64);
+    const hasSelfie = !!selfieB64;
 
     const userContent: any[] = [
       {
@@ -71,26 +75,33 @@ async function runAIeKYC(verificationId: number, data: {
 有効期限: ${data.licenseExpiry}
 本日: ${today}
 
-チェック項目:
+【チェック項目】
 1. 年齢が18歳以上か（${age}歳）
 2. 有効期限が本日（${today}）以降か
 3. 免許番号が12桁の数字か
 4. 氏名が実在しそうな日本人名か
 5. 免許種別が有効な値か（普通・中型・大型・普通二輪・大型二輪・原付等）
-${frontB64 || backB64 ? "6. 免許証画像と提出データが一致しているか（画像内の氏名・番号・有効期限を確認）" : "※ 画像未取得のためテキストのみで判定"}`
+${hasImages ? "6. 免許証画像の氏名・番号・有効期限と提出データが一致するか" : "※ 免許証画像未取得 - テキストのみで判定"}
+${hasSelfie ? "7. 顔写真と免許証の顔写真が同一人物か（なりすまし確認）" : "※ 顔写真なし"}
+
+【画像の順番】
+${frontB64 ? "1枚目: 免許証表面" : ""}
+${backB64 ? "2枚目: 免許証裏面" : ""}
+${selfieB64 ? "3枚目: 本人セルフィー（免許証の顔写真と照合してください）" : ""}`
       },
     ];
     if (frontB64) userContent.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${frontB64}`, detail: "high" } });
     if (backB64)  userContent.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${backB64}`,  detail: "high" } });
+    if (selfieB64) userContent.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${selfieB64}`, detail: "high" } });
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: `あなたは日本の運転免許証を審査するeKYCシステムです。
-提出されたデータ（と免許証画像）を照合し、以下のJSONのみ返してください:
-{"result": "verified" | "rejected", "reason": "理由（日本語、25文字以内）"}`
+          content: `あなたは日本の運転免許証と顔写真を審査するeKYCシステムです。
+提出データ・免許証画像・セルフィーを総合的に照合し、以下のJSONのみ返してください:
+{"result": "verified" | "rejected", "reason": "理由（日本語、30文字以内）"}`
         },
         { role: "user", content: userContent }
       ],
@@ -1090,14 +1101,18 @@ router.post("/van/applications/:id/identity-verification", requireAuth, async (r
     const b = req.body;
 
     // Validate uploaded document paths are in the private objects namespace
+    const pathsToCheck = [b.license_front, b.license_back, ...(b.selfie_photo ? [b.selfie_photo] : [])];
     if (!isValidObjectPath(b.license_front) || !isValidObjectPath(b.license_back)) {
       return res.status(400).json({ error: "Invalid document path" });
     }
+    if (b.selfie_photo && !isValidObjectPath(b.selfie_photo)) {
+      return res.status(400).json({ error: "Invalid selfie path" });
+    }
 
-    // Verify upload ownership — both paths must have been issued to this user
+    // Verify upload ownership — all paths must have been issued to this user
     const claimRows = await db.execute(sql`
       SELECT object_path FROM upload_claims
-      WHERE object_path IN (${b.license_front}, ${b.license_back})
+      WHERE object_path IN (${b.license_front}, ${b.license_back}${b.selfie_photo ? sql`, ${b.selfie_photo}` : sql``})
         AND user_id = ${userId!}
         AND content_type LIKE 'image/%'
     `);
@@ -1120,10 +1135,12 @@ router.post("/van/applications/:id/identity-verification", requireAuth, async (r
         fullName: b.full_name, birthDate: b.birth_date, address: b.address, phone: b.phone,
         email: b.email, licenseFront: b.license_front, licenseBack: b.license_back,
         licenseExpiry: b.license_expiry, licenseType: b.license_type, licenseNumber: b.license_number,
-        emergencyContactName: b.emergency_contact_name, emergencyContactPhone: b.emergency_contact_phone,
-        emergencyContactRelation: b.emergency_contact_relation,
         status: 'submitted' as any, rejectionReason: null, updatedAt: new Date(),
       }).where(eq(identityVerificationsTable.id, existing[0].id)).returning();
+      // selfie_photo は別カラムとして保存（マイグレーション済みの場合）
+      if (b.selfie_photo) {
+        await db.execute(sql`UPDATE identity_verifications SET selfie_photo = ${b.selfie_photo} WHERE id = ${existing[0].id}`);
+      }
     } else {
       [result] = await db.insert(identityVerificationsTable).values({
         userId: userId!,
@@ -1131,16 +1148,18 @@ router.post("/van/applications/:id/identity-verification", requireAuth, async (r
         fullName: b.full_name, birthDate: b.birth_date, address: b.address, phone: b.phone,
         email: b.email, licenseFront: b.license_front, licenseBack: b.license_back,
         licenseExpiry: b.license_expiry, licenseType: b.license_type, licenseNumber: b.license_number,
-        emergencyContactName: b.emergency_contact_name, emergencyContactPhone: b.emergency_contact_phone,
-        emergencyContactRelation: b.emergency_contact_relation, status: 'submitted',
+        status: 'submitted',
       }).returning();
+      if (b.selfie_photo) {
+        await db.execute(sql`UPDATE identity_verifications SET selfie_photo = ${b.selfie_photo} WHERE id = ${(result as any).id}`);
+      }
     }
 
-    // Mark claims as used
-    await db.execute(sql`
-      UPDATE upload_claims SET used_at = NOW()
-      WHERE object_path IN (${b.license_front}, ${b.license_back}) AND user_id = ${userId!}
-    `);
+    // Mark all uploaded paths as used
+    const allPaths = [b.license_front, b.license_back, ...(b.selfie_photo ? [b.selfie_photo] : [])];
+    for (const p of allPaths) {
+      await db.execute(sql`UPDATE upload_claims SET used_at = NOW() WHERE object_path = ${p} AND user_id = ${userId!}`);
+    }
 
     // Notify admin
     const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
@@ -1157,6 +1176,7 @@ router.post("/van/applications/:id/identity-verification", requireAuth, async (r
       licenseNumber: b.license_number, licenseExpiry: b.license_expiry,
       licenseType: b.license_type,
       licenseFront: b.license_front, licenseBack: b.license_back,
+      selfiePhoto: b.selfie_photo,
       userId: userId!, applicationId: appId,
     }));
 
@@ -1743,5 +1763,11 @@ router.delete("/van/vehicles/:id", requireAuth, requireAdmin, async (req: Reques
     return res.status(500).json({ error: "Internal error" });
   }
 });
+
+// ── マイグレーション: selfie_photo 列追加 ─────────────────────────────────
+db.execute(sql`
+  ALTER TABLE identity_verifications
+  ADD COLUMN IF NOT EXISTS selfie_photo TEXT
+`).catch(() => {});
 
 export default router;

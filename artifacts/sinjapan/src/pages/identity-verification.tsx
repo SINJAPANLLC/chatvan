@@ -110,11 +110,9 @@ export default function IdentityVerificationPage() {
   const [licenseType, setLicenseType] = useState('普通');
   const [licenseNumber, setLicenseNumber] = useState('');
   const [licenseExpiry, setLicenseExpiry] = useState('');
-  const [emergencyName, setEmergencyName] = useState('');
-  const [emergencyPhone, setEmergencyPhone] = useState('');
-  const [emergencyRelation, setEmergencyRelation] = useState('');
   const [frontImage, setFrontImage] = useState<UploadedImage | null>(null);
   const [backImage, setBackImage] = useState<UploadedImage | null>(null);
+  const [selfieImage, setSelfieImage] = useState<UploadedImage | null>(null);
 
   useEffect(() => {
     if (!userLoading && !user) { setLocation('/login'); return; }
@@ -143,9 +141,6 @@ export default function IdentityVerificationPage() {
             if (iv.licenseType) setLicenseType(iv.licenseType);
             if (iv.licenseNumber) setLicenseNumber(iv.licenseNumber);
             if (iv.licenseExpiry) setLicenseExpiry(iv.licenseExpiry);
-            if (iv.emergencyContactName) setEmergencyName(iv.emergencyContactName);
-            if (iv.emergencyContactPhone) setEmergencyPhone(iv.emergencyContactPhone);
-            if (iv.emergencyContactRelation) setEmergencyRelation(iv.emergencyContactRelation);
           }
           if (iv?.applicationId) setApplicationId(iv.applicationId);
         }
@@ -164,6 +159,7 @@ export default function IdentityVerificationPage() {
     e.preventDefault();
     if (!frontImage) { toast({ title: '免許証表面の画像を添付してください', variant: 'destructive' }); return; }
     if (!backImage) { toast({ title: '免許証裏面の画像を添付してください', variant: 'destructive' }); return; }
+    if (!selfieImage) { toast({ title: '顔写真（セルフィー）を添付してください', variant: 'destructive' }); return; }
     if (!applicationId) { toast({ title: '申込情報が見つかりません。先にチャットで相談を開始してください。', variant: 'destructive' }); return; }
 
     setSubmitting(true);
@@ -181,9 +177,7 @@ export default function IdentityVerificationPage() {
           license_expiry: licenseExpiry,
           license_front: frontImage.path,
           license_back: backImage.path,
-          emergency_contact_name: emergencyName,
-          emergency_contact_phone: emergencyPhone,
-          emergency_contact_relation: emergencyRelation,
+          selfie_photo: selfieImage.path,
         }),
       });
       if (!res.ok) throw new Error('送信失敗');
@@ -238,7 +232,7 @@ export default function IdentityVerificationPage() {
     <div className="max-w-2xl mx-auto px-4 py-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight mb-1">本人確認書類の提出</h1>
-        <p className="text-muted-foreground text-sm">免許証の情報と緊急連絡先を入力してください。</p>
+        <p className="text-muted-foreground text-sm">免許証の表裏と顔写真をアップロードしてください。AIが自動で確認します。</p>
         {existingStatus === 'rejected' && (
           <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
             <strong>否認されました。</strong>{existingRejectionReason ? `　理由: ${existingRejectionReason}` : ''} 内容を修正して再提出してください。
@@ -328,39 +322,18 @@ export default function IdentityVerificationPage() {
           </CardContent>
         </Card>
 
-        {/* 緊急連絡先 */}
+        {/* 顔写真 */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">緊急連絡先</CardTitle>
+            <CardTitle className="text-base">顔写真（セルフィー）</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="text-sm font-medium block mb-1.5">氏名 <span className="text-red-500">*</span></label>
-                <input
-                  required value={emergencyName} onChange={e => setEmergencyName(e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-foreground"
-                  placeholder="山田 花子"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium block mb-1.5">電話番号 <span className="text-red-500">*</span></label>
-                <input
-                  required value={emergencyPhone} onChange={e => setEmergencyPhone(e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-foreground"
-                  placeholder="090-9876-5432"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium block mb-1.5">続柄 <span className="text-red-500">*</span></label>
-                <select
-                  required value={emergencyRelation} onChange={e => setEmergencyRelation(e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-foreground"
-                >
-                  <option value="">選択してください</option>
-                  {['配偶者', '父', '母', '子', '兄弟・姉妹', '祖父母', '親族', 'その他'].map(r => <option key={r}>{r}</option>)}
-                </select>
-              </div>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              正面を向いた顔写真を撮影してください。免許証の顔写真と照合します。<br />
+              帽子・サングラス等は外し、明るい場所で撮影してください。
+            </p>
+            <div className="max-w-[200px]">
+              <ImageUploader label="顔写真 *" value={selfieImage} onChange={setSelfieImage} />
             </div>
           </CardContent>
         </Card>
