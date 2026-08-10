@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useGetVanApplication } from '@workspace/api-client-react';
-import { Loader2, ChevronLeft, FileText, CheckCircle2, Clock, PenLine, RotateCcw, ChevronDown, MapPin, Umbrella } from 'lucide-react';
+import { Loader2, ChevronLeft, FileText, CheckCircle2, Clock, PenLine, RotateCcw, ChevronDown, MapPin, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const apiUrl = (path: string) => `${import.meta.env.BASE_URL}api${path}`;
@@ -495,7 +495,7 @@ export default function VanContract() {
               <div className="flex-1">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium flex items-center gap-2">
-                    <Umbrella className="h-4 w-4 text-muted-foreground" />保険紹介
+                    <ShieldCheck className="h-4 w-4 text-muted-foreground" />保険紹介
                   </span>
                   <span className="text-xs text-muted-foreground">担当者より案内</span>
                 </div>
