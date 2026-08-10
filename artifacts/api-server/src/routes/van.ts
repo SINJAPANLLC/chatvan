@@ -147,8 +147,9 @@ function parseStartDate(raw: string | null | undefined): { date: string; payment
   const fmt = (d: Date) => d.toISOString().split("T")[0];
 
   if (!raw) {
-    const next = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-    return { date: fmt(next), paymentDay: 1 };
+    const next = new Date(today);
+    next.setDate(next.getDate() + 3);
+    return { date: fmt(next), paymentDay: next.getDate() };
   }
 
   // YYYY-MM-DD
@@ -194,9 +195,10 @@ function parseStartDate(raw: string | null | undefined): { date: string; payment
     return { date: fmt(next), paymentDay: next.getDate() };
   }
 
-  // デフォルト: 来月1日
-  const next = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-  return { date: fmt(next), paymentDay: 1 };
+  // デフォルト: 3日後
+  const next = new Date(today);
+  next.setDate(next.getDate() + 3);
+  return { date: fmt(next), paymentDay: next.getDate() };
 }
 
 async function runAIScreening(appId: number) {
