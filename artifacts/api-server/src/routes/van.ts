@@ -2140,11 +2140,31 @@ router.get("/van/vehicles/:id", requireAuth, async (req: Request, res: Response)
 router.patch("/van/vehicles/:id", requireAuth, requireAdmin, async (req: Request, res: Response) => {
   try {
     const id = parseInt(String(req.params.id));
-    const [updated] = await db.update(vehiclesTable).set(req.body).where(eq(vehiclesTable.id, id)).returning();
+    const b = req.body as any;
+    // スキーマに存在するカラムのみを渡す（ネストオブジェクト等は除外）
+    const allowed: Record<string, any> = {};
+    const fields = [
+      'rentalCompanyId','maker','model','grade','year','vin','licensePlate',
+      'blackNumberStatus','mileage','inspectionExpiry','compulsoryInsuranceExpiry',
+      'insuranceExpiry','prefecture','locationDetail','gpsDeviceId','smokingPolicy',
+      'hasEtc','hasDashcam','hasBackupCam','availableFrom','minPeriodMonths',
+      'maxPeriodMonths','mileageLimit','excessMileageFee','monthlyPrice',
+      'sinJapanFee','insuranceFee','photos','notes','status',
+      'inspectionCertificateOwner','inspectionCertificateUser',
+      'insuranceCompany','insurancePolicyNumber','insuranceContact',
+    ] as const;
+    for (const f of fields) {
+      if (b[f] !== undefined) allowed[f] = b[f];
+      // snake_case → camelCase のフォールバック
+      const snake = f.replace(/[A-Z]/g, c => `_${c.toLowerCase()}`);
+      if (b[snake] !== undefined && allowed[f] === undefined) allowed[f] = b[snake];
+    }
+    const [updated] = await db.update(vehiclesTable).set(allowed).where(eq(vehiclesTable.id, id)).returning();
     if (!updated) return res.status(404).json({ error: "Not found" });
     return res.json(updated);
-  } catch (err) {
-    return res.status(500).json({ error: "Internal error" });
+  } catch (err: any) {
+    console.error('PATCH /van/vehicles error:', err?.message ?? err);
+    return res.status(500).json({ error: err?.message ?? "Internal error" });
   }
 });
 
@@ -2166,6 +2186,11 @@ db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS black_number_r
 db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS insurance_referral_requested BOOLEAN DEFAULT false`).catch(() => {});
 db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS gps_consent BOOLEAN DEFAULT false`).catch(() => {});
 db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS options_fee NUMERIC(10,2) DEFAULT 0`).catch(() => {});
+db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS inspection_certificate_owner TEXT`).catch(() => {});
+db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS inspection_certificate_user TEXT`).catch(() => {});
+db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS insurance_company TEXT`).catch(() => {});
+db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS insurance_policy_number TEXT`).catch(() => {});
+db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS insurance_contact TEXT`).catch(() => {});
 db.execute(sql`
   CREATE TABLE IF NOT EXISTS user_locations (
     id SERIAL PRIMARY KEY,

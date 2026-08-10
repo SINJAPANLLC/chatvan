@@ -63,6 +63,12 @@ export const vehiclesTable = pgTable("vehicles", {
   photos: text("photos"),
   notes: text("notes"),
   status: vehicleStatusEnum("status").notNull().default("draft"),
+  // 車検・任意保険情報
+  inspectionCertificateOwner: text("inspection_certificate_owner"),
+  inspectionCertificateUser: text("inspection_certificate_user"),
+  insuranceCompany: text("insurance_company"),
+  insurancePolicyNumber: text("insurance_policy_number"),
+  insuranceContact: text("insurance_contact"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
