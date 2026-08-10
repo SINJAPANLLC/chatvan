@@ -1315,6 +1315,64 @@ router.post("/van/applications/:id/request-return", requireAuth, async (req: Req
   }
 });
 
+// ── POST /van/applications/:id/confirm-return  返却確認 ──────────────────────
+router.post("/van/applications/:id/confirm-return", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const appId = parseInt(String(req.params.id));
+    const userId: number | undefined = (req.session as any)?.userId;
+    const { returnPhotos, returnDocuments } = req.body as {
+      returnPhotos?: string[];
+      returnDocuments?: string[];
+    };
+
+    const [app] = await db.select().from(vanApplicationsTable).where(eq(vanApplicationsTable.id, appId));
+    if (!app) return res.status(404).json({ error: "Not found" });
+    if (app.userId !== userId) return res.status(403).json({ error: "Forbidden" });
+    if (app.status !== "return_pending") return res.status(400).json({ error: "返却確認は return_pending 状態のみ可能です" });
+
+    await db.update(vanApplicationsTable)
+      .set({ status: "completed", updatedAt: new Date() })
+      .where(eq(vanApplicationsTable.id, appId));
+
+    const [contract] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.applicationId, appId));
+    if (contract) {
+      await db.execute(sql`
+        UPDATE van_contracts SET
+          return_photos    = ${returnPhotos ? JSON.stringify(returnPhotos) : null},
+          return_documents = ${returnDocuments ? JSON.stringify(returnDocuments) : null},
+          status = 'completed',
+          updated_at = NOW()
+        WHERE id = ${contract.id}
+      `);
+      if (contract.vehicleId) {
+        await db.update(vehiclesTable)
+          .set({ status: "available", updatedAt: new Date() })
+          .where(eq(vehiclesTable.id, contract.vehicleId));
+      }
+    }
+
+    await db.insert(notificationsTable).values({
+      userId: app.userId,
+      title: "Chat VAN - 返却完了",
+      message: "車両の返却が完了しました。ご利用ありがとうございました。",
+    });
+
+    const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
+    for (const admin of admins) {
+      await db.insert(notificationsTable).values({
+        userId: admin.id,
+        title: "Chat VAN - 返却完了",
+        message: `申込ID: ${appId} の車両返却が完了しました。`,
+      });
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("confirm-return error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
 // ── 免許証確認 ─────────────────────────────────────────────────────────────
 // ── GET /van/applications/:id/related ──────────────────────────────────────
 // 相談詳細画面の追加タブ用: 契約・保険・GPS・事故・審査・決済を一括取得

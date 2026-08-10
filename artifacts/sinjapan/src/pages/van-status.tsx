@@ -4,13 +4,44 @@ import { useGetVanApplication } from '@workspace/api-client-react';
 import {
   Loader2, CheckCircle2, Clock, FileText, CreditCard, Truck, XCircle,
   ChevronLeft, MapPin, ScanFace, AlertCircle, Phone, CalendarDays,
-  RefreshCw, CircleX, PackageCheck, Image, ExternalLink,
+  RefreshCw, CircleX, PackageCheck, Image, ExternalLink, Camera, Copy,
 } from 'lucide-react';
 import EkycInlineForm from '@/components/EkycInlineForm';
 import { useToast } from '@/hooks/use-toast';
 
 const apiUrl = (p: string) => `${import.meta.env.BASE_URL}api${p}`;
-const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem('sinjapan_auth_token') ?? ''}` });
+const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem('sinjapan_auth_token') ?? ''}`, 'Content-Type': 'application/json' });
+
+// ─── 返却写真・書類スロット ───────────────────────────────────────────────────
+const RETURN_PHOTO_SLOTS = [
+  { key: 'front', label: '前方' },
+  { key: 'rear',  label: '後方' },
+  { key: 'left',  label: '左側' },
+  { key: 'right', label: '右側' },
+] as const;
+type ReturnPhotoKey = typeof RETURN_PHOTO_SLOTS[number]['key'];
+
+const RETURN_DOC_SLOTS = [
+  { key: 'shakken',   label: '車検証' },
+  { key: 'kiroku',    label: '検査証記録事項' },
+  { key: 'jibaiseki', label: '自賠責' },
+  { key: 'ninni',     label: '任意保険' },
+] as const;
+type ReturnDocKey = typeof RETURN_DOC_SLOTS[number]['key'];
+
+async function uploadToStorage(file: File, applicationId: number): Promise<string> {
+  const r = await fetch(apiUrl('/storage/user-uploads/request-url'), {
+    method: 'POST',
+    credentials: 'include',
+    headers: { Authorization: `Bearer ${localStorage.getItem('sinjapan_auth_token') ?? ''}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: file.name, contentType: file.type, applicationId }),
+  });
+  if (!r.ok) throw new Error('アップロードURLの取得に失敗しました');
+  const { uploadURL, objectPath } = await r.json();
+  const putRes = await fetch(uploadURL, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
+  if (!putRes.ok) throw new Error('ファイルのアップロードに失敗しました');
+  return objectPath as string;
+}
 
 /** objectPath（例: /objects/uuid）→ 認証付き画像URL */
 const objUrl = (path: string) => {
@@ -107,6 +138,13 @@ export default function VanStatus() {
   const [showReturnConfirm, setShowReturnConfirm] = useState(false);
   const [returnReason, setReturnReason] = useState('');
 
+  // 返却用
+  const [returnPhotos, setReturnPhotos] = useState<Partial<Record<ReturnPhotoKey, string>>>({});
+  const [returnPhotoLoading, setReturnPhotoLoading] = useState<Partial<Record<ReturnPhotoKey, boolean>>>({});
+  const [returnDocs, setReturnDocs] = useState<Partial<Record<ReturnDocKey, string>>>({});
+  const [returnDocLoading, setReturnDocLoading] = useState<Partial<Record<ReturnDocKey, boolean>>>({});
+  const [returnSubmitting, setReturnSubmitting] = useState(false);
+
   const { data: application, isLoading, refetch } = useGetVanApplication(applicationId, {
     query: { enabled: !!applicationId },
   });
@@ -181,6 +219,57 @@ export default function VanStatus() {
     const timer = setInterval(() => { refetch(); fetchEkyc(); }, 10_000);
     return () => clearInterval(timer);
   }, [application?.status, refetch, fetchEkyc]);
+
+  const handleReturnPhotoUpload = async (key: ReturnPhotoKey, file: File) => {
+    setReturnPhotoLoading(prev => ({ ...prev, [key]: true }));
+    try {
+      const path = await uploadToStorage(file, applicationId);
+      setReturnPhotos(prev => ({ ...prev, [key]: path }));
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'アップロード失敗', description: e.message });
+    } finally {
+      setReturnPhotoLoading(prev => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const handleReturnDocUpload = async (key: ReturnDocKey, file: File) => {
+    setReturnDocLoading(prev => ({ ...prev, [key]: true }));
+    try {
+      const path = await uploadToStorage(file, applicationId);
+      setReturnDocs(prev => ({ ...prev, [key]: path }));
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'アップロード失敗', description: e.message });
+    } finally {
+      setReturnDocLoading(prev => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const allReturnPhotosUploaded = RETURN_PHOTO_SLOTS.every(s => !!returnPhotos[s.key]);
+
+  const handleConfirmReturn = async () => {
+    if (!allReturnPhotosUploaded) {
+      toast({ variant: 'destructive', title: '写真が不足しています', description: '車両4方向（前・後・左・右）の写真をすべてアップロードしてください' });
+      return;
+    }
+    setReturnSubmitting(true);
+    try {
+      const r = await fetch(apiUrl(`/van/applications/${applicationId}/confirm-return`), {
+        method: 'POST', credentials: 'include',
+        headers: authHeader(),
+        body: JSON.stringify({
+          returnPhotos: Object.values(returnPhotos).filter(Boolean),
+          returnDocuments: Object.values(returnDocs).filter(Boolean),
+        }),
+      });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? '処理に失敗しました'); }
+      await refetch();
+      toast({ title: '返却が完了しました' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'エラー', description: e.message });
+    } finally {
+      setReturnSubmitting(false);
+    }
+  };
 
   const handleRequestReturn = async () => {
     setSubmitting(true);
@@ -269,19 +358,142 @@ export default function VanStatus() {
       {/* ── 解約申請中 ── */}
       {status === 'return_pending' && (
         <div>
-          <h1 className="text-2xl font-bold tracking-tight mb-1">解約申請中</h1>
-          <p className="text-sm text-muted-foreground mb-8">申込番号 #{String(applicationId).padStart(6, '0')}</p>
-          <div className="rounded-2xl border-2 border-border p-8 text-center">
-            <div className="w-14 h-14 rounded-full bg-muted border-2 border-border flex items-center justify-center mx-auto mb-4">
-              <Clock className="h-7 w-7 text-foreground" />
+          <h1 className="text-xl font-bold tracking-tight mb-0.5">車両の返却</h1>
+          <p className="text-sm text-muted-foreground mb-4">担当のレンタル会社へ返却してください</p>
+
+          {/* 返却手順 */}
+          <div className="rounded-xl border border-border overflow-hidden mb-3">
+            <div className="px-4 py-2 bg-muted/40 border-b border-border text-sm font-semibold flex items-center gap-2">
+              <Truck className="h-4 w-4" />返却手順
             </div>
-            <h2 className="text-lg font-bold mb-2">解約申請を受け付けました</h2>
-            <p className="text-sm text-muted-foreground mb-6">担当者より返却手続きのご連絡をいたします（2〜3営業日以内）。</p>
-            {company?.phone && (
-              <a href={`tel:${company.phone}`}
-                className="inline-flex items-center gap-2 px-6 py-2.5 border border-border rounded-full text-sm hover:bg-muted transition-colors">
-                <Phone className="h-4 w-4" />{company.name}へ連絡する
-              </a>
+            <div className="p-4 space-y-2">
+              {[
+                '事前にレンタル会社へ電話でご連絡ください',
+                '返却日時を担当者と調整してください',
+                '車内清掃・ガソリン補充をお済ませください',
+                '担当者と車両状態を確認してから返却してください',
+              ].map((step, i) => (
+                <div key={i} className="flex items-start gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-foreground text-background text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                    {i + 1}
+                  </span>
+                  <p className="text-sm">{step}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* レンタル会社情報 */}
+          {company && (
+            <div className="rounded-xl border border-border overflow-hidden mb-6">
+              <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold">{company.name}</div>
+              <div className="divide-y divide-border/50">
+                {company.address && (
+                  <div className="px-5 py-4 flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                      <p className="text-sm font-medium">{company.address}</p>
+                    </div>
+                    <button onClick={() => navigator.clipboard.writeText(company.address).then(() => toast({ title: '住所をコピーしました' }))}
+                      className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted shrink-0">
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+                {company.phone && (
+                  <div className="px-5 py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <p className="text-sm font-medium">{company.phone}</p>
+                    </div>
+                    <a href={`tel:${company.phone}`}
+                      className="px-3 py-1.5 text-xs bg-foreground text-background rounded-full hover:opacity-90 transition-opacity">
+                      電話する
+                    </a>
+                  </div>
+                )}
+                {company.businessHours && (
+                  <div className="px-5 py-4 flex items-center gap-3">
+                    <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <p className="text-sm font-medium">{company.businessHours}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 返却確認セクション */}
+          <div className="border-t border-border pt-4">
+            <p className="text-xs font-semibold mb-2">返却確認</p>
+
+            {/* 4方向写真 */}
+            <div className="mb-2">
+              <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
+                <Camera className="h-3.5 w-3.5" /> 車両4方向の写真 <span className="text-red-500">（必須）</span>
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                {RETURN_PHOTO_SLOTS.map(({ key, label }) => {
+                  const uploaded = !!returnPhotos[key];
+                  const loading = !!returnPhotoLoading[key];
+                  return (
+                    <label key={key} className={`relative flex flex-col items-center justify-center rounded-xl border-2 cursor-pointer transition-all min-h-[120px] ${
+                      uploaded ? 'border-foreground bg-foreground/5' : 'border-dashed border-border hover:border-foreground/40'
+                    }`}>
+                      <input
+                        type="file" accept="image/*" capture="environment" className="sr-only"
+                        onChange={e => { const f = e.target.files?.[0]; if (f) handleReturnPhotoUpload(key, f); }}
+                        disabled={loading}
+                      />
+                      {loading ? <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        : uploaded ? <CheckCircle2 className="h-8 w-8 text-foreground" />
+                        : <Camera className="h-8 w-8 text-muted-foreground" />}
+                      <span className={`text-sm font-medium mt-2 ${uploaded ? 'text-foreground' : 'text-muted-foreground'}`}>{label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 書類アップロード */}
+            <div className="mb-3">
+              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                <FileText className="h-3.5 w-3.5" /> 所定書類 <span>（各書類を撮影・アップロード）</span>
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {RETURN_DOC_SLOTS.map(({ key, label }) => {
+                  const uploaded = !!returnDocs[key];
+                  const loading = !!returnDocLoading[key];
+                  return (
+                    <label key={key} className={`relative flex flex-col items-center justify-center rounded-xl border-2 cursor-pointer transition-all min-h-[90px] ${
+                      uploaded ? 'border-foreground bg-foreground/5' : 'border-dashed border-border hover:border-foreground/40'
+                    }`}>
+                      <input
+                        type="file" accept="image/*,application/pdf" capture="environment" className="sr-only"
+                        onChange={e => { const f = e.target.files?.[0]; if (f) handleReturnDocUpload(key, f); }}
+                        disabled={loading}
+                      />
+                      {loading ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        : uploaded ? <CheckCircle2 className="h-6 w-6 text-foreground" />
+                        : <FileText className="h-6 w-6 text-muted-foreground" />}
+                      <span className={`text-xs font-medium mt-1.5 text-center px-1 ${uploaded ? 'text-foreground' : 'text-muted-foreground'}`}>{label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 返却確認ボタン */}
+            <button
+              onClick={handleConfirmReturn}
+              disabled={returnSubmitting || !allReturnPhotosUploaded}
+              className="w-full py-2.5 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2"
+            >
+              {returnSubmitting
+                ? <><Loader2 className="h-4 w-4 animate-spin" />確認中…</>
+                : <><CheckCircle2 className="h-4 w-4" />返却しました（{Object.values(returnPhotos).filter(Boolean).length}/4枚）</>}
+            </button>
+            {!allReturnPhotosUploaded && (
+              <p className="text-xs text-muted-foreground text-center mt-1.5">4方向すべての写真をアップロードすると確認できます</p>
             )}
           </div>
         </div>
