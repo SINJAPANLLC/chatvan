@@ -1032,6 +1032,7 @@ router.post("/van/contracts/:id/sign", requireAuth, async (req: Request, res: Re
       termsAgreedAt: now,
       signatureData: signatureData ? JSON.stringify({ meta, signature: signatureData }) : meta,
       status: "pending_payment",
+      paymentDay: now.getDate(),
       updatedAt: now,
     }).where(eq(vanContractsTable.id, id)).returning();
 

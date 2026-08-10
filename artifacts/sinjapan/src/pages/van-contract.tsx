@@ -198,7 +198,6 @@ const vehicleTerms = (contract: any) => {
 (1) 月額料金（税抜）: ¥${monthlyBase.toLocaleString()}/月
 (2) 月額料金（税込）: ¥${Math.floor(monthlyBase * 1.1).toLocaleString()}/月
 (3) 支払日: 毎月${contract?.paymentDay ?? 1}日（Square, Inc.によるクレジットカード自動引き落とし）
-(4) 料金にはプラットフォーム利用料（¥${Number(contract?.sinJapanFee ?? 0).toLocaleString()}）を含みます。
 
 第5条（禁止事項）
 乙は以下の行為を行ってはなりません。
