@@ -51,7 +51,7 @@ export function UserLayout({ children }: { children: React.ReactNode }) {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then(r => r.ok ? r.json() : [])
-      .then((data: VanApp[]) => setHistory(data.slice(0, 8)))
+      .then((data: VanApp[]) => setHistory(data))
       .catch(() => {});
   }, [user, pathname]); // pathname が変わるたびに再取得（新相談後に反映）
 
