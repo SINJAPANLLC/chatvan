@@ -638,7 +638,11 @@ export default function AdminApplicationDetail() {
             ) : related?.contracts?.map((c: any) => (
               <Section key={c.id} title={`契約 #${c.id} — ${c.maker ?? ''} ${c.model ?? ''}`}>
                 <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-                  <DL label="ステータス" value={<span className="px-2 py-0.5 bg-muted rounded-full text-xs">{c.status}</span>} />
+                  <DL label="ステータス" value={<span className="px-2 py-0.5 bg-muted rounded-full text-xs">{{
+                    pending_payment: '決済待ち', active: '利用中', delivery_pending: '納車待ち',
+                    return_pending: '返却予定', payment_issue: '支払い問題',
+                    completed: '契約終了', cancelled: '解約',
+                  }[c.status as string] ?? c.status}</span>} />
                   <DL label="ナンバー" value={c.license_plate} />
                   <DL label="都道府県" value={c.prefecture} />
                   <DL label="月額" value={c.monthly_price ? `¥${Number(c.monthly_price).toLocaleString()}` : null} />
@@ -681,7 +685,7 @@ export default function AdminApplicationDetail() {
                             p.result === 'success' ? 'bg-green-100 text-green-700' :
                             p.result === 'failed'  ? 'bg-red-100 text-red-700' :
                             'bg-muted text-muted-foreground'
-                          }`}>{p.result ?? '-'}</span>
+                          }`}>{{ success: '成功', failed: '失敗' }[p.result as string] ?? p.result ?? '-'}</span>
                         </td>
                         <td className="py-2.5 text-xs text-muted-foreground">{p.attempted_at ? format(new Date(p.attempted_at), 'MM/dd HH:mm') : '-'}</td>
                         <td className="py-2.5 text-xs text-muted-foreground max-w-[200px] truncate">{p.failure_reason ?? '-'}</td>

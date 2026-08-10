@@ -4,6 +4,20 @@ import { Loader2, FileText, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
+// DBに保存される英語enumと表示ラベルのマッピング
+const STATUS_OPTIONS = [
+  { value: 'pending_payment', label: '決済待ち',     color: 'bg-yellow-50 text-yellow-700' },
+  { value: 'active',          label: '利用中',       color: 'bg-green-50 text-green-700' },
+  { value: 'delivery_pending',label: '納車待ち',     color: 'bg-blue-50 text-blue-700' },
+  { value: 'return_pending',  label: '返却予定',     color: 'bg-orange-50 text-orange-700' },
+  { value: 'payment_issue',   label: '支払い問題',   color: 'bg-red-50 text-red-700' },
+  { value: 'completed',       label: '契約終了',     color: 'bg-gray-100 text-gray-700' },
+  { value: 'cancelled',       label: '解約',         color: 'bg-red-100 text-red-800' },
+] as const;
+
+const statusColor = (s: string) => STATUS_OPTIONS.find(o => o.value === s)?.color ?? 'bg-gray-100 text-gray-600';
+const statusLabel = (s: string) => STATUS_OPTIONS.find(o => o.value === s)?.label ?? s;
+
 export default function AdminContracts() {
   const { data: contracts, isLoading, refetch } = useListVanContracts();
   const updateMut = useUpdateVanContract();
@@ -25,15 +39,6 @@ export default function AdminContracts() {
     } catch {
       toast({ variant: 'destructive', title: 'エラー', description: '更新に失敗しました' });
     }
-  };
-
-  const statusColors: Record<string, string> = {
-    '契約手続き中': 'bg-yellow-50 text-yellow-700',
-    '利用開始待ち': 'bg-blue-50 text-blue-700',
-    '利用中': 'bg-green-50 text-green-700',
-    '返却予定': 'bg-orange-50 text-orange-700',
-    '契約終了': 'bg-gray-100 text-gray-700',
-    '解約': 'bg-red-50 text-red-700',
   };
 
   return (
@@ -82,14 +87,11 @@ export default function AdminContracts() {
                   <select
                     value={c.status}
                     onChange={(e) => handleUpdateStatus(c.id, e.target.value)}
-                    className={`px-2.5 py-1 text-xs font-semibold rounded border border-transparent outline-none focus:border-foreground/30 cursor-pointer ${statusColors[c.status] || 'bg-gray-100'}`}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded border border-transparent outline-none focus:border-foreground/30 cursor-pointer ${statusColor(c.status)}`}
                   >
-                    <option value="契約手続き中">契約手続き中</option>
-                    <option value="利用開始待ち">利用開始待ち</option>
-                    <option value="利用中">利用中</option>
-                    <option value="返却予定">返却予定</option>
-                    <option value="契約終了">契約終了</option>
-                    <option value="解約">解約</option>
+                    {STATUS_OPTIONS.map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
                   </select>
                 </td>
               </tr>
