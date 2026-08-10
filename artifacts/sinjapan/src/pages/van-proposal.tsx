@@ -59,6 +59,14 @@ export default function VanProposal() {
   };
 
   const formatPrice = (val: number) => new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY', maximumFractionDigits: 0 }).format(val);
+  const taxIncluded = (val: number) => Math.floor(val * 1.1);
+  const getPhotoUrl = (v: { photos?: string | null; maker: string; model: string }) => {
+    try {
+      const arr = JSON.parse((v.photos as string) || '[]');
+      if (arr[0]) return arr[0] as string;
+    } catch { /* ignore */ }
+    return null;
+  };
 
   return (
     <div className="flex-1 max-w-4xl mx-auto w-full px-4 py-8">
@@ -112,13 +120,13 @@ export default function VanProposal() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {vehicles.map((v) => (
             <Card key={v.id} className="overflow-hidden flex flex-col border-border shadow-sm hover:shadow-md transition-shadow">
-              <div className="aspect-video bg-muted relative flex items-center justify-center border-b border-border/50">
-                <span className="text-muted-foreground font-medium">{v.maker} {v.model}</span>
-                {v.status === '商談中' && (
-                  <div className="absolute top-3 right-3 bg-secondary text-secondary-foreground text-xs font-semibold px-2.5 py-1 rounded-full shadow-sm">
-                    残りわずか
-                  </div>
-                )}
+              <div className="aspect-video bg-muted relative flex items-center justify-center border-b border-border/50 overflow-hidden">
+                {(() => {
+                  const url = getPhotoUrl(v as any);
+                  return url
+                    ? <img src={url} alt={`${v.maker} ${v.model}`} className="w-full h-full object-cover" />
+                    : <img src="/logo.jpg" alt="Chat VAN" className="w-24 h-24 object-contain opacity-40" />;
+                })()}
               </div>
               <CardContent className="p-5 flex flex-col flex-1">
                 <div className="mb-4">
@@ -129,7 +137,10 @@ export default function VanProposal() {
                 <div className="space-y-3 mb-6 flex-1">
                   <div className="flex justify-between items-end pb-3 border-b border-border/50">
                     <span className="text-sm text-muted-foreground flex items-center"><JapaneseYen className="h-4 w-4 mr-1"/>月額料金</span>
-                    <span className="text-xl font-bold text-foreground">{formatPrice(v.userPrice)}<span className="text-sm font-normal text-muted-foreground ml-1">/月</span></span>
+                    <div className="text-right">
+                      <span className="text-xl font-bold text-foreground">{formatPrice(taxIncluded(v.userPrice))}<span className="text-sm font-normal text-muted-foreground ml-1">/月</span></span>
+                      <p className="text-xs text-muted-foreground">税込（税抜 {formatPrice(v.userPrice)}）</p>
+                    </div>
                   </div>
                   
                   <div className="flex justify-between items-center text-sm">
