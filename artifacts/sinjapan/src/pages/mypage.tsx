@@ -104,10 +104,6 @@ export default function MyPage() {
                             <JapaneseYen className="h-3.5 w-3.5" />月額料金（税込）
                           </p>
                           <p className="font-bold text-xl">{formatPrice(totalWithTax(contract))}</p>
-                          <p className="text-xs text-muted-foreground">
-                            内訳: 車両{formatPrice(Number(contract.monthlyPrice))}
-                            {Number((contract as any).sinJapanFee) > 0 && ` + 管理${formatPrice(Number((contract as any).sinJapanFee))}`}
-                          </p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
