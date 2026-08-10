@@ -164,47 +164,47 @@ export default function VanPickup() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto w-full px-4 py-8">
+    <div className="max-w-2xl mx-auto w-full px-4 pt-5 pb-4">
       <button onClick={() => setLocation(`/van/${applicationId}/status`)}
-        className="flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors mb-8">
+        className="flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors mb-4">
         <ChevronLeft className="h-4 w-4 mr-1" /> 進捗に戻る
       </button>
 
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight mb-1">車両の受け取り</h1>
+      <div className="mb-4">
+        <h1 className="text-xl font-bold tracking-tight mb-0.5">車両の受け取り</h1>
         <p className="text-sm text-muted-foreground">担当のレンタル会社にお越しください</p>
       </div>
 
       {/* 受け取り予定日 */}
       {pickupDate && (
-        <div className="rounded-xl border-2 border-foreground overflow-hidden mb-6">
-          <div className="px-5 py-3 bg-foreground text-background text-sm font-semibold flex items-center gap-2">
+        <div className="rounded-xl border-2 border-foreground overflow-hidden mb-3">
+          <div className="px-4 py-2 bg-foreground text-background text-sm font-semibold flex items-center gap-2">
             <CalendarDays className="h-4 w-4" />受け取り予定日
           </div>
-          <div className="px-5 py-4 flex items-center gap-3">
-            <CalendarDays className="h-5 w-5 text-muted-foreground shrink-0" />
-            <p className="text-xl font-bold">{formatDate(pickupDate)}</p>
+          <div className="px-4 py-2.5 flex items-center gap-3">
+            <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+            <p className="text-lg font-bold">{formatDate(pickupDate)}</p>
           </div>
-          <div className="px-5 pb-4">
+          <div className="px-4 pb-2.5">
             <p className="text-xs text-muted-foreground">※ 正確な時間は事前にレンタル会社へお電話でご確認ください</p>
           </div>
         </div>
       )}
 
       {/* 受け取り手順 */}
-      <div className="rounded-xl border border-border overflow-hidden mb-6">
-        <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold flex items-center gap-2">
+      <div className="rounded-xl border border-border overflow-hidden mb-3">
+        <div className="px-4 py-2 bg-muted/40 border-b border-border text-sm font-semibold flex items-center gap-2">
           <Truck className="h-4 w-4" />受け取り手順
         </div>
-        <div className="p-5 space-y-3">
+        <div className="p-4 space-y-2">
           {[
             '事前にレンタル会社へ電話でご連絡ください',
             pickupDate ? `${formatDate(pickupDate)}に担当者と時間を確認してください` : '受け取り日時を担当者と調整してください',
             '当日は本人確認書類（免許証）をお持ちください',
             '車両の状態を担当者と確認してから受け取りください',
           ].map((step, i) => (
-            <div key={i} className="flex items-start gap-3">
-              <span className="w-6 h-6 rounded-full bg-foreground text-background text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+            <div key={i} className="flex items-start gap-2.5">
+              <span className="w-5 h-5 rounded-full bg-foreground text-background text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
                 {i + 1}
               </span>
               <p className="text-sm">{step}</p>
@@ -215,7 +215,7 @@ export default function VanPickup() {
 
       {/* レンタル会社情報・緊急連絡先・マップ */}
       {!company && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 mb-6 text-sm text-amber-800">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 mb-3 text-sm text-amber-800">
           レンタル会社情報が未設定です。担当者よりご連絡いたします。
         </div>
       )}
@@ -312,21 +312,20 @@ export default function VanPickup() {
       )}
 
       {/* 受け取り確認 */}
-      <div className="border-t border-border pt-8">
-        <h2 className="text-base font-bold mb-1">受け取り確認</h2>
-        <p className="text-xs text-muted-foreground mb-5">4方向写真と書類をアップロードして受け取りを完了してください</p>
+      <div className="border-t border-border pt-4">
+        <p className="text-xs font-semibold mb-2">受け取り確認</p>
 
         {/* 4方向写真 */}
-        <div className="mb-5">
-          <p className="text-sm font-medium mb-3 flex items-center gap-1">
-            📸 車両4方向の写真 <span className="text-red-500 text-xs">（必須）</span>
+        <div className="mb-2">
+          <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
+            📸 車両4方向の写真 <span className="text-red-500">（必須）</span>
           </p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-4 gap-2">
             {PHOTO_SLOTS.map(({ key, label }) => {
               const uploaded = !!photos[key];
               const loading = !!photoLoading[key];
               return (
-                <label key={key} className={`relative flex flex-col items-center justify-center rounded-xl border-2 cursor-pointer transition-all min-h-[100px] ${
+                <label key={key} className={`relative flex flex-col items-center justify-center rounded-lg border-2 cursor-pointer transition-all min-h-[68px] ${
                   uploaded ? 'border-foreground bg-foreground/5' : 'border-dashed border-border hover:border-foreground/40'
                 }`}>
                   <input
@@ -335,14 +334,14 @@ export default function VanPickup() {
                     disabled={loading}
                   />
                   {loading ? (
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                   ) : uploaded ? (
-                    <CheckCircle2 className="h-6 w-6 text-foreground mb-1" />
+                    <CheckCircle2 className="h-5 w-5 text-foreground" />
                   ) : (
-                    <span className="text-2xl mb-1">📷</span>
+                    <span className="text-lg">📷</span>
                   )}
-                  <span className={`text-xs font-medium ${uploaded ? 'text-foreground' : 'text-muted-foreground'}`}>
-                    {label}{uploaded ? ' ✓' : ''}
+                  <span className={`text-[10px] font-medium mt-0.5 ${uploaded ? 'text-foreground' : 'text-muted-foreground'}`}>
+                    {label}
                   </span>
                 </label>
               );
@@ -351,24 +350,24 @@ export default function VanPickup() {
         </div>
 
         {/* 書類アップロード */}
-        <div className="mb-6">
-          <p className="text-sm font-medium mb-3 flex items-center gap-1">
-            📄 所定書類 <span className="text-xs text-muted-foreground">（引渡確認書・任意）</span>
+        <div className="mb-3">
+          <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
+            📄 所定書類 <span>（引渡確認書・任意）</span>
           </p>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {docs.map((_, i) => (
-              <div key={i} className="flex items-center gap-2 text-sm text-foreground bg-muted/40 rounded-lg px-3 py-2">
-                <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <div key={i} className="flex items-center gap-2 text-xs text-foreground bg-muted/40 rounded-lg px-3 py-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                 <span>書類 {i + 1} アップロード済み</span>
               </div>
             ))}
-            <label className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border border-dashed border-border hover:border-foreground/40 cursor-pointer transition-all text-sm text-muted-foreground ${docLoading ? 'opacity-50' : ''}`}>
+            <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-border hover:border-foreground/40 cursor-pointer transition-all text-xs text-muted-foreground ${docLoading ? 'opacity-50' : ''}`}>
               <input
                 type="file" accept="image/*,application/pdf" className="sr-only"
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleDocUpload(f); }}
                 disabled={docLoading}
               />
-              {docLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <span>＋</span>}
+              {docLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <span>＋</span>}
               {docs.length === 0 ? '書類をアップロード（任意）' : 'さらに追加'}
             </label>
           </div>
@@ -378,7 +377,7 @@ export default function VanPickup() {
         <button
           onClick={handleConfirmPickup}
           disabled={submitting || !allPhotosUploaded}
-          className="w-full py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2"
+          className="w-full py-2.5 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2"
         >
           {submitting
             ? <><Loader2 className="h-4 w-4 animate-spin" />確認中…</>
@@ -386,7 +385,7 @@ export default function VanPickup() {
           }
         </button>
         {!allPhotosUploaded && (
-          <p className="text-xs text-muted-foreground text-center mt-2">4方向すべての写真をアップロードすると確認できます</p>
+          <p className="text-xs text-muted-foreground text-center mt-1.5">4方向すべての写真をアップロードすると確認できます</p>
         )}
       </div>
     </div>
