@@ -1,6 +1,7 @@
 /**
  * Chat VAN — van rental routes
  */
+import cron from "node-cron";
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
   db,
@@ -1110,29 +1111,24 @@ router.post("/van/contracts/:id/pay", requireAuth, async (req: Request, res: Res
     const [contract] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.id, id));
     if (!contract) return res.status(404).json({ error: "Contract not found" });
 
-    // 契約・申込をアクティブに
+    // 契約をアクティブに・申込は「受け取り待ち」に
     await db.update(vanContractsTable)
       .set({ status: "active" as any, updatedAt: new Date() })
       .where(eq(vanContractsTable.id, id));
 
     if (contract.applicationId) {
       await db.update(vanApplicationsTable)
-        .set({ status: "active", updatedAt: new Date() })
+        .set({ status: "delivery_pending", updatedAt: new Date() })
         .where(eq(vanApplicationsTable.id, contract.applicationId));
     }
-
-    // 車両ステータスを「貸出中」に
-    await db.update(vehiclesTable)
-      .set({ status: "rented", updatedAt: new Date() })
-      .where(eq(vehiclesTable.id, contract.vehicleId));
 
     // ユーザー通知
     await db.insert(notificationsTable).values({
       userId: contract.userId,
-      title: "Chat VAN - ご利用開始",
-      message: method === 'transfer'
-        ? "振込のご確認が完了しました。ご利用を開始できます。担当者よりご連絡いたします。"
-        : "お支払いが完了しました。ご利用を開始できます。担当者よりご連絡いたします。",
+      title: "Chat VAN - 受け取り準備完了",
+      message: method === 'invoice'
+        ? "法人請求書払いの申請を受け付けました。担当者より審査結果をご連絡します。受け取り日時はレンタル会社へお電話ください。"
+        : "お支払いが完了しました。レンタル会社へ連絡して車両を受け取ってください。",
     });
 
     // 管理者通知
@@ -1140,14 +1136,113 @@ router.post("/van/contracts/:id/pay", requireAuth, async (req: Request, res: Res
     for (const admin of admins) {
       await db.insert(notificationsTable).values({
         userId: admin.id,
-        title: "Chat VAN - 決済完了",
-        message: `決済が完了しました（契約ID: ${id} / 支払方法: ${method === 'transfer' ? '銀行振込' : 'カード'}）`,
+        title: "Chat VAN - 決済完了・受け取り待ち",
+        message: `決済完了（契約ID: ${id} / 支払方法: ${method === 'invoice' ? '法人請求書' : 'カード'}）。車両受け取り待ちです。`,
       });
     }
 
     return res.json({ ok: true });
   } catch (err) {
     console.error("pay error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── POST /van/applications/:id/confirm-pickup  車両受け取り確認 ─────────────
+router.post("/van/applications/:id/confirm-pickup", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const appId = parseInt(String(req.params.id));
+    const userId: number | undefined = (req.session as any)?.userId;
+
+    const [app] = await db.select().from(vanApplicationsTable).where(eq(vanApplicationsTable.id, appId));
+    if (!app) return res.status(404).json({ error: "Not found" });
+    if (app.userId !== userId) return res.status(403).json({ error: "Forbidden" });
+    if (app.status !== "delivery_pending") return res.status(400).json({ error: "受け取り確認は delivery_pending 状態のみ可能です" });
+
+    await db.update(vanApplicationsTable)
+      .set({ status: "active", updatedAt: new Date() })
+      .where(eq(vanApplicationsTable.id, appId));
+
+    // 車両ステータスを貸出中に
+    const [contract] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.applicationId, appId));
+    if (contract?.vehicleId) {
+      await db.update(vehiclesTable)
+        .set({ status: "rented", updatedAt: new Date() })
+        .where(eq(vehiclesTable.id, contract.vehicleId));
+    }
+
+    await db.insert(notificationsTable).values({
+      userId: app.userId,
+      title: "Chat VAN - 受け取り完了",
+      message: "車両の受け取りが完了しました。ご利用開始です。毎月の自動決済が設定された支払日に実行されます。",
+    });
+
+    const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
+    for (const admin of admins) {
+      await db.insert(notificationsTable).values({
+        userId: admin.id,
+        title: "Chat VAN - 受け取り完了",
+        message: `申込ID: ${appId} の車両受け取りが完了しました。`,
+      });
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("confirm-pickup error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── POST /van/applications/:id/request-return  解約申請 ────────────────────
+router.post("/van/applications/:id/request-return", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const appId = parseInt(String(req.params.id));
+    const userId: number | undefined = (req.session as any)?.userId;
+    const { reason } = req.body as { reason?: string };
+
+    const [app] = await db.select().from(vanApplicationsTable).where(eq(vanApplicationsTable.id, appId));
+    if (!app) return res.status(404).json({ error: "Not found" });
+    if (app.userId !== userId) return res.status(403).json({ error: "Forbidden" });
+    if (!["active", "payment_issue"].includes(app.status)) {
+      return res.status(400).json({ error: "利用中または支払い問題の状態のみ解約申請できます" });
+    }
+
+    // 最低利用期間チェック
+    const [contract] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.applicationId, appId));
+    if (contract?.startDate && contract?.minimumTerm) {
+      const startDate = new Date(contract.startDate);
+      const minimumEndDate = new Date(startDate);
+      minimumEndDate.setMonth(minimumEndDate.getMonth() + Number(contract.minimumTerm));
+      if (new Date() < minimumEndDate) {
+        const fmt = (d: Date) => `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+        return res.status(400).json({
+          error: `最低利用期間（${contract.minimumTerm}ヶ月）のため、${fmt(minimumEndDate)}以降に解約申請できます`,
+        });
+      }
+    }
+
+    await db.update(vanApplicationsTable)
+      .set({ status: "return_pending", updatedAt: new Date() })
+      .where(eq(vanApplicationsTable.id, appId));
+
+    await db.insert(notificationsTable).values({
+      userId: app.userId,
+      title: "Chat VAN - 解約申請を受け付けました",
+      message: "解約申請を受け付けました。担当者より返却手続きのご連絡をいたします（2〜3営業日以内）。",
+    });
+
+    const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
+    for (const admin of admins) {
+      await db.insert(notificationsTable).values({
+        userId: admin.id,
+        title: "Chat VAN - 解約申請",
+        message: `申込ID: ${appId} から解約申請が届きました。${reason ? `理由: ${reason}` : ""}`,
+      });
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("request-return error:", err);
     return res.status(500).json({ error: "Internal error" });
   }
 });
@@ -1954,5 +2049,84 @@ db.execute(sql`
   ALTER TABLE identity_verifications
   ADD COLUMN IF NOT EXISTS selfie_photo TEXT
 `).catch(() => {});
+
+// ── 月額自動決済スケジューラー (毎日 JST 9:00 = UTC 0:00) ────────────────
+cron.schedule("0 0 * * *", async () => {
+  const jstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const today = jstNow.getUTCDate();
+  console.log(`[月額決済] チェック開始 JST日付: ${today}日`);
+
+  try {
+    // 今日が支払日のアクティブ契約を取得
+    const rows = await db
+      .select({ contract: vanContractsTable, user: usersTable })
+      .from(vanContractsTable)
+      .leftJoin(usersTable, eq(vanContractsTable.userId, usersTable.id))
+      .where(
+        and(
+          eq(vanContractsTable.status, "active" as any),
+          sql`${vanContractsTable.paymentDay} = ${today}`
+        )
+      );
+
+    console.log(`[月額決済] 対象契約: ${rows.length}件`);
+
+    for (const { contract, user } of rows) {
+      const amount = Math.floor((Number(contract.monthlyPrice) + Number(contract.sinJapanFee ?? 0)) * 1.1);
+      const idempotencyKey = `monthly-${contract.id}-${jstNow.getUTCFullYear()}-${jstNow.getUTCMonth()}`;
+
+      try {
+        if (user?.squareCardId && user?.squareCustomerId) {
+          // Square カード決済
+          const squareRes = await squareFetch("/v2/payments", "POST", {
+            source_id: user.squareCardId,
+            amount_money: { amount: amount * 100, currency: "JPY" },
+            customer_id: user.squareCustomerId,
+            location_id: process.env.SQUARE_LOCATION_ID,
+            idempotency_key: idempotencyKey,
+          });
+          const data = await squareRes.json() as any;
+
+          if (!squareRes.ok) {
+            console.error(`[月額決済] 失敗 contract=${contract.id}:`, data.errors);
+            // 支払い問題ステータスに変更
+            if (contract.applicationId) {
+              await db.update(vanApplicationsTable)
+                .set({ status: "payment_issue", updatedAt: new Date() })
+                .where(eq(vanApplicationsTable.id, contract.applicationId));
+            }
+            await db.insert(notificationsTable).values({
+              userId: contract.userId,
+              title: "Chat VAN - 月額決済に失敗しました",
+              message: `月額料金（¥${amount.toLocaleString()}）の決済に失敗しました。お支払い情報をご確認ください。`,
+            });
+          } else {
+            console.log(`[月額決済] 成功 contract=${contract.id} ¥${amount}`);
+            await db.insert(notificationsTable).values({
+              userId: contract.userId,
+              title: "Chat VAN - 月額料金のお支払いが完了しました",
+              message: `月額料金（¥${amount.toLocaleString()}）のお支払いが完了しました。`,
+            });
+          }
+        } else {
+          // 請求書払い → 管理者に通知
+          console.log(`[月額決済] 請求書払い contract=${contract.id} ¥${amount}`);
+          const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
+          for (const admin of admins) {
+            await db.insert(notificationsTable).values({
+              userId: admin.id,
+              title: "Chat VAN - 月額請求書を発行してください",
+              message: `契約ID: ${contract.id} / ユーザーID: ${contract.userId} への月額請求書（¥${amount.toLocaleString()}）を発行してください。`,
+            });
+          }
+        }
+      } catch (e) {
+        console.error(`[月額決済] エラー contract=${contract.id}:`, e);
+      }
+    }
+  } catch (e) {
+    console.error("[月額決済] スケジューラーエラー:", e);
+  }
+}, { timezone: "UTC" });
 
 export default router;
