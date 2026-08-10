@@ -265,7 +265,7 @@ async function runAIScreening(appId: number) {
                 monthlyPrice: vehicle.monthlyPrice,
                 sinJapanFee: vehicle.sinJapanFee ?? "0",
                 startDate: parsedStart,
-                minimumTerm: 3,
+                minimumTerm: 1,
                 paymentDay,
                 contractNumber,
                 platformOperator: "合同会社SIN JAPAN",
