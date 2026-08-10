@@ -507,7 +507,7 @@ export default function VanContract() {
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   提携行政書士が申請手続きを代行します。初回のみ加算。<br />
-                  <span className="text-amber-600 font-medium">※ 取得手続きのため納車まで数日〜1週間程度お時間をいただきます。</span>
+                  <span className="text-gray-900 font-medium">※ 取得手続きのため納車まで数日〜1週間程度お時間をいただきます。</span>
                 </p>
                 <div className="mt-2 bg-muted/50 rounded-lg px-3 py-2 text-xs text-muted-foreground leading-relaxed">
                   <span className="font-medium text-foreground">必要書類（郵送にてお送りください）</span><br />
