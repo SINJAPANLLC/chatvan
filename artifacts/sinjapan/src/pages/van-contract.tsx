@@ -187,7 +187,7 @@ const vehicleTerms = (contract: any) => {
 (1) 利用開始日: ${contract?.startDate ?? '車両受取日'}
 (2) 最低利用期間: ${contract?.minimumTerm ?? 3}ヶ月以上
 (3) 最低利用期間満了後、乙から解約の意思表示（30日前書面通知）がない場合、本契約は1ヶ月単位で自動更新されます。
-(4) 自動更新時は、毎月${contract?.paymentDay ?? 1}日に登録済みのクレジットカードへ自動決済されます。
+(4) 自動更新時は、毎月${new Date().getDate()}日に登録済みのクレジットカードへ自動決済されます。
 
 第3条（使用目的と方法）
 (1) 乙は、申込時に申告した利用目的（軽貨物配送業務等）に限り車両を使用できます。
@@ -197,7 +197,7 @@ const vehicleTerms = (contract: any) => {
 第4条（月額料金と支払）
 (1) 月額料金（税抜）: ¥${monthlyBase.toLocaleString()}/月
 (2) 月額料金（税込）: ¥${Math.floor(monthlyBase * 1.1).toLocaleString()}/月
-(3) 支払日: 毎月${contract?.paymentDay ?? 1}日（Square, Inc.によるクレジットカード自動引き落とし）
+(3) 支払日: 毎月${new Date().getDate()}日（Square, Inc.によるクレジットカード自動引き落とし）
 
 第5条（禁止事項）
 乙は以下の行為を行ってはなりません。
@@ -526,7 +526,7 @@ export default function VanContract() {
           <div className="flex justify-between"><span className="text-muted-foreground">税抜</span><span>¥{monthlyBase.toLocaleString()}/月</span></div>
           {contract.startDate && <div className="flex justify-between"><span className="text-muted-foreground">開始日</span><span>{contract.startDate}</span></div>}
           {contract.minimumTerm && <div className="flex justify-between"><span className="text-muted-foreground">最低利用期間</span><span>{contract.minimumTerm}ヶ月</span></div>}
-          <div className="flex justify-between"><span className="text-muted-foreground">支払日</span><span>毎月{contract.paymentDay ?? 1}日</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">支払日</span><span>毎月{new Date().getDate()}日</span></div>
           {!alreadySigned && blackNumber && (
             <div className="flex justify-between text-foreground">
               <span className="text-muted-foreground flex items-center gap-1">
