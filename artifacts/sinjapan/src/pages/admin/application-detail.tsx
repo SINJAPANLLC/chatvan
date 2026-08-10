@@ -22,18 +22,31 @@ const yen = (n: number | null | undefined) =>
   n != null ? `¥${Number(n).toLocaleString()}` : '-';
 
 const STATUS_STYLES: Record<string, string> = {
-  '相談中':     'bg-gray-100 text-gray-700 border-gray-200',
-  '確認中':     'bg-orange-50 text-orange-700 border-orange-200',
-  '提案送信済': 'bg-blue-50 text-blue-700 border-blue-200',
-  '申込受付':   'bg-yellow-50 text-yellow-700 border-yellow-200',
-  '審査中':     'bg-purple-50 text-purple-700 border-purple-200',
-  '提案確定':   'bg-teal-50 text-teal-700 border-teal-200',
-  '契約手続き': 'bg-indigo-50 text-indigo-700 border-indigo-200',
-  '利用開始':   'bg-cyan-50 text-cyan-700 border-cyan-200',
-  '利用中':     'bg-green-50 text-green-700 border-green-200',
-  '返却予定':   'bg-amber-50 text-amber-700 border-amber-200',
-  '契約終了':   'bg-gray-50 text-gray-500 border-gray-200',
-  'キャンセル': 'bg-red-50 text-red-400 border-red-200',
+  new:                  'bg-gray-100 text-gray-700 border-gray-200',
+  hearing:              'bg-orange-50 text-orange-700 border-orange-200',
+  proposed:             'bg-blue-50 text-blue-700 border-blue-200',
+  application_received: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+  screening:            'bg-purple-50 text-purple-700 border-purple-200',
+  approved:             'bg-teal-50 text-teal-700 border-teal-200',
+  contracting:          'bg-indigo-50 text-indigo-700 border-indigo-200',
+  active:               'bg-green-50 text-green-700 border-green-200',
+  return_pending:       'bg-amber-50 text-amber-700 border-amber-200',
+  completed:            'bg-gray-50 text-gray-500 border-gray-200',
+  cancelled:            'bg-red-50 text-red-400 border-red-200',
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  new:                  '新規',
+  hearing:              'ヒアリング中',
+  proposed:             '提案送信済',
+  application_received: '申込受付',
+  screening:            '審査中',
+  approved:             '承認済',
+  contracting:          '契約手続き',
+  active:               '利用中',
+  return_pending:       '返却予定',
+  completed:            '契約終了',
+  cancelled:            'キャンセル',
 };
 
 const ALL_STATUSES = Object.keys(STATUS_STYLES);
@@ -197,7 +210,7 @@ export default function AdminApplicationDetail() {
       toast({ title: '提案を送信しました' });
       setSelectedVehicles([]);
       setProposalMessage('');
-      setStatus('提案送信済');
+      setStatus('proposed');
       refetch();
     } catch {
       toast({ variant: 'destructive', title: 'エラー', description: '送信に失敗しました' });
@@ -221,7 +234,7 @@ export default function AdminApplicationDetail() {
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold">相談詳細 #{app.id}</h1>
               <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border ${STATUS_STYLES[app.status] || 'bg-gray-100 text-gray-700'}`}>
-                {app.status}
+                {STATUS_LABEL[app.status] ?? app.status}
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -276,7 +289,7 @@ export default function AdminApplicationDetail() {
                 onChange={e => setStatus(e.target.value)}
                 className="w-full sm:w-64 px-3 py-2 bg-background border border-border rounded-lg text-sm outline-none focus:border-foreground/50"
               >
-                {ALL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                {ALL_STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s] ?? s}</option>)}
               </select>
             </Section>
 
@@ -959,7 +972,7 @@ export default function AdminApplicationDetail() {
                   <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold mt-1 inline-block ${
                     STATUS_STYLES[app.status]?.replace('border-', '').replace('-50', '-900').replace('-200', '') || 'bg-gray-700 text-white'
                   }`} style={{ background: 'rgba(255,255,255,0.15)', color: 'white' }}>
-                    {app.status}
+                    {STATUS_LABEL[app.status] ?? app.status}
                   </span>
                 </div>
               </div>

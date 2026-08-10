@@ -5,18 +5,31 @@ import { Loader2, Filter, Phone, Mail, User, TrendingUp } from 'lucide-react';
 import { format } from 'date-fns';
 
 const STATUS_STYLES: Record<string, string> = {
-  '相談中':     'bg-gray-100 text-gray-700 border-gray-200',
-  '確認中':     'bg-orange-50 text-orange-700 border-orange-200',
-  '提案送信済': 'bg-blue-50 text-blue-700 border-blue-200',
-  '申込受付':   'bg-yellow-50 text-yellow-700 border-yellow-200',
-  '審査中':     'bg-purple-50 text-purple-700 border-purple-200',
-  '提案確定':   'bg-teal-50 text-teal-700 border-teal-200',
-  '契約手続き': 'bg-indigo-50 text-indigo-700 border-indigo-200',
-  '利用開始':   'bg-cyan-50 text-cyan-700 border-cyan-200',
-  '利用中':     'bg-green-50 text-green-700 border-green-200',
-  '返却予定':   'bg-amber-50 text-amber-700 border-amber-200',
-  '契約終了':   'bg-gray-50 text-gray-500 border-gray-200',
-  'キャンセル': 'bg-red-50 text-red-400 border-red-200',
+  new:                  'bg-gray-100 text-gray-700 border-gray-200',
+  hearing:              'bg-orange-50 text-orange-700 border-orange-200',
+  proposed:             'bg-blue-50 text-blue-700 border-blue-200',
+  application_received: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+  screening:            'bg-purple-50 text-purple-700 border-purple-200',
+  approved:             'bg-teal-50 text-teal-700 border-teal-200',
+  contracting:          'bg-indigo-50 text-indigo-700 border-indigo-200',
+  active:               'bg-green-50 text-green-700 border-green-200',
+  return_pending:       'bg-amber-50 text-amber-700 border-amber-200',
+  completed:            'bg-gray-50 text-gray-500 border-gray-200',
+  cancelled:            'bg-red-50 text-red-400 border-red-200',
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  new:                  '新規',
+  hearing:              'ヒアリング中',
+  proposed:             '提案送信済',
+  application_received: '申込受付',
+  screening:            '審査中',
+  approved:             '承認済',
+  contracting:          '契約手続き',
+  active:               '利用中',
+  return_pending:       '返却予定',
+  completed:            '契約終了',
+  cancelled:            'キャンセル',
 };
 
 const ALL_STATUSES = Object.keys(STATUS_STYLES);
@@ -47,8 +60,8 @@ export default function AdminApplications() {
   // stats
   const stats = {
     total: applications.length,
-    active: applications.filter(a => ['相談中','確認中','提案送信済','申込受付','審査中'].includes(a.status)).length,
-    contract: applications.filter(a => ['利用開始','利用中'].includes(a.status)).length,
+    active: applications.filter(a => ['new','hearing','proposed','application_received','screening'].includes(a.status)).length,
+    contract: applications.filter(a => ['contracting','active'].includes(a.status)).length,
     today: applications.filter(a => {
       const d = new Date(a.createdAt);
       const now = new Date();
@@ -97,7 +110,7 @@ export default function AdminApplications() {
             className="w-full pl-9 pr-4 py-2 bg-background border border-border rounded-lg text-sm outline-none focus:border-foreground/50 appearance-none"
           >
             <option value="">すべてのステータス</option>
-            {ALL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+            {ALL_STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s] ?? s}</option>)}
           </select>
           <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         </div>
@@ -143,7 +156,7 @@ export default function AdminApplications() {
                       </td>
                       <td className="px-4 py-3.5">
                         <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border whitespace-nowrap ${STATUS_STYLES[app.status] || 'bg-gray-100 text-gray-700'}`}>
-                          {app.status}
+                          {STATUS_LABEL[app.status] ?? app.status}
                         </span>
                       </td>
                       <td className="px-4 py-3.5">

@@ -117,7 +117,7 @@ export default function VanProposal() {
 
                 <button
                   onClick={() => handleAccept(v.id)}
-                  disabled={acceptProposal.isPending || application.status === '申込受付'}
+                  disabled={acceptProposal.isPending || application.status === 'application_received'}
                   className="w-full py-2.5 bg-foreground text-background text-sm font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   {acceptProposal.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'この車両を申し込む'}
@@ -128,7 +128,7 @@ export default function VanProposal() {
         </div>
       )}
 
-      {application.status === '申込受付' && (
+      {application.status === 'application_received' && (
         <div className="mt-8 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
           <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
           <div>

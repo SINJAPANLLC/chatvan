@@ -47,7 +47,7 @@ export default function VanChat() {
 
   useEffect(() => {
     if (!application) return;
-    const isComplete = application.status === '提案送信済' || application.status === '申込受付' || application.status === '契約手続き' || application.status === '利用中';
+    const isComplete = application.status === 'proposed' || application.status === 'application_received' || application.status === 'contracting' || application.status === 'active';
     if (!isComplete) return;
 
     const key = `modifying_van_${applicationId}`;
@@ -90,7 +90,7 @@ export default function VanChat() {
   return (
     <div className="flex-1 flex flex-col max-w-3xl mx-auto w-full h-[calc(100dvh-120px)] relative">
       
-      {application?.status === '提案送信済' && (
+      {application?.status === 'proposed' && (
         <div className="bg-primary text-primary-foreground p-4 flex items-center justify-between shadow-sm border-b border-primary/20 shrink-0 cursor-pointer hover:bg-primary/90 transition-colors" onClick={() => setLocation(`/van/${applicationId}/proposal`)}>
           <div className="flex items-center gap-2">
             <Info className="h-5 w-5" />
