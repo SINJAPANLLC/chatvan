@@ -1289,9 +1289,20 @@ router.post("/van/applications/:id/request-return", requireAuth, async (req: Req
       return res.status(400).json({ error: "利用中または支払い問題の状態のみ解約申請できます" });
     }
 
+    // 契約終了日 = 申請翌日
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const endDateStr = tomorrow.toISOString().split('T')[0]; // YYYY-MM-DD
+
     await db.update(vanApplicationsTable)
       .set({ status: "return_pending", updatedAt: new Date() })
       .where(eq(vanApplicationsTable.id, appId));
+
+    // 契約終了日をセット
+    await db.execute(sql`
+      UPDATE van_contracts SET planned_end_date = ${endDateStr}, updated_at = NOW()
+      WHERE application_id = ${appId}
+    `);
 
     await db.insert(notificationsTable).values({
       userId: app.userId,

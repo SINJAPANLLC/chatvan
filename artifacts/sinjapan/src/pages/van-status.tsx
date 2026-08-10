@@ -361,6 +361,19 @@ export default function VanStatus() {
           <h1 className="text-xl font-bold tracking-tight mb-0.5">車両の返却</h1>
           <p className="text-sm text-muted-foreground mb-4">担当のレンタル会社へ返却してください</p>
 
+          {/* 契約終了日 */}
+          {contract?.plannedEndDate && (
+            <div className="rounded-xl border-2 border-foreground overflow-hidden mb-3">
+              <div className="px-4 py-2 bg-foreground text-background text-sm font-semibold flex items-center gap-2">
+                <CalendarDays className="h-4 w-4" />契約終了日
+              </div>
+              <div className="px-4 py-2.5 flex items-center gap-3">
+                <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+                <p className="text-lg font-bold">{fmtDate(contract.plannedEndDate)}</p>
+              </div>
+            </div>
+          )}
+
           {/* 返却手順 */}
           <div className="rounded-xl border border-border overflow-hidden mb-3">
             <div className="px-4 py-2 bg-muted/40 border-b border-border text-sm font-semibold flex items-center gap-2">
