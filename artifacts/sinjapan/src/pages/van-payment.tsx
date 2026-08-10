@@ -34,7 +34,7 @@ function InvoiceForm({
 }: {
   applicationId: number;
   contractId: number;
-  onDone: () => void;
+  onDone: (wasApproved: boolean) => void;
 }) {
   const { toast } = useToast();
   const [status, setStatus] = useState<CorporateStatus | null>(null);
@@ -75,7 +75,7 @@ function InvoiceForm({
       });
       if (!r2.ok) { const d2 = await r2.json().catch(() => ({})); throw new Error(d2.error ?? '処理に失敗しました'); }
 
-      onDone();
+      onDone(skipApply);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'エラー', description: e.message });
     } finally {
@@ -177,6 +177,7 @@ export default function VanPayment() {
   const [cardReady, setCardReady] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [invoicePreApproved, setInvoicePreApproved] = useState(false);
   const [squareError, setSquareError] = useState<string | null>(null);
 
   // オプション選択（契約データが来たら初期化）
@@ -315,12 +316,12 @@ export default function VanPayment() {
           <CheckCircle2 className="h-10 w-10 text-background" />
         </div>
         <h1 className="text-2xl font-bold mb-2">
-          {method === 'invoice' ? '申請を受け付けました' : 'お支払い完了'}
+          {method === 'invoice' && !invoicePreApproved ? '申請を受け付けました' : 'お支払い完了'}
         </h1>
         <p className="text-muted-foreground mb-8">
-          {method === 'invoice'
+          {method === 'invoice' && !invoicePreApproved
             ? '審査結果を2〜3営業日以内にメールでご連絡します。'
-            : 'カード決済が完了しました。担当者からご連絡いたします。'}
+            : '請求書払いが確定しました。担当者からご連絡いたします。'}
         </p>
         <button onClick={() => setLocation(`/van/${applicationId}/status`)}
           className="px-8 py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity">
@@ -472,7 +473,7 @@ export default function VanPayment() {
           <InvoiceForm
             applicationId={applicationId}
             contractId={contract.id}
-            onDone={() => setDone(true)}
+            onDone={(wasApproved) => { setInvoicePreApproved(wasApproved); setDone(true); }}
           />
         </div>
       )}
