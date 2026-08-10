@@ -6,8 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 
 declare const Square: any;
 
-const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, '');
-const apiUrl = (path: string) => `${BASE_URL}api${path}`;
+const apiUrl = (path: string) => `${import.meta.env.BASE_URL}api${path}`;
 const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem('sinjapan_auth_token')}`, 'Content-Type': 'application/json' });
 
 const BANK_INFO = { bank: '三菱UFJ銀行', branch: '渋谷支店', type: '普通', number: '1234567', name: 'シンジャパン（カ' };
@@ -23,7 +22,7 @@ export default function VanPayment() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const [method, setMethod] = useState<'transfer' | 'card'>('card');
+  const [method, setMethod] = useState<'invoice' | 'card'>('card');
   const [cardReady, setCardReady] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
@@ -94,7 +93,7 @@ export default function VanPayment() {
       const result = await cardRef.current.tokenize();
       if (result.status !== 'OK') throw new Error(result.errors?.[0]?.message ?? 'カードのトークン化に失敗しました');
       const r = await fetch(apiUrl(`/van/contracts/${contract.id}/square-charge`), {
-        method: 'POST', headers: authHeader(),
+        method: 'POST', credentials: 'include', headers: authHeader(),
         body: JSON.stringify({ sourceId: result.token }),
       });
       const data = await r.json();
@@ -107,12 +106,12 @@ export default function VanPayment() {
     }
   };
 
-  const handleTransferConfirm = async () => {
+  const handleInvoiceApply = async () => {
     setSubmitting(true);
     try {
       const r = await fetch(apiUrl(`/van/contracts/${contract.id}/pay`), {
-        method: 'POST', headers: authHeader(),
-        body: JSON.stringify({ method: 'transfer' }),
+        method: 'POST', credentials: 'include', headers: authHeader(),
+        body: JSON.stringify({ method: 'invoice' }),
       });
       if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? '処理に失敗しました'); }
       setDone(true);
@@ -135,7 +134,7 @@ export default function VanPayment() {
         </div>
         <h1 className="text-2xl font-bold mb-2">お支払い完了</h1>
         <p className="text-muted-foreground mb-8">
-          {method === 'transfer' ? '振込確認後、ご利用開始のご連絡をいたします。' : 'カード決済が完了しました。担当者からご連絡いたします。'}
+          {method === 'invoice' ? '請求書審査のご連絡を2〜3営業日以内にお送りします。' : 'カード決済が完了しました。担当者からご連絡いたします。'}
         </p>
         <button onClick={() => setLocation(`/van/${applicationId}/status`)}
           className="px-8 py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity">
@@ -182,14 +181,14 @@ export default function VanPayment() {
             </div>
             {method === 'card' && <CheckCircle2 className="h-5 w-5 ml-2 shrink-0" />}
           </div>
-          <div onClick={() => setMethod('transfer')}
-            className={`flex items-center p-4 rounded-lg border cursor-pointer transition-all ${method === 'transfer' ? 'border-foreground ring-1 ring-foreground bg-foreground/5' : 'border-border hover:border-foreground/40'}`}>
-            <Building2 className={`h-5 w-5 mr-3 shrink-0 ${method === 'transfer' ? '' : 'text-muted-foreground'}`} />
+          <div onClick={() => setMethod('invoice')}
+            className={`flex items-center p-4 rounded-lg border cursor-pointer transition-all ${method === 'invoice' ? 'border-foreground ring-1 ring-foreground bg-foreground/5' : 'border-border hover:border-foreground/40'}`}>
+            <Building2 className={`h-5 w-5 mr-3 shrink-0 ${method === 'invoice' ? '' : 'text-muted-foreground'}`} />
             <div className="flex-1">
-              <span className="font-medium text-sm">銀行振込</span>
-              <p className="text-xs text-muted-foreground mt-0.5">振込確認後に利用開始（1〜2営業日）</p>
+              <span className="font-medium text-sm">法人請求書払い</span>
+              <p className="text-xs text-muted-foreground mt-0.5">法人のみ・審査あり・翌月末払い</p>
             </div>
-            {method === 'transfer' && <CheckCircle2 className="h-5 w-5 ml-2 shrink-0" />}
+            {method === 'invoice' && <CheckCircle2 className="h-5 w-5 ml-2 shrink-0" />}
           </div>
         </div>
       </div>
@@ -214,33 +213,28 @@ export default function VanPayment() {
         </div>
       )}
 
-      {/* 銀行振込情報 */}
-      {method === 'transfer' && (
+      {/* 法人請求書払い情報 */}
+      {method === 'invoice' && (
         <div className="rounded-xl border border-border overflow-hidden mb-6">
-          <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold">振込先口座</div>
-          <div className="p-5 space-y-3 text-sm">
-            {[
-              { label: '金融機関', value: BANK_INFO.bank },
-              { label: '支店',     value: BANK_INFO.branch },
-              { label: '口座種別', value: BANK_INFO.type },
-              { label: '口座番号', value: BANK_INFO.number, copy: true },
-              { label: '口座名義', value: BANK_INFO.name, copy: true },
-            ].map(row => (
-              <div key={row.label} className="flex justify-between items-center">
-                <span className="text-muted-foreground">{row.label}</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{row.value}</span>
-                  {row.copy && (
-                    <button onClick={() => copy(row.value, row.label)} className="text-muted-foreground hover:text-foreground">
-                      <Copy className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-            <p className="text-xs text-muted-foreground pt-2 border-t border-border">
-              振込人名義は「お名前（申込番号 #{String(applicationId).padStart(6, '0')}）」でお振込みください。
-            </p>
+          <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold flex items-center gap-2">
+            <Building2 className="h-4 w-4" />法人請求書払いについて
+          </div>
+          <div className="p-5 space-y-3 text-sm text-muted-foreground">
+            <div className="flex gap-3 items-start">
+              <span className="font-bold text-foreground min-w-[1.5rem]">①</span>
+              <span>申請後、2〜3営業日以内に担当者が法人審査を行います。</span>
+            </div>
+            <div className="flex gap-3 items-start">
+              <span className="font-bold text-foreground min-w-[1.5rem]">②</span>
+              <span>審査通過後、登録メールアドレスへ請求書をお送りします。</span>
+            </div>
+            <div className="flex gap-3 items-start">
+              <span className="font-bold text-foreground min-w-[1.5rem]">③</span>
+              <span>お支払い期限は請求月の翌月末です。</span>
+            </div>
+            <div className="pt-3 border-t border-border text-xs">
+              ※ 審査の結果によりご利用いただけない場合があります。その際はクレジットカード払いをお選びください。
+            </div>
           </div>
         </div>
       )}
@@ -259,9 +253,9 @@ export default function VanPayment() {
           {submitting ? <><Loader2 className="h-4 w-4 animate-spin" />処理中…</> : `${fmt(total)} をカード払いで確定する`}
         </button>
       ) : (
-        <button onClick={handleTransferConfirm} disabled={submitting}
+        <button onClick={handleInvoiceApply} disabled={submitting}
           className="w-full py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2">
-          {submitting ? <><Loader2 className="h-4 w-4 animate-spin" />処理中…</> : `振込手続きを完了する（${fmt(total)}）`}
+          {submitting ? <><Loader2 className="h-4 w-4 animate-spin" />処理中…</> : '法人請求書払いを申請する'}
         </button>
       )}
     </div>
