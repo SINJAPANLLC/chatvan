@@ -121,7 +121,7 @@ export function NotificationBell() {
                     <p className={`text-xs leading-snug line-clamp-1 ${!n.readStatus ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
                       {n.title}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
                       {n.message}
                     </p>
                     <p className="text-[10px] text-muted-foreground/60 mt-1">{fmtDate(n.createdAt)}</p>
