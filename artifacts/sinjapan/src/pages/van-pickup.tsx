@@ -213,7 +213,12 @@ export default function VanPickup() {
         </div>
       </div>
 
-      {/* レンタル会社情報・緊急連絡先・マップ（情報がある場合のみ） */}
+      {/* レンタル会社情報・緊急連絡先・マップ */}
+      {!company && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 mb-6 text-sm text-amber-800">
+          レンタル会社情報が未設定です。担当者よりご連絡いたします。
+        </div>
+      )}
       {company && (
         <>
           <div className="rounded-xl border border-border overflow-hidden mb-6">
