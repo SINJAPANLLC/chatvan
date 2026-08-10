@@ -164,7 +164,7 @@ export default function VanPickup() {
   }
 
   return (
-    <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full px-4 pt-8 pb-4">
+    <div className="max-w-2xl mx-auto w-full px-4 py-8">
       <button onClick={() => setLocation(`/van/${applicationId}/status`)}
         className="flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors mb-8">
         <ChevronLeft className="h-4 w-4 mr-1" /> 進捗に戻る
@@ -312,7 +312,7 @@ export default function VanPickup() {
       )}
 
       {/* 受け取り確認 */}
-      <div className="border-t border-border pt-8 flex-1 flex flex-col">
+      <div className="border-t border-border pt-8">
         <h2 className="text-base font-bold mb-1">受け取り確認</h2>
         <p className="text-xs text-muted-foreground mb-5">4方向写真と書類をアップロードして受け取りを完了してください</p>
 
@@ -375,21 +375,19 @@ export default function VanPickup() {
         </div>
 
         {/* 確認ボタン */}
-        <div className="mt-auto pt-4">
-          <button
-            onClick={handleConfirmPickup}
-            disabled={submitting || !allPhotosUploaded}
-            className="w-full py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2"
-          >
-            {submitting
-              ? <><Loader2 className="h-4 w-4 animate-spin" />確認中…</>
-              : <><CheckCircle2 className="h-4 w-4" />受け取りました（{Object.values(photos).filter(Boolean).length}/4枚）</>
-            }
-          </button>
-          {!allPhotosUploaded && (
-            <p className="text-xs text-muted-foreground text-center mt-2">4方向すべての写真をアップロードすると確認できます</p>
-          )}
-        </div>
+        <button
+          onClick={handleConfirmPickup}
+          disabled={submitting || !allPhotosUploaded}
+          className="w-full py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2"
+        >
+          {submitting
+            ? <><Loader2 className="h-4 w-4 animate-spin" />確認中…</>
+            : <><CheckCircle2 className="h-4 w-4" />受け取りました（{Object.values(photos).filter(Boolean).length}/4枚）</>
+          }
+        </button>
+        {!allPhotosUploaded && (
+          <p className="text-xs text-muted-foreground text-center mt-2">4方向すべての写真をアップロードすると確認できます</p>
+        )}
       </div>
     </div>
   );
