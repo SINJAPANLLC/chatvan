@@ -37,6 +37,7 @@ Chat VANは、チャットで希望条件を伝えると最適な軽バンを提
 
 ## ヒアリング項目（優先順）
 以下の情報を自然な会話で収集してください。
+※ ユーザーの氏名・メールアドレス・電話番号はシステムで既に把握しているため、絶対に聞かないでください。
 
 【基本情報（まず確認）】
 1. 利用する都道府県・エリア
@@ -50,23 +51,19 @@ Chat VANは、チャットで希望条件を伝えると最適な軽バンを提
 7. 黒ナンバーの取得状況
 8. 配送経験の有無
 
-【申込み情報（最後に確認）】
-9. 氏名
-10. 電話番号
-11. メールアドレス
-
 ## 会話ルール
 - 1ターンに質問は1〜2項目まで
 - ユーザーが最初のメッセージで複数情報を伝えた場合は、重複して聞かない
 - 親切で自然な日本語で応答する
 - 丁寧すぎず、テンポよく会話を進める
+- 氏名・メール・電話番号は絶対に聞かない（システムで管理済み）
 
 ## 選択肢ボタン（全ての質問に必須）
 質問するときは必ず選択肢を出力する:
 <options>["選択肢A", "選択肢B", "選択肢C"]</options>
 
 ## 完了タグ（必須）
-氏名・電話番号・メールアドレスまで揃ったら、返答の末尾に必ず以下を出力する:
+エリア・開始日・月額・目的・期間・保険・黒ナンバー・配送経験が揃ったら、返答の末尾に必ず以下を出力する:
 
 <van_inquiry>
 {
@@ -77,19 +74,30 @@ Chat VANは、チャットで希望条件を伝えると最適な軽バンを提
   "durationMonths": 6,
   "insuranceStatus": "加入済み/未加入/わからない",
   "hasBlackNumber": true,
-  "hasDeliveryExperience": true,
-  "applicantName": "山田太郎",
-  "phone": "090-1234-5678",
-  "email": "yamada@example.com"
+  "hasDeliveryExperience": true
 }
 </van_inquiry>`;
 
-async function getSystemPrompt(): Promise<string> {
+interface UserInfo { name: string; email: string; phone: string | null }
+
+async function getSystemPrompt(user?: UserInfo): Promise<string> {
+  let base = VAN_SYSTEM_PROMPT;
   try {
     const [row] = await db.select().from(settingsTable).where(eq(settingsTable.key, "ai_system_prompt"));
-    if (row?.value) return row.value;
+    if (row?.value) base = row.value;
   } catch { /* ignore */ }
-  return VAN_SYSTEM_PROMPT;
+
+  // ユーザー登録情報をプロンプト先頭に注入
+  if (user) {
+    const userBlock = `## ユーザー登録情報（システム管理済み・聞かないこと）
+- 氏名: ${user.name}
+- メールアドレス: ${user.email}
+- 電話番号: ${user.phone ?? "未登録"}
+
+`;
+    base = userBlock + base;
+  }
+  return base;
 }
 
 function parseOptions(text: string): string[] | null {
@@ -118,15 +126,27 @@ router.post("/van/start", async (req: Request, res: Response) => {
     if (!message?.trim()) return res.status(400).json({ error: "message required" });
     const userId: number | undefined = (req.session as any)?.userId;
 
+    // ユーザー登録情報を取得
+    let userInfo: UserInfo | undefined;
+    if (userId) {
+      const [u] = await db.select({ name: usersTable.name, email: usersTable.email, phone: usersTable.phone })
+        .from(usersTable).where(eq(usersTable.id, userId));
+      if (u) userInfo = u;
+    }
+
     const [app] = await db.insert(vanApplicationsTable).values({
       userId: userId ?? null,
       status: "new",
       requestText: message,
+      // 登録情報を初期値として設定
+      applicantName: userInfo?.name ?? null,
+      phone: userInfo?.phone ?? null,
+      email: userInfo?.email ?? null,
     }).returning();
 
     await db.insert(vanMessagesTable).values({ vanApplicationId: app.id, role: "user", content: message });
 
-    const systemPrompt = await getSystemPrompt();
+    const systemPrompt = await getSystemPrompt(userInfo);
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [{ role: "system", content: systemPrompt }, { role: "user", content: message }],
@@ -149,9 +169,10 @@ router.post("/van/start", async (req: Request, res: Response) => {
         insuranceStatus: inquiry.insuranceStatus as string,
         hasBlackNumber: inquiry.hasBlackNumber as boolean,
         hasDeliveryExperience: inquiry.hasDeliveryExperience as boolean,
-        applicantName: inquiry.applicantName as string,
-        phone: inquiry.phone as string,
-        email: inquiry.email as string,
+        // ユーザー登録情報を優先、inquiryにあれば上書き
+        applicantName: (inquiry.applicantName as string) ?? userInfo?.name ?? null,
+        phone: (inquiry.phone as string) ?? userInfo?.phone ?? null,
+        email: (inquiry.email as string) ?? userInfo?.email ?? null,
         updatedAt: new Date(),
       }).where(eq(vanApplicationsTable.id, app.id));
 
@@ -202,13 +223,22 @@ router.post("/van/applications/:id/messages", async (req: Request, res: Response
     const [app] = await db.select().from(vanApplicationsTable).where(eq(vanApplicationsTable.id, appId));
     if (!app) return res.status(404).json({ error: "Application not found" });
 
+    // ユーザー登録情報を取得
+    const sessionUserId: number | undefined = (req.session as any)?.userId ?? app.userId ?? undefined;
+    let userInfo: UserInfo | undefined;
+    if (sessionUserId) {
+      const [u] = await db.select({ name: usersTable.name, email: usersTable.email, phone: usersTable.phone })
+        .from(usersTable).where(eq(usersTable.id, sessionUserId));
+      if (u) userInfo = u;
+    }
+
     const history = await db.select().from(vanMessagesTable)
       .where(eq(vanMessagesTable.vanApplicationId, appId))
       .orderBy(vanMessagesTable.createdAt);
 
     await db.insert(vanMessagesTable).values({ vanApplicationId: appId, role: "user", content: message });
 
-    const systemPrompt = await getSystemPrompt();
+    const systemPrompt = await getSystemPrompt(userInfo);
     const openaiMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [
       { role: "system", content: systemPrompt },
       ...history.map(m => ({ role: (m.role === "assistant" ? "assistant" : "user") as "user" | "assistant", content: m.content })),
@@ -238,9 +268,10 @@ router.post("/van/applications/:id/messages", async (req: Request, res: Response
         insuranceStatus: (inquiry.insuranceStatus as string) ?? app.insuranceStatus,
         hasBlackNumber: (inquiry.hasBlackNumber as boolean) ?? app.hasBlackNumber,
         hasDeliveryExperience: (inquiry.hasDeliveryExperience as boolean) ?? app.hasDeliveryExperience,
-        applicantName: (inquiry.applicantName as string) ?? app.applicantName,
-        phone: (inquiry.phone as string) ?? app.phone,
-        email: (inquiry.email as string) ?? app.email,
+        // ユーザー登録情報を優先（inquiryには氏名・連絡先は含まれなくなった）
+        applicantName: userInfo?.name ?? app.applicantName,
+        phone: userInfo?.phone ?? app.phone,
+        email: userInfo?.email ?? app.email,
         updatedAt: new Date(),
       }).where(eq(vanApplicationsTable.id, appId));
 
