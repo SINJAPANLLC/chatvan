@@ -142,8 +142,13 @@ export default function VanProposal() {
     new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY', maximumFractionDigits: 0 }).format(val);
   const taxIn = (val: number) => Math.floor(val * 1.1);
 
+  // 台数に応じてレイアウト切り替え
+  const count = vehicles.length;
+  const isMulti = count > 1;
+  const maxW = count >= 3 ? 'max-w-4xl' : count === 2 ? 'max-w-3xl' : 'max-w-2xl';
+
   return (
-    <div className="flex-1 max-w-2xl mx-auto w-full px-4 py-8">
+    <div className={`flex-1 ${maxW} mx-auto w-full px-4 py-8`}>
       {/* ヘッダー */}
       <button
         onClick={() => {
@@ -181,74 +186,75 @@ export default function VanProposal() {
           </div>
         </div>
       ) : (
-        <div className="space-y-8">
+        <div className={
+          count === 1 ? 'space-y-6' :
+          count === 2 ? 'grid grid-cols-1 sm:grid-cols-2 gap-4' :
+                        'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'
+        }>
           {vehicles.map((v: any) => {
             const photos = parsePhotos(v.photos);
             const features = [
               v.hasEtc && 'ETC',
-              v.hasDashcam && 'ドライブレコーダー',
+              v.hasDashcam && 'ドラレコ',
               v.hasBackupCam && 'バックカメラ',
             ].filter(Boolean) as string[];
 
             return (
-              <div key={v.id} className="border border-border rounded-2xl overflow-hidden shadow-sm">
-                {/* 写真ギャラリー */}
-                <div className="px-4 pt-4 pb-3">
+              <div key={v.id} className="border border-border rounded-2xl overflow-hidden shadow-sm flex flex-col">
+                {/* 写真 */}
+                <div className={isMulti ? 'px-3 pt-3 pb-2' : 'px-4 pt-4 pb-3'}>
                   <PhotoGallery photos={photos} alt={`${v.maker} ${v.model}`} />
                 </div>
 
-                <div className="px-4 pb-4">
-                  {/* 車両名 + 月額を横並び */}
-                  <div className="flex items-start justify-between gap-3 mb-4">
-                    <div>
-                      <h2 className="text-base font-bold leading-snug">{v.maker} {v.model}{v.grade ? ` ${v.grade}` : ''}</h2>
-                    </div>
+                <div className={`flex flex-col flex-1 ${isMulti ? 'px-3 pb-3' : 'px-4 pb-4'}`}>
+                  {/* 車両名 + 月額 */}
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <h2 className={`font-bold leading-snug ${isMulti ? 'text-sm' : 'text-base'}`}>
+                      {v.maker} {v.model}{v.grade ? ` ${v.grade}` : ''}
+                    </h2>
                     <div className="text-right shrink-0">
-                      <p className="text-lg font-bold">{fmt(taxIn(v.userPrice))}<span className="text-xs font-normal text-muted-foreground ml-1">/月</span></p>
-                      <p className="text-xs text-muted-foreground">税抜 {fmt(v.userPrice)}</p>
+                      <p className={`font-bold ${isMulti ? 'text-base' : 'text-lg'}`}>
+                        {fmt(taxIn(v.userPrice))}<span className="text-xs font-normal text-muted-foreground ml-0.5">/月</span>
+                      </p>
+                      {!isMulti && <p className="text-xs text-muted-foreground">税抜 {fmt(v.userPrice)}</p>}
                     </div>
                   </div>
 
-                  {/* 詳細スペック */}
-                  <div className="divide-y divide-border/60 border border-border/60 rounded-xl overflow-hidden mb-5">
+                  {/* スペック */}
+                  <div className={`divide-y divide-border/60 border border-border/60 rounded-xl overflow-hidden mb-3 ${isMulti ? 'text-xs' : 'text-sm'}`}>
                     {[
-                      v.year        && { icon: <CarFront className="h-4 w-4" />,  label: '年式',           value: `${v.year}年式` },
-                      v.mileage     && { icon: <Gauge className="h-4 w-4" />,     label: '走行距離',       value: `${v.mileage.toLocaleString()} km` },
-                      { icon: <MapPin className="h-4 w-4" />,    label: 'エリア',         value: v.prefecture || '指定なし' },
-                      { icon: <Calendar className="h-4 w-4" />,  label: '最低利用期間',   value: `${v.minPeriodMonths ?? 1}ヶ月〜` },
-                      v.maxPeriodMonths && { icon: <Calendar className="h-4 w-4" />, label: '最長利用期間', value: `${v.maxPeriodMonths}ヶ月` },
-                      v.mileageLimit    && { icon: <Gauge className="h-4 w-4" />,    label: '月間走行上限', value: `${v.mileageLimit.toLocaleString()} km` },
-                      v.excessMileageFee && { icon: <JapaneseYen className="h-4 w-4" />, label: '超過料金', value: `${fmt(v.excessMileageFee)} / km` },
-                      v.inspectionExpiry && { icon: <CarFront className="h-4 w-4" />, label: '車検満了',    value: v.inspectionExpiry },
-                      v.availableFrom    && { icon: <Calendar className="h-4 w-4" />, label: '利用開始可能日', value: v.availableFrom },
+                      v.year     && { icon: <CarFront className="h-3.5 w-3.5" />, label: '年式',     value: `${v.year}年式` },
+                      v.mileage  && { icon: <Gauge className="h-3.5 w-3.5" />,    label: '走行距離', value: `${v.mileage.toLocaleString()} km` },
+                      { icon: <MapPin className="h-3.5 w-3.5" />,   label: 'エリア',       value: v.prefecture || '指定なし' },
+                      { icon: <Calendar className="h-3.5 w-3.5" />, label: '最低利用',     value: `${v.minPeriodMonths ?? 1}ヶ月〜` },
+                      !isMulti && v.maxPeriodMonths  && { icon: <Calendar className="h-3.5 w-3.5" />, label: '最長利用',   value: `${v.maxPeriodMonths}ヶ月` },
+                      !isMulti && v.mileageLimit     && { icon: <Gauge className="h-3.5 w-3.5" />,    label: '走行上限',   value: `${v.mileageLimit.toLocaleString()} km` },
+                      !isMulti && v.excessMileageFee && { icon: <JapaneseYen className="h-3.5 w-3.5" />, label: '超過料金', value: `${fmt(v.excessMileageFee)} / km` },
+                      !isMulti && v.inspectionExpiry && { icon: <CarFront className="h-3.5 w-3.5" />,  label: '車検満了', value: v.inspectionExpiry },
+                      !isMulti && v.availableFrom    && { icon: <Calendar className="h-3.5 w-3.5" />,  label: '開始可能日', value: v.availableFrom },
                     ].filter(Boolean).map((row: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between px-4 py-2.5">
-                        <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                          {row.icon}{row.label}
-                        </span>
-                        <span className="text-sm font-medium text-right ml-4">{row.value}</span>
+                      <div key={i} className={`flex items-center justify-between ${isMulti ? 'px-3 py-2' : 'px-4 py-2.5'}`}>
+                        <span className="flex items-center gap-1.5 text-muted-foreground">{row.icon}{row.label}</span>
+                        <span className="font-medium text-right ml-2">{row.value}</span>
                       </div>
                     ))}
                   </div>
 
-                  {/* 装備 */}
+                  {/* 装備バッジ */}
                   {features.length > 0 && (
-                    <div className="mb-5">
-                      <p className="text-xs text-muted-foreground mb-2 font-medium">装備・オプション</p>
-                      <div className="flex flex-wrap gap-2">
-                        {features.map((f) => (
-                          <span key={f} className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-muted border border-border">
-                            <Check className="h-3 w-3 text-green-600" />{f}
-                          </span>
-                        ))}
-                      </div>
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {features.map((f) => (
+                        <span key={f} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-muted border border-border">
+                          <Check className="h-3 w-3 text-green-600" />{f}
+                        </span>
+                      ))}
                     </div>
                   )}
 
-                  {/* 備考 */}
-                  {v.notes && (
-                    <div className="mb-5 p-4 bg-muted/40 rounded-xl">
-                      <p className="text-xs text-muted-foreground mb-1 font-medium">備考・説明</p>
+                  {/* 備考（1台のみ表示） */}
+                  {!isMulti && v.notes && (
+                    <div className="mb-3 p-3 bg-muted/40 rounded-xl">
+                      <p className="text-xs text-muted-foreground mb-1 font-medium">備考</p>
                       <p className="text-sm leading-relaxed whitespace-pre-wrap">{v.notes}</p>
                     </div>
                   )}
@@ -257,7 +263,7 @@ export default function VanProposal() {
                   <button
                     onClick={() => handleAccept(v.id)}
                     disabled={acceptProposal.isPending || application.status === 'application_received'}
-                    className="w-full py-3.5 bg-foreground text-background font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+                    className={`mt-auto w-full bg-foreground text-background font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${isMulti ? 'py-2.5 text-xs' : 'py-3.5 text-sm'}`}
                   >
                     {acceptProposal.isPending
                       ? <><Loader2 className="h-4 w-4 animate-spin" />処理中...</>
