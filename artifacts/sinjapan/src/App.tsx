@@ -58,6 +58,7 @@ const AdminIncidents        = lazy(() => import('@/pages/admin/incidents'));
 const AdminRecovery         = lazy(() => import('@/pages/admin/recovery'));
 const AdminPayments         = lazy(() => import('@/pages/admin/payments-van'));
 const AdminScreening        = lazy(() => import('@/pages/admin/screening'));
+const AdminCorporate        = lazy(() => import('@/pages/admin/corporate'));
 const AdminInvoices         = lazy(() => import('@/pages/admin/invoices'));
 const AdminAuditLogs        = lazy(() => import('@/pages/admin/audit-logs'));
 
@@ -132,6 +133,9 @@ function Router() {
         </Route>
         <Route path="/admin/screening">
           <AdminLayout><AdminScreening /></AdminLayout>
+        </Route>
+        <Route path="/admin/corporate">
+          <AdminLayout><AdminCorporate /></AdminLayout>
         </Route>
         <Route path="/admin/audit-logs">
           <AdminLayout><AdminAuditLogs /></AdminLayout>

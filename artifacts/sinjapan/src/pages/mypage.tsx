@@ -247,76 +247,64 @@ export default function MyPage() {
               const appId = (contract as any).applicationId;
               return (
                 <Card key={contract.id} className="overflow-hidden border-border shadow-sm">
-                  <div className="flex flex-col sm:flex-row">
-                    {/* 左: 車両サムネイル */}
-                    <div className="sm:w-1/3 bg-muted flex flex-col justify-center items-center border-b sm:border-b-0 sm:border-r border-border/50 overflow-hidden relative">
-                      {(() => {
-                        const photos = JSON.parse((contract.vehicle as any)?.photos || '[]');
-                        return photos[0]
-                          ? <img src={`${import.meta.env.BASE_URL}api/storage${photos[0]}`} alt="車両写真" className="w-full h-full object-cover absolute inset-0" />
-                          : <Car className="h-12 w-12 text-muted-foreground/50" />;
-                      })()}
-                      <div className="relative z-10 flex flex-col items-center p-4 bg-gradient-to-t from-black/60 via-transparent to-transparent w-full mt-auto">
-                        <span className="font-bold text-base text-center text-white drop-shadow">
-                          {contract.vehicle?.maker} {contract.vehicle?.model}
-                        </span>
-                        {contract.vehicle?.year && (
-                          <span className="text-xs text-white/80 mt-0.5">{contract.vehicle.year}年式</span>
-                        )}
-                        <span className={`inline-block mt-2 px-2.5 py-0.5 text-xs font-semibold rounded-full ${st.color}`}>
-                          {st.label}
-                        </span>
+                  <div className="p-5 flex flex-col gap-4">
+                    {/* 一行目: ステータス ＋ 車種 */}
+                    <div className="flex items-center gap-3">
+                      <span className={`shrink-0 px-2.5 py-0.5 text-xs font-semibold rounded-full ${st.color}`}>
+                        {st.label}
+                      </span>
+                      <span className="font-bold text-base">
+                        {contract.vehicle?.maker} {contract.vehicle?.model}
+                        {contract.vehicle?.year && <span className="text-muted-foreground font-normal text-sm ml-1">{contract.vehicle.year}年式</span>}
+                      </span>
+                    </div>
+
+                    {/* 契約情報グリッド */}
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
+                          <JapaneseYen className="h-3.5 w-3.5" />月額料金（税込）
+                        </p>
+                        <p className="font-bold text-xl">{formatPrice(totalWithTax(contract))}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
+                          <Calendar className="h-3.5 w-3.5" />利用開始日
+                        </p>
+                        <p className="font-medium">
+                          {contract.startDate ? format(new Date(contract.startDate), 'yyyy年M月d日') : '未定'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
+                          <CreditCard className="h-3.5 w-3.5" />次回支払日
+                        </p>
+                        <p className="font-medium">毎月 {contract.paymentDay}日</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
+                          <Calendar className="h-3.5 w-3.5" />最低利用期間
+                        </p>
+                        <p className="font-medium">{(contract as any).minimumTerm ?? 1}ヶ月</p>
                       </div>
                     </div>
 
-                    {/* 右: 契約情報 */}
-                    <div className="sm:w-2/3 p-6 flex flex-col justify-between gap-5">
-                      <div className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                            <JapaneseYen className="h-3.5 w-3.5" />月額料金（税込）
-                          </p>
-                          <p className="font-bold text-xl">{formatPrice(totalWithTax(contract))}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                            <Calendar className="h-3.5 w-3.5" />利用開始日
-                          </p>
-                          <p className="font-medium">
-                            {contract.startDate ? format(new Date(contract.startDate), 'yyyy年M月d日') : '未定'}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                            <CreditCard className="h-3.5 w-3.5" />次回支払日
-                          </p>
-                          <p className="font-medium">毎月 {contract.paymentDay}日</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                            <Calendar className="h-3.5 w-3.5" />最低利用期間
-                          </p>
-                          <p className="font-medium">{(contract as any).minimumTerm ?? 1}ヶ月</p>
-                        </div>
-                      </div>
-
-                      {/* アクションボタン */}
-                      <div className="flex flex-wrap gap-2">
-                        {appId && (
-                          <Link href={`/van/${appId}/status`}>
-                            <button className="flex items-center gap-2 px-4 py-2 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity">
-                              <FileText className="h-4 w-4" />
-                              契約詳細・利用状況
-                            </button>
-                          </Link>
-                        )}
-                        <Link href={`/contract-chat/${contract.id}`}>
-                          <button className="flex items-center gap-2 px-4 py-2 border border-border rounded-full text-sm hover:bg-muted transition-colors">
-                            <AlertCircle className="h-4 w-4" />
-                            事故・トラブル報告
+                    {/* アクションボタン */}
+                    <div className="flex flex-wrap gap-3 pt-1 border-t border-border">
+                      {appId && (
+                        <Link href={`/van/${appId}/status`}>
+                          <button className="flex items-center gap-2 px-4 py-2 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity">
+                            <FileText className="h-4 w-4" />
+                            契約詳細・利用状況
                           </button>
                         </Link>
-                      </div>
+                      )}
+                      <Link href={`/contract-chat/${contract.id}`} className="ml-auto">
+                        <button className="flex items-center gap-2 px-4 py-2 border border-border rounded-full text-sm hover:bg-muted transition-colors">
+                          <AlertCircle className="h-4 w-4" />
+                          事故・トラブル報告
+                        </button>
+                      </Link>
                     </div>
                   </div>
                 </Card>

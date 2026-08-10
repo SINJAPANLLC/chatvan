@@ -311,7 +311,6 @@ export default function ContractChat() {
   }, [messages]);
 
   const isMine = (msg: any) => msg.sender_id === me?.id;
-  const backHref = me?.role === 'rental_company' || me?.role === 'admin' ? '/company/contracts' : '/mypage';
 
   return (
     <div className="flex flex-col h-[100dvh] bg-background">
@@ -319,7 +318,7 @@ export default function ContractChat() {
       {/* ヘッダー */}
       <header className="shrink-0 border-b border-border bg-card">
         <div className="flex items-center gap-3 px-4 py-3">
-          <button onClick={() => setLocation(backHref)} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+          <button onClick={() => window.history.back()} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div className="flex items-center gap-2">
