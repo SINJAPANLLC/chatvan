@@ -497,11 +497,6 @@ export default function VanStatus() {
                 className="text-sm text-muted-foreground underline hover:text-foreground transition-colors">
                 解約を申請する
               </button>
-              {contract?.startDate && contract?.minimumTerm && !canRequestReturn(contract.startDate, Number(contract.minimumTerm)) && (
-                <p className="text-xs text-muted-foreground">
-                  ※ 最低利用期間の関係で{returnAvailableDate(contract.startDate, Number(contract.minimumTerm))}以降に解約可能です
-                </p>
-              )}
             </div>
           ) : (
             <div className="rounded-xl border border-border overflow-hidden">
