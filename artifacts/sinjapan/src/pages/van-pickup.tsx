@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useGetVanApplication } from '@workspace/api-client-react';
-import { Loader2, ChevronLeft, MapPin, Phone, Clock, AlertCircle, Truck, Copy, ExternalLink, CalendarDays, CheckCircle2 } from 'lucide-react';
+import { Loader2, ChevronLeft, MapPin, Phone, Clock, AlertCircle, Truck, Copy, ExternalLink, CalendarDays, CheckCircle2, Camera, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const apiUrl = (path: string) => `${import.meta.env.BASE_URL}api${path}`;
@@ -29,6 +29,15 @@ const PHOTO_SLOTS = [
 ] as const;
 type PhotoKey = typeof PHOTO_SLOTS[number]['key'];
 
+// ─── 書類スロット ────────────────────────────────────────────────────────────
+const DOC_SLOTS = [
+  { key: 'shakken',   label: '車検証' },
+  { key: 'kiroku',    label: '検査証記録事項' },
+  { key: 'jibaiseki', label: '自賠責' },
+  { key: 'ninni',     label: '任意保険' },
+] as const;
+type DocKey = typeof DOC_SLOTS[number]['key'];
+
 async function uploadToStorage(file: File, applicationId: number): Promise<string> {
   const r = await fetch(apiUrl('/storage/user-uploads/request-url'), {
     method: 'POST',
@@ -51,8 +60,8 @@ export default function VanPickup() {
 
   const [photos, setPhotos] = useState<Partial<Record<PhotoKey, string>>>({});
   const [photoLoading, setPhotoLoading] = useState<Partial<Record<PhotoKey, boolean>>>({});
-  const [docs, setDocs] = useState<string[]>([]);
-  const [docLoading, setDocLoading] = useState(false);
+  const [docs, setDocs] = useState<Partial<Record<DocKey, string>>>({});
+  const [docLoading, setDocLoading] = useState<Partial<Record<DocKey, boolean>>>({});
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
@@ -76,15 +85,15 @@ export default function VanPickup() {
     }
   };
 
-  const handleDocUpload = async (file: File) => {
-    setDocLoading(true);
+  const handleDocUpload = async (key: DocKey, file: File) => {
+    setDocLoading(prev => ({ ...prev, [key]: true }));
     try {
       const path = await uploadToStorage(file, applicationId);
-      setDocs(prev => [...prev, path]);
+      setDocs(prev => ({ ...prev, [key]: path }));
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'アップロード失敗', description: e.message });
     } finally {
-      setDocLoading(false);
+      setDocLoading(prev => ({ ...prev, [key]: false }));
     }
   };
 
@@ -103,7 +112,7 @@ export default function VanPickup() {
         headers: { ...authHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pickupPhotos: Object.values(photos).filter(Boolean),
-          pickupDocuments: docs,
+          pickupDocuments: Object.values(docs).filter(Boolean),
         }),
       });
       if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? '処理に失敗しました'); }
@@ -338,7 +347,7 @@ export default function VanPickup() {
                   ) : uploaded ? (
                     <CheckCircle2 className="h-8 w-8 text-foreground" />
                   ) : (
-                    <span className="text-3xl">📷</span>
+                    <Camera className="h-8 w-8 text-muted-foreground" />
                   )}
                   <span className={`text-sm font-medium mt-2 ${uploaded ? 'text-foreground' : 'text-muted-foreground'}`}>
                     {label}
@@ -351,25 +360,35 @@ export default function VanPickup() {
 
         {/* 書類アップロード */}
         <div className="mb-3">
-          <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
-            📄 所定書類 <span>（車検証・自賠責・任意保険）</span>
+          <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+            <FileText className="h-3.5 w-3.5" /> 所定書類 <span>（各書類を撮影・アップロード）</span>
           </p>
-          <div className="space-y-1.5">
-            {docs.map((_, i) => (
-              <div key={i} className="flex items-center gap-2 text-xs text-foreground bg-muted/40 rounded-lg px-3 py-1.5">
-                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                <span>書類 {i + 1} アップロード済み</span>
-              </div>
-            ))}
-            <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-border hover:border-foreground/40 cursor-pointer transition-all text-xs text-muted-foreground ${docLoading ? 'opacity-50' : ''}`}>
-              <input
-                type="file" accept="image/*,application/pdf" className="sr-only"
-                onChange={e => { const f = e.target.files?.[0]; if (f) handleDocUpload(f); }}
-                disabled={docLoading}
-              />
-              {docLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <span>＋</span>}
-              {docs.length === 0 ? '書類をアップロード（任意）' : 'さらに追加'}
-            </label>
+          <div className="grid grid-cols-2 gap-2">
+            {DOC_SLOTS.map(({ key, label }) => {
+              const uploaded = !!docs[key];
+              const loading = !!docLoading[key];
+              return (
+                <label key={key} className={`relative flex flex-col items-center justify-center rounded-xl border-2 cursor-pointer transition-all min-h-[90px] ${
+                  uploaded ? 'border-foreground bg-foreground/5' : 'border-dashed border-border hover:border-foreground/40'
+                }`}>
+                  <input
+                    type="file" accept="image/*,application/pdf" capture="environment" className="sr-only"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleDocUpload(key, f); }}
+                    disabled={loading}
+                  />
+                  {loading ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  ) : uploaded ? (
+                    <CheckCircle2 className="h-6 w-6 text-foreground" />
+                  ) : (
+                    <FileText className="h-6 w-6 text-muted-foreground" />
+                  )}
+                  <span className={`text-xs font-medium mt-1.5 text-center px-1 ${uploaded ? 'text-foreground' : 'text-muted-foreground'}`}>
+                    {label}
+                  </span>
+                </label>
+              );
+            })}
           </div>
         </div>
 
