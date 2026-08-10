@@ -183,7 +183,7 @@ export default function VanPayment() {
   const cardContainerRef = useRef<HTMLDivElement>(null);
 
   const { data: application, isLoading, refetch } = useGetVanApplication(applicationId, {
-    query: { enabled: !!applicationId },
+    query: { enabled: !!applicationId, staleTime: 0, refetchOnMount: 'always' },
   });
   const contract = (application as any)?.contract as any;
 
