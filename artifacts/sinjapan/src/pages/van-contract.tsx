@@ -460,6 +460,43 @@ export default function VanContract() {
         <p className="text-sm text-muted-foreground">契約番号: {contract.contractNumber ?? `CVN-${contract.id}`}</p>
       </div>
 
+      {/* オプション選択（契約概要の上） */}
+      {!alreadySigned && (
+        <div className="rounded-xl border border-border overflow-hidden mb-4">
+          <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold">オプション（任意）</div>
+          <div className="divide-y divide-border">
+            {/* 黒ナンバー代理取得 */}
+            <label className="flex items-start gap-4 px-5 py-4 cursor-pointer hover:bg-muted/30 transition-colors">
+              <input type="checkbox" checked={blackNumber} onChange={e => setBlackNumber(e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-foreground cursor-pointer shrink-0" />
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />黒ナンバー代理取得
+                  </span>
+                  <span className="text-sm font-semibold">+¥19,800</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">黒ナンバーの取得手続きを代行します。初回のみ加算されます。</p>
+              </div>
+            </label>
+            {/* 保険紹介 */}
+            <label className="flex items-start gap-4 px-5 py-4 cursor-pointer hover:bg-muted/30 transition-colors">
+              <input type="checkbox" checked={insuranceReferral} onChange={e => setInsuranceReferral(e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-foreground cursor-pointer shrink-0" />
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium flex items-center gap-2">
+                    <Umbrella className="h-4 w-4 text-muted-foreground" />保険紹介
+                  </span>
+                  <span className="text-xs text-muted-foreground">担当者より案内</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">軽貨物に適した保険プランを担当者が個別にご紹介します。</p>
+              </div>
+            </label>
+          </div>
+        </div>
+      )}
+
       {/* 契約概要 */}
       <div className="rounded-xl border border-border overflow-hidden mb-6">
         <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold">契約概要</div>
@@ -472,6 +509,20 @@ export default function VanContract() {
           {contract.startDate && <div className="flex justify-between"><span className="text-muted-foreground">開始日</span><span>{contract.startDate}</span></div>}
           {contract.minimumTerm && <div className="flex justify-between"><span className="text-muted-foreground">最低利用期間</span><span>{contract.minimumTerm}ヶ月</span></div>}
           <div className="flex justify-between"><span className="text-muted-foreground">支払日</span><span>毎月{contract.paymentDay ?? 1}日</span></div>
+          {!alreadySigned && blackNumber && (
+            <div className="flex justify-between text-foreground">
+              <span className="text-muted-foreground flex items-center gap-1">
+                <FileText className="h-3.5 w-3.5" />黒ナンバー代理取得（初回のみ）
+              </span>
+              <span>+¥19,800</span>
+            </div>
+          )}
+          {!alreadySigned && (blackNumber) && (
+            <div className="flex justify-between pt-2.5 border-t border-border font-bold">
+              <span>初回お支払い合計</span>
+              <span className="text-base">¥{(monthlyTax + (blackNumber ? 19800 : 0)).toLocaleString()}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -534,56 +585,22 @@ export default function VanContract() {
             />
           ))}
 
-          {/* オプション選択 */}
+          {/* GPS同意 */}
           <div className={`rounded-xl border border-border overflow-hidden mb-6 transition-opacity ${allRead ? '' : 'opacity-40 pointer-events-none'}`}>
-            <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold">オプション（任意）</div>
-            <div className="divide-y divide-border">
-
-              {/* 黒ナンバー代理取得 */}
-              <label className="flex items-start gap-4 px-5 py-4 cursor-pointer hover:bg-muted/30 transition-colors">
-                <input type="checkbox" checked={blackNumber} onChange={e => setBlackNumber(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 accent-foreground cursor-pointer shrink-0" />
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-muted-foreground" />黒ナンバー代理取得
-                    </span>
-                    <span className="text-sm font-semibold">+¥19,800</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">軽貨物運送業に必要な黒ナンバーの取得手続きを代行します。初回のみ加算されます。</p>
+            <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold">位置情報の同意</div>
+            <label className="flex items-start gap-4 px-5 py-4 cursor-pointer hover:bg-muted/30 transition-colors">
+              <input type="checkbox" checked={gpsConsent} onChange={e => setGpsConsent(e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-foreground cursor-pointer shrink-0" />
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />GPS位置情報の取得を許可する
+                  </span>
+                  <span className="text-xs text-muted-foreground">無料</span>
                 </div>
-              </label>
-
-              {/* 保険紹介 */}
-              <label className="flex items-start gap-4 px-5 py-4 cursor-pointer hover:bg-muted/30 transition-colors">
-                <input type="checkbox" checked={insuranceReferral} onChange={e => setInsuranceReferral(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 accent-foreground cursor-pointer shrink-0" />
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium flex items-center gap-2">
-                      <Umbrella className="h-4 w-4 text-muted-foreground" />保険紹介
-                    </span>
-                    <span className="text-xs text-muted-foreground">担当者より案内</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">軽貨物に適した保険プランを担当者から個別にご紹介します。</p>
-                </div>
-              </label>
-
-              {/* GPS許可 */}
-              <label className="flex items-start gap-4 px-5 py-4 cursor-pointer hover:bg-muted/30 transition-colors">
-                <input type="checkbox" checked={gpsConsent} onChange={e => setGpsConsent(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 accent-foreground cursor-pointer shrink-0" />
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />GPS位置情報の取得を許可する
-                    </span>
-                    <span className="text-xs text-muted-foreground">無料</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">車両の位置情報を常時取得することに同意します。安全管理・緊急時対応に使用します。</p>
-                </div>
-              </label>
-            </div>
+                <p className="text-xs text-muted-foreground mt-1">車両の位置情報を常時取得することに同意します。安全管理・緊急時対応に使用します。</p>
+              </div>
+            </label>
           </div>
 
           {/* 署名欄 */}
