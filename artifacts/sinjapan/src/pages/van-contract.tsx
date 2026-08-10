@@ -367,8 +367,12 @@ export default function VanContract() {
         body: JSON.stringify({ signatureData }),
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error ?? '署名に失敗しました');
+        let errMsg = '署名に失敗しました';
+        try {
+          const text = await res.text();
+          if (text) errMsg = (JSON.parse(text)).error ?? errMsg;
+        } catch {}
+        throw new Error(errMsg);
       }
       toast({ title: '電子署名が完了しました', description: 'お支払い手続きへ進みます。' });
       setLocation(`/van/${applicationId}/payment`);
