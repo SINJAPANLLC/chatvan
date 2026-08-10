@@ -117,6 +117,37 @@ router.get(
 );
 
 /**
+ * GET /storage/user-objects/*
+ * Serve private object entities for authenticated users (not admin-only).
+ */
+router.get(
+  '/storage/user-objects/*objectPath',
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const raw = req.params.objectPath;
+      const objectPath = '/objects/' + (Array.isArray(raw) ? raw.join('/') : raw);
+      const file = await storage.getObjectEntityFile(objectPath);
+      const response = await storage.downloadObject(file);
+      res.status(response.status);
+      response.headers.forEach((value, key) => res.setHeader(key, value));
+      if (response.body) {
+        Readable.fromWeb(response.body as ReadableStream<Uint8Array>).pipe(res);
+      } else {
+        res.end();
+      }
+    } catch (err) {
+      if (err instanceof ObjectNotFoundError) {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
+      console.error('[storage] user-object serve error:', err);
+      res.status(500).json({ error: 'Failed to serve object' });
+    }
+  },
+);
+
+/**
  * GET /storage/objects/*
  * Serve private object entities (auth required).
  */

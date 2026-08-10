@@ -4,13 +4,19 @@ import { useGetVanApplication } from '@workspace/api-client-react';
 import {
   Loader2, CheckCircle2, Clock, FileText, CreditCard, Truck, XCircle,
   ChevronLeft, MapPin, ScanFace, AlertCircle, Phone, CalendarDays,
-  RefreshCw, CircleX, PackageCheck,
+  RefreshCw, CircleX, PackageCheck, Image, ExternalLink,
 } from 'lucide-react';
 import EkycInlineForm from '@/components/EkycInlineForm';
 import { useToast } from '@/hooks/use-toast';
 
 const apiUrl = (p: string) => `${import.meta.env.BASE_URL}api${p}`;
 const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem('sinjapan_auth_token') ?? ''}` });
+
+/** objectPath（例: /objects/uuid）→ 認証付き画像URL */
+const objUrl = (path: string) => {
+  const stripped = path.replace(/^\/objects\//, '');
+  return apiUrl(`/storage/user-objects/${stripped}`);
+};
 
 type EkycStatus = 'not_started' | 'submitted' | 'verified' | 'rejected' | 'expired';
 type Step = { label: string; icon: React.ReactNode };
@@ -506,6 +512,79 @@ export default function VanStatus() {
               </div>
             </div>
           )}
+
+          {/* 書類・写真 */}
+          {(() => {
+            const pickupPhotos: string[] = (contract as any)?.pickupPhotos ?? [];
+            const pickupDocs: string[] = (contract as any)?.pickupDocuments ?? [];
+            const inspectionDoc: string | null = vehicle?.inspectionDoc ?? null;
+            const insuranceDoc: string | null = vehicle?.compulsoryInsuranceDoc ?? null;
+            const hasAny = pickupPhotos.length > 0 || pickupDocs.length > 0 || inspectionDoc || insuranceDoc;
+            if (!hasAny) return null;
+            return (
+              <div className="rounded-xl border border-border overflow-hidden mb-4">
+                <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold flex items-center gap-2">
+                  <Image className="h-4 w-4" />書類・写真
+                </div>
+                <div className="p-5 space-y-5">
+                  {/* 受け取り時の写真 */}
+                  {pickupPhotos.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-2">受け取り時の車両写真</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {pickupPhotos.map((path, i) => (
+                          <a key={i} href={objUrl(path)} target="_blank" rel="noopener noreferrer"
+                            className="block aspect-square rounded-lg overflow-hidden border border-border hover:opacity-90 transition-opacity bg-muted">
+                            <img src={objUrl(path)} alt={`受け取り写真 ${i + 1}`} className="w-full h-full object-cover" />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* 受け取り書類 */}
+                  {pickupDocs.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-2">受け取り書類</p>
+                      <div className="flex flex-col gap-2">
+                        {pickupDocs.map((path, i) => (
+                          <a key={i} href={objUrl(path)} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg border border-border hover:bg-muted transition-colors">
+                            <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                            書類 {i + 1}
+                            <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* 車両書類（車検証・自賠責） */}
+                  {(inspectionDoc || insuranceDoc) && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-2">車両書類</p>
+                      <div className="flex flex-col gap-2">
+                        {inspectionDoc && (
+                          <a href={objUrl(inspectionDoc)} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg border border-border hover:bg-muted transition-colors">
+                            <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                            車検証
+                            <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                          </a>
+                        )}
+                        {insuranceDoc && (
+                          <a href={objUrl(insuranceDoc)} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg border border-border hover:bg-muted transition-colors">
+                            <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                            自賠責保険証
+                            <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* 解約申請 */}
           {!showReturnConfirm ? (

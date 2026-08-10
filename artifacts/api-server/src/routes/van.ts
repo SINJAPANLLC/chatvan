@@ -710,7 +710,14 @@ router.get("/van/applications/:id", requireAuth, async (req: Request, res: Respo
       ? { ...contractRow.contract, vehicle: contractRow.vehicle ? { ...contractRow.vehicle, rentalCompany: contractRow.company } : null }
       : null;
 
-    return res.json({ ...app, proposedVehicles, identityVerification: idVerification ?? null, contract });
+    // pickup_photos / pickup_documents を JSON パース
+    const contractWithParsed = contract ? {
+      ...contract,
+      pickupPhotos: (() => { try { return JSON.parse((contract as any).pickupPhotos ?? '[]'); } catch { return []; } })(),
+      pickupDocuments: (() => { try { return JSON.parse((contract as any).pickupDocuments ?? '[]'); } catch { return []; } })(),
+    } : null;
+
+    return res.json({ ...app, proposedVehicles, identityVerification: idVerification ?? null, contract: contractWithParsed });
   } catch (err) {
     console.error("get application error:", err);
     return res.status(500).json({ error: "Internal error" });
@@ -2061,6 +2068,8 @@ router.delete("/van/vehicles/:id", requireAuth, requireAdmin, async (req: Reques
 db.execute(sql`ALTER TABLE identity_verifications ADD COLUMN IF NOT EXISTS selfie_photo TEXT`).catch(() => {});
 db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS pickup_photos TEXT`).catch(() => {});
 db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS pickup_documents TEXT`).catch(() => {});
+db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS inspection_doc TEXT`).catch(() => {});
+db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS compulsory_insurance_doc TEXT`).catch(() => {});
 
 // ── 月額自動決済スケジューラー (毎日 JST 9:00 = UTC 0:00) ────────────────
 cron.schedule("0 0 * * *", async () => {
