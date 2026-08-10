@@ -5,6 +5,12 @@ import { Loader2, CheckCircle2, ChevronLeft, Calendar, MapPin, JapaneseYen, Chec
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 
+const apiUrl = (p: string) => `${import.meta.env.BASE_URL}api${p}`;
+const objUrl = (path: string) => {
+  const stripped = path.replace(/^\/objects\//, '');
+  return apiUrl(`/storage/user-objects/${stripped}`);
+};
+
 export default function VanProposal() {
   const [, params] = useRoute('/van/:id/proposal');
   const applicationId = Number(params?.id);
@@ -64,7 +70,7 @@ export default function VanProposal() {
   const getPhotoUrl = (v: { photos?: string | null; maker: string; model: string }) => {
     try {
       const arr = JSON.parse((v.photos as string) || '[]');
-      if (arr[0]) return arr[0] as string;
+      if (arr[0]) return objUrl(arr[0] as string);
     } catch { /* ignore */ }
     return null;
   };
