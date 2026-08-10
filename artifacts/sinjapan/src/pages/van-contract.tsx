@@ -627,7 +627,7 @@ export default function VanContract() {
 
           <button
             onClick={handleSign}
-            disabled={loading || !allRead || !signatureData}
+            disabled={loading || !allRead || !signatureData || !gpsConsent}
             className="w-full py-3.5 bg-foreground text-background font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-30 flex items-center justify-center gap-2 text-sm"
           >
             {loading
