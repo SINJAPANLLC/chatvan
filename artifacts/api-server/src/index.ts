@@ -177,6 +177,7 @@ async function runMigrations() {
     "ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS return_photos TEXT",
     "ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS return_documents TEXT",
     "ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS payment_method TEXT",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS invoice_credit_limit INTEGER",
   ];
   for (const q of alterCols) {
     try { await db.execute(sql.raw(q)); } catch (e: any) {

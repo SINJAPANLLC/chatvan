@@ -362,40 +362,39 @@ export default function MyPage() {
         </Link>
       </section>
 
-      {/* お支払いカード */}
-      <section>
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <CreditCard className="h-5 w-5" />お支払いカード
-        </h2>
-        <Card className="border-border shadow-sm">
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className={`h-10 w-10 rounded-full flex items-center justify-center border ${
-              user?.squareCardId ? 'bg-foreground border-foreground text-background' : 'bg-muted border-border text-muted-foreground'
-            }`}>
-              <CreditCard className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="font-medium text-sm">クレジットカード</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {user?.squareCardId
-                  ? `登録済み${user.cardBrand ? `（${CARD_BRAND[user.cardBrand] ?? user.cardBrand} ****${user.cardLast4}）` : ''}`
-                  : '未登録'}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+      <CardSection user={user} onUpdated={() => refetchUser()} />
 
       {/* 法人請求書払い */}
       {(() => {
         const invoiceContracts = activeContracts.filter(c => (c as any).paymentMethod === 'invoice');
         if (invoiceContracts.length === 0) return null;
+        const usedAmount = invoiceContracts.reduce((sum, c) => sum + totalWithTax(c), 0);
+        const creditLimit = (user as any)?.invoiceCreditLimit ?? null;
         return (
           <section>
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <FileText className="h-5 w-5" />法人請求書払い
             </h2>
             <Card className="border-border shadow-sm">
+              {/* 与信額・利用額 */}
+              <div className="px-5 py-4 grid grid-cols-2 gap-4 border-b border-border">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">与信額</p>
+                  <p className="font-bold text-lg">
+                    {creditLimit != null ? formatPrice(creditLimit) : <span className="text-muted-foreground text-sm">未設定</span>}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">月次利用額</p>
+                  <p className="font-bold text-lg">{formatPrice(usedAmount)}</p>
+                  {creditLimit != null && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      残枠 {formatPrice(Math.max(0, creditLimit - usedAmount))}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {/* 契約一覧 */}
               <CardContent className="p-0 divide-y divide-border">
                 {invoiceContracts.map(c => (
                   <div key={c.id} className="px-5 py-4 flex items-center justify-between gap-4">
