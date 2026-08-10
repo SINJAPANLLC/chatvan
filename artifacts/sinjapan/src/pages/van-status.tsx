@@ -62,139 +62,6 @@ function returnAvailableDate(startDate: string, minimumTerm: number): string {
   return end.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-// ─── 受け取り時アップロードフォーム ─────────────────────────────────────────
-const PHOTO_SLOTS = [
-  { key: 'front', label: '前方' },
-  { key: 'rear',  label: '後方' },
-  { key: 'left',  label: '左側' },
-  { key: 'right', label: '右側' },
-] as const;
-
-type PhotoKey = typeof PHOTO_SLOTS[number]['key'];
-
-async function uploadToStorage(
-  file: File,
-  applicationId: number
-): Promise<string> {
-  const r = await fetch(apiUrl('/storage/user-uploads/request-url'), {
-    method: 'POST',
-    credentials: 'include',
-    headers: { ...authHeader(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: file.name, contentType: file.type, applicationId }),
-  });
-  if (!r.ok) throw new Error('アップロードURLの取得に失敗しました');
-  const { uploadURL, objectPath } = await r.json();
-  const putRes = await fetch(uploadURL, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
-  if (!putRes.ok) throw new Error('ファイルのアップロードに失敗しました');
-  return objectPath as string;
-}
-
-function PickupUploadForm({
-  applicationId,
-  onPhotosChange,
-  onDocumentsChange,
-}: {
-  applicationId: number;
-  onPhotosChange: (paths: Partial<Record<PhotoKey, string>>) => void;
-  onDocumentsChange: (paths: string[]) => void;
-}) {
-  const { toast } = useToast();
-  const [photos, setPhotos] = useState<Partial<Record<PhotoKey, string>>>({});
-  const [photoLoading, setPhotoLoading] = useState<Partial<Record<PhotoKey, boolean>>>({});
-  const [docs, setDocs] = useState<string[]>([]);
-  const [docLoading, setDocLoading] = useState(false);
-
-  const handlePhotoUpload = async (key: PhotoKey, file: File) => {
-    setPhotoLoading(prev => ({ ...prev, [key]: true }));
-    try {
-      const path = await uploadToStorage(file, applicationId);
-      const next = { ...photos, [key]: path };
-      setPhotos(next);
-      onPhotosChange(next);
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'アップロード失敗', description: e.message });
-    } finally {
-      setPhotoLoading(prev => ({ ...prev, [key]: false }));
-    }
-  };
-
-  const handleDocUpload = async (file: File) => {
-    setDocLoading(true);
-    try {
-      const path = await uploadToStorage(file, applicationId);
-      const next = [...docs, path];
-      setDocs(next);
-      onDocumentsChange(next);
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'アップロード失敗', description: e.message });
-    } finally {
-      setDocLoading(false);
-    }
-  };
-
-  return (
-    <div className="space-y-5">
-      {/* 4方向写真 */}
-      <div>
-        <p className="text-sm font-medium mb-3 flex items-center gap-1">
-          📸 車両4方向の写真 <span className="text-red-500 text-xs">（必須）</span>
-        </p>
-        <div className="grid grid-cols-2 gap-3">
-          {PHOTO_SLOTS.map(({ key, label }) => {
-            const uploaded = !!photos[key];
-            const loading = !!photoLoading[key];
-            return (
-              <label key={key} className={`relative flex flex-col items-center justify-center rounded-xl border-2 cursor-pointer transition-all min-h-[100px] ${
-                uploaded ? 'border-foreground bg-foreground/5' : 'border-dashed border-border hover:border-foreground/40'
-              }`}>
-                <input
-                  type="file" accept="image/*" capture="environment" className="sr-only"
-                  onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(key, f); }}
-                  disabled={loading}
-                />
-                {loading ? (
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                ) : uploaded ? (
-                  <CheckCircle2 className="h-6 w-6 text-foreground mb-1" />
-                ) : (
-                  <span className="text-2xl mb-1">📷</span>
-                )}
-                <span className={`text-xs font-medium ${uploaded ? 'text-foreground' : 'text-muted-foreground'}`}>
-                  {label}{uploaded ? ' ✓' : ''}
-                </span>
-              </label>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 書類アップロード */}
-      <div>
-        <p className="text-sm font-medium mb-3 flex items-center gap-1">
-          📄 所定書類 <span className="text-xs text-muted-foreground">（引渡確認書・任意）</span>
-        </p>
-        <div className="space-y-2">
-          {docs.map((_, i) => (
-            <div key={i} className="flex items-center gap-2 text-sm text-foreground bg-muted/40 rounded-lg px-3 py-2">
-              <CheckCircle2 className="h-4 w-4 shrink-0" />
-              <span>書類 {i + 1} アップロード済み</span>
-            </div>
-          ))}
-          <label className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border border-dashed border-border hover:border-foreground/40 cursor-pointer transition-all text-sm text-muted-foreground ${docLoading ? 'opacity-50' : ''}`}>
-            <input
-              type="file" accept="image/*,application/pdf" className="sr-only"
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleDocUpload(f); }}
-              disabled={docLoading}
-            />
-            {docLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <span>＋</span>}
-            {docs.length === 0 ? '書類をアップロード（任意）' : 'さらに追加'}
-          </label>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── ステップインジケーター ──────────────────────────────────────────────────
 function StepIndicator({ currentStep }: { currentStep: number }) {
   return (
@@ -239,8 +106,6 @@ export default function VanStatus() {
   const [submitting, setSubmitting] = useState(false);
   const [showReturnConfirm, setShowReturnConfirm] = useState(false);
   const [returnReason, setReturnReason] = useState('');
-  const [pickupPhotos, setPickupPhotos] = useState<Partial<Record<PhotoKey, string>>>({});
-  const [pickupDocs, setPickupDocs] = useState<string[]>([]);
 
   const { data: application, isLoading, refetch } = useGetVanApplication(applicationId, {
     query: { enabled: !!applicationId },
@@ -316,33 +181,6 @@ export default function VanStatus() {
     const timer = setInterval(() => { refetch(); fetchEkyc(); }, 10_000);
     return () => clearInterval(timer);
   }, [application?.status, refetch, fetchEkyc]);
-
-  const allPhotosUploaded = (PHOTO_SLOTS as readonly { key: PhotoKey; label: string }[]).every(s => !!pickupPhotos[s.key]);
-
-  const handleConfirmPickup = async () => {
-    if (!allPhotosUploaded) {
-      toast({ variant: 'destructive', title: '写真が不足しています', description: '車両4方向（前・後・左・右）の写真をすべてアップロードしてください' });
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const r = await fetch(apiUrl(`/van/applications/${applicationId}/confirm-pickup`), {
-        method: 'POST', credentials: 'include',
-        headers: { ...authHeader(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pickupPhotos: Object.values(pickupPhotos).filter(Boolean),
-          pickupDocuments: pickupDocs,
-        }),
-      });
-      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? '処理に失敗しました'); }
-      await refetch();
-      toast({ title: '受け取り確認が完了しました' });
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'エラー', description: e.message });
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const handleRequestReturn = async () => {
     setSubmitting(true);
@@ -807,39 +645,13 @@ export default function VanStatus() {
                   </div>
                   <div>
                     <h2 className="text-base font-bold leading-tight">受け取り確認</h2>
-                    <p className="text-xs text-muted-foreground">4方向写真と書類をアップロードして受け取りを完了してください</p>
+                    <p className="text-xs text-muted-foreground">受け取り場所・写真アップロード・確認を行います</p>
                   </div>
                 </div>
-
-                <div className="mb-5">
-                  <button onClick={() => setLocation(`/van/${applicationId}/pickup`)}
-                    className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-border hover:bg-muted transition-colors text-sm">
-                    <span className="flex items-center gap-2"><MapPin className="h-4 w-4 text-muted-foreground" />受け取り場所・担当者を確認する</span>
-                    <span className="text-muted-foreground text-xs">→</span>
-                  </button>
-                </div>
-
-                <div className="mb-6">
-                  <PickupUploadForm
-                    applicationId={applicationId}
-                    onPhotosChange={setPickupPhotos}
-                    onDocumentsChange={setPickupDocs}
-                  />
-                </div>
-
-                <button
-                  onClick={handleConfirmPickup}
-                  disabled={submitting || !allPhotosUploaded}
-                  className="w-full py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2"
-                >
-                  {submitting
-                    ? <><Loader2 className="h-4 w-4 animate-spin" />確認中…</>
-                    : <><CheckCircle2 className="h-4 w-4" />受け取りました（{Object.values(pickupPhotos).filter(Boolean).length}/4枚）</>
-                  }
+                <button onClick={() => setLocation(`/van/${applicationId}/pickup`)}
+                  className="w-full py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+                  <PackageCheck className="h-4 w-4" />受け取り確認へ進む
                 </button>
-                {!allPhotosUploaded && (
-                  <p className="text-xs text-muted-foreground text-center mt-2">4方向すべての写真をアップロードすると確認できます</p>
-                )}
               </div>
             )}
           </div>
