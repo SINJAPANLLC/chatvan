@@ -310,7 +310,7 @@ export default function MyPage() {
                             </button>
                           </Link>
                         )}
-                        <Link href={`/contract-chat/${contract.id}`} className="ml-auto">
+                        <Link href={`/contract-chat/${contract.id}`}>
                           <button className="flex items-center gap-2 px-4 py-2 border border-border rounded-full text-sm hover:bg-muted transition-colors">
                             <AlertCircle className="h-4 w-4" />
                             事故・トラブル報告
