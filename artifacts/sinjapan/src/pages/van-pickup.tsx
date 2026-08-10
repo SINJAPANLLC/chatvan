@@ -143,7 +143,7 @@ export default function VanPickup() {
     );
   }
 
-  const mapUrl = company.address
+  const mapUrl = company?.address
     ? `https://maps.google.com/maps?q=${encodeURIComponent(company.address)}`
     : null;
 
@@ -213,94 +213,97 @@ export default function VanPickup() {
         </div>
       </div>
 
-      {/* レンタル会社情報 */}
-      <div className="rounded-xl border border-border overflow-hidden mb-6">
-        <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold">
-          {company.name}
-        </div>
-        <div className="divide-y divide-border/50">
-          {company.address && (
-            <div className="px-5 py-4 flex items-start justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">住所</p>
-                  <p className="text-sm font-medium">{company.address}</p>
+      {/* レンタル会社情報・緊急連絡先・マップ（情報がある場合のみ） */}
+      {company && (
+        <>
+          <div className="rounded-xl border border-border overflow-hidden mb-6">
+            <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold">
+              {company.name}
+            </div>
+            <div className="divide-y divide-border/50">
+              {company.address && (
+                <div className="px-5 py-4 flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">住所</p>
+                      <p className="text-sm font-medium">{company.address}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button onClick={() => copy(company.address, '住所')}
+                      className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted">
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                    {mapUrl && (
+                      <a href={mapUrl} target="_blank" rel="noopener noreferrer"
+                        className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted">
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="flex gap-2 shrink-0">
-                <button onClick={() => copy(company.address, '住所')}
-                  className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted">
-                  <Copy className="h-3.5 w-3.5" />
-                </button>
-                {mapUrl && (
-                  <a href={mapUrl} target="_blank" rel="noopener noreferrer"
-                    className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted">
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
-                )}
-              </div>
-            </div>
-          )}
-          {company.phone && (
-            <div className="px-5 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">電話番号</p>
-                  <p className="text-sm font-medium">{company.phone}</p>
+              )}
+              {company.phone && (
+                <div className="px-5 py-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">電話番号</p>
+                      <p className="text-sm font-medium">{company.phone}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => copy(company.phone, '電話番号')}
+                      className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted">
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                    <a href={`tel:${company.phone}`}
+                      className="px-3 py-1.5 text-xs bg-foreground text-background rounded-full hover:opacity-90 transition-opacity">
+                      電話する
+                    </a>
+                  </div>
                 </div>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => copy(company.phone, '電話番号')}
-                  className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted">
-                  <Copy className="h-3.5 w-3.5" />
-                </button>
-                <a href={`tel:${company.phone}`}
-                  className="px-3 py-1.5 text-xs bg-foreground text-background rounded-full hover:opacity-90 transition-opacity">
-                  電話する
-                </a>
-              </div>
+              )}
+              {company.businessHours && (
+                <div className="px-5 py-4 flex items-start gap-3">
+                  <Clock className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">営業時間</p>
+                    <p className="text-sm font-medium whitespace-pre-line">{company.businessHours}</p>
+                  </div>
+                </div>
+              )}
+              {company.contactName && (
+                <div className="px-5 py-4 flex items-center gap-3">
+                  <div className="h-4 w-4 shrink-0" />
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">担当者</p>
+                    <p className="text-sm font-medium">{company.contactName}</p>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-          {company.businessHours && (
-            <div className="px-5 py-4 flex items-start gap-3">
-              <Clock className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">営業時間</p>
-                <p className="text-sm font-medium whitespace-pre-line">{company.businessHours}</p>
-              </div>
-            </div>
-          )}
-          {company.contactName && (
-            <div className="px-5 py-4 flex items-center gap-3">
-              <div className="h-4 w-4 shrink-0" />
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">担当者</p>
-                <p className="text-sm font-medium">{company.contactName}</p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 緊急連絡先 */}
-      {company.emergencyContact && (
-        <div className="rounded-xl border border-border overflow-hidden mb-6">
-          <div className="px-5 py-3 border-b border-border text-sm font-semibold flex items-center gap-2">
-            <AlertCircle className="h-4 w-4" />緊急連絡先
           </div>
-          <div className="px-5 py-4">
-            <p className="text-sm">{company.emergencyContact}</p>
-          </div>
-        </div>
-      )}
 
-      {mapUrl && (
-        <a href={mapUrl} target="_blank" rel="noopener noreferrer"
-          className="w-full flex items-center justify-center gap-2 py-3 border border-border rounded-full text-sm font-medium hover:bg-muted transition-colors mb-8">
-          <MapPin className="h-4 w-4" />Google マップで見る
-        </a>
+          {company.emergencyContact && (
+            <div className="rounded-xl border border-border overflow-hidden mb-6">
+              <div className="px-5 py-3 border-b border-border text-sm font-semibold flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />緊急連絡先
+              </div>
+              <div className="px-5 py-4">
+                <p className="text-sm">{company.emergencyContact}</p>
+              </div>
+            </div>
+          )}
+
+          {mapUrl && (
+            <a href={mapUrl} target="_blank" rel="noopener noreferrer"
+              className="w-full flex items-center justify-center gap-2 py-3 border border-border rounded-full text-sm font-medium hover:bg-muted transition-colors mb-8">
+              <MapPin className="h-4 w-4" />Google マップで見る
+            </a>
+          )}
+        </>
       )}
 
       {/* 受け取り確認 */}
