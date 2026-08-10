@@ -327,7 +327,7 @@ export default function VanPickup() {
         {/* 4方向写真 */}
         <div className="mb-2">
           <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
-            📸 車両4方向の写真 <span className="text-red-500">（必須）</span>
+            <Camera className="h-3.5 w-3.5" /> 車両4方向の写真 <span className="text-red-500">（必須）</span>
           </p>
           <div className="grid grid-cols-2 gap-3">
             {PHOTO_SLOTS.map(({ key, label }) => {
