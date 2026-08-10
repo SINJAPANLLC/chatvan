@@ -150,9 +150,16 @@ async function runAIScreening(appId: number) {
       messages: [
         {
           role: "system",
-          content: `あなたは軽バンレンタルサービスの審査AIです。
+          content: `あなたは軽バン月額レンタルサービスの申込審査AIです。
 申込データを分析し、以下のJSONのみ返してください:
-{"result": "approved" | "rejected", "reason": "理由（日本語、50文字以内）"}`
+{"result": "approved" | "rejected", "reason": "理由（日本語、50文字以内）"}
+
+【審査方針】
+初めて車を借りるユーザーがほとんどのため、保険・黒ナンバー・配送経験は一切審査対象にしない。
+以下の2条件のみで判断する:
+1. 利用目的が明らかに違法（麻薬・密輸・犯罪等）でないこと
+2. 申込内容が明らかな嫌がらせ・テスト・無意味な入力でないこと
+上記に該当しない限り、必ず approved にすること。`
         },
         {
           role: "user",
@@ -160,17 +167,7 @@ async function runAIScreening(appId: number) {
 エリア: ${app.area ?? "未記入"}
 月額予算: ${app.monthlyBudget ? `¥${Number(app.monthlyBudget).toLocaleString()}` : "未記入"}
 利用目的: ${app.purpose ?? "未記入"}
-利用期間: ${app.durationMonths ?? "未記入"}ヶ月
-保険状況: ${app.insuranceStatus ?? "未記入"}
-黒ナンバー: ${app.hasBlackNumber ? "取得済み" : "未取得"}
-配送経験: ${app.hasDeliveryExperience ? "あり" : "なし"}
-
-審査基準:
-- 月額予算が30,000円以上
-- 利用目的が法令に反しない（違法薬物輸送等でない）
-- 保険未加入でも利用目的が個人・軽貨物なら許可
-- 軽貨物業目的で黒ナンバー未取得でも仮承認可
-- 明らかに虚偽・悪意のある申込は否決`
+利用期間: ${app.durationMonths ?? "未記入"}ヶ月`
         }
       ],
       response_format: { type: "json_object" },
