@@ -4,7 +4,6 @@ import { useGetVanApplication } from '@workspace/api-client-react';
 import { Loader2, ChevronLeft, CreditCard, Building2, CheckCircle2, ShieldCheck, FileText as LicenseIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-const BLACK_NUMBER_FEE = 19800;
 
 declare const Square: any;
 
