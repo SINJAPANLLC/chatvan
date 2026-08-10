@@ -1289,20 +1289,6 @@ router.post("/van/applications/:id/request-return", requireAuth, async (req: Req
       return res.status(400).json({ error: "利用中または支払い問題の状態のみ解約申請できます" });
     }
 
-    // 最低利用期間チェック
-    const [contract] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.applicationId, appId));
-    if (contract?.startDate && contract?.minimumTerm) {
-      const startDate = new Date(contract.startDate);
-      const minimumEndDate = new Date(startDate);
-      minimumEndDate.setMonth(minimumEndDate.getMonth() + Number(contract.minimumTerm));
-      if (new Date() < minimumEndDate) {
-        const fmt = (d: Date) => `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
-        return res.status(400).json({
-          error: `最低利用期間（${contract.minimumTerm}ヶ月）のため、${fmt(minimumEndDate)}以降に解約申請できます`,
-        });
-      }
-    }
-
     await db.update(vanApplicationsTable)
       .set({ status: "return_pending", updatedAt: new Date() })
       .where(eq(vanApplicationsTable.id, appId));
