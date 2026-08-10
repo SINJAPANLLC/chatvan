@@ -603,7 +603,6 @@ export default function VanContract() {
                   <span className="text-sm font-medium flex items-center gap-2">
                     <MapPin className="h-4 w-4 text-muted-foreground" />GPS位置情報の取得を許可する
                   </span>
-                  <span className="text-xs text-muted-foreground">無料</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">車両の位置情報を常時取得することに同意します。安全管理・緊急時対応に使用します。</p>
               </div>
