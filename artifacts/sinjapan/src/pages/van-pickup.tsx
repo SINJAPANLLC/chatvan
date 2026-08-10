@@ -27,7 +27,7 @@ export default function VanPickup() {
   }
 
   const contract = (application as any)?.contract as any;
-  const company = contract?.rentalCompany as any;
+  const company = contract?.vehicle?.rentalCompany as any;
 
   if (!contract || !company) {
     return (
