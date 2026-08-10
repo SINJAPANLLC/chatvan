@@ -320,12 +320,12 @@ export default function VanPickup() {
           <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
             📸 車両4方向の写真 <span className="text-red-500">（必須）</span>
           </p>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             {PHOTO_SLOTS.map(({ key, label }) => {
               const uploaded = !!photos[key];
               const loading = !!photoLoading[key];
               return (
-                <label key={key} className={`relative flex flex-col items-center justify-center rounded-lg border-2 cursor-pointer transition-all min-h-[68px] ${
+                <label key={key} className={`relative flex flex-col items-center justify-center rounded-xl border-2 cursor-pointer transition-all min-h-[120px] ${
                   uploaded ? 'border-foreground bg-foreground/5' : 'border-dashed border-border hover:border-foreground/40'
                 }`}>
                   <input
@@ -334,13 +334,13 @@ export default function VanPickup() {
                     disabled={loading}
                   />
                   {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   ) : uploaded ? (
-                    <CheckCircle2 className="h-5 w-5 text-foreground" />
+                    <CheckCircle2 className="h-8 w-8 text-foreground" />
                   ) : (
-                    <span className="text-lg">📷</span>
+                    <span className="text-3xl">📷</span>
                   )}
-                  <span className={`text-[10px] font-medium mt-0.5 ${uploaded ? 'text-foreground' : 'text-muted-foreground'}`}>
+                  <span className={`text-sm font-medium mt-2 ${uploaded ? 'text-foreground' : 'text-muted-foreground'}`}>
                     {label}
                   </span>
                 </label>
@@ -352,7 +352,7 @@ export default function VanPickup() {
         {/* 書類アップロード */}
         <div className="mb-3">
           <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
-            📄 所定書類 <span>（引渡確認書・任意）</span>
+            📄 所定書類 <span>（車検証・自賠責・任意保険）</span>
           </p>
           <div className="space-y-1.5">
             {docs.map((_, i) => (
