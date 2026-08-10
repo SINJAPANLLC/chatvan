@@ -362,6 +362,10 @@ export default function VanStatus() {
                   <span className="text-muted-foreground">最低利用期間</span>
                   <span>{contract.minimumTerm}ヶ月</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">更新</span>
+                  <span className="text-xs bg-muted px-2 py-0.5 rounded-full">自動更新</span>
+                </div>
               </div>
             </div>
           )}
