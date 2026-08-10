@@ -26,29 +26,25 @@ const STATUS_LABEL: Record<string, string> = {
   new: '相談中', hearing: 'ヒアリング中', proposed: '提案あり',
   application_received: '審査中', screening: '審査中', approved: '承認済み',
   contracting: '契約手続き', pending_payment: '決済待ち',
-  active: '利用中', completed: '完了', rejected: '見送り',
+  active: '利用中', delivery_pending: '納車待ち', completed: '完了', rejected: '見送り',
 };
 
 const STATUS_STYLES: Record<string, string> = {
-  new:                  'bg-blue-50 text-blue-700 border-blue-200',
-  hearing:              'bg-blue-50 text-blue-700 border-blue-200',
-  proposed:             'bg-purple-50 text-purple-700 border-purple-200',
-  application_received: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-  screening:            'bg-yellow-50 text-yellow-700 border-yellow-200',
-  approved:             'bg-green-50 text-green-700 border-green-200',
-  contracting:          'bg-indigo-50 text-indigo-700 border-indigo-200',
-  pending_payment:      'bg-orange-50 text-orange-700 border-orange-200',
-  active:               'bg-emerald-50 text-emerald-700 border-emerald-200',
-  completed:            'bg-gray-50 text-gray-600 border-gray-200',
-  rejected:             'bg-red-50 text-red-700 border-red-200',
+  new:                  'bg-white text-foreground border-border',
+  hearing:              'bg-white text-foreground border-border',
+  proposed:             'bg-white text-foreground border-border',
+  application_received: 'bg-white text-foreground border-border',
+  screening:            'bg-white text-foreground border-border',
+  approved:             'bg-foreground text-background border-foreground',
+  contracting:          'bg-foreground text-background border-foreground',
+  pending_payment:      'bg-white text-foreground border-border',
+  active:               'bg-foreground text-background border-foreground',
+  delivery_pending:     'bg-white text-foreground border-border',
+  completed:            'bg-white text-muted-foreground border-border',
+  rejected:             'bg-white text-muted-foreground border-border',
 };
 
-const DOT: Record<string, string> = {
-  new: 'bg-blue-400', hearing: 'bg-blue-400', proposed: 'bg-purple-400',
-  application_received: 'bg-yellow-400', screening: 'bg-yellow-400', approved: 'bg-green-400',
-  contracting: 'bg-indigo-400', pending_payment: 'bg-orange-400',
-  active: 'bg-emerald-500', completed: 'bg-gray-300', rejected: 'bg-red-400',
-};
+const DOT_STYLE = 'bg-foreground';
 
 const STEP: Record<string, number> = {
   new: 0, hearing: 0, proposed: 1,
@@ -121,14 +117,11 @@ export default function VanHistory() {
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <span className={`w-2 h-2 rounded-full shrink-0 mt-0.5 ${DOT[app.status] ?? 'bg-gray-400'}`} />
+                    <span className={`w-2 h-2 rounded-full shrink-0 mt-0.5 ${DOT_STYLE}`} />
                     <div>
                       <p className="font-semibold text-sm leading-tight">
-                        {app.area ?? `相談 #${app.id}`}
+                        {`相談 #${app.id}`}
                       </p>
-                      {app.purpose && (
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{app.purpose}</p>
-                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
