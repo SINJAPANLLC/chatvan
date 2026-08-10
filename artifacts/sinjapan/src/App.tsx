@@ -23,7 +23,8 @@ const VanPickup     = lazy(() => import('@/pages/van-pickup'));
 const VanHistory    = lazy(() => import('@/pages/van-history'));
 const MyPage        = lazy(() => import('@/pages/mypage'));
 const Settings      = lazy(() => import('@/pages/settings'));
-const Login         = lazy(() => import('@/pages/login'));
+const Login          = lazy(() => import('@/pages/login'));
+const ForgotPassword = lazy(() => import('@/pages/forgot-password'));
 const Register      = lazy(() => import('@/pages/register'));
 const Contact       = lazy(() => import('@/pages/contact'));
 const BreakdownPage = lazy(() => import('@/pages/breakdown'));
@@ -79,6 +80,7 @@ function Router() {
     <Suspense fallback={<PageLoader />}>
       <Switch>
         <Route path="/login" component={Login} />
+        <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/register" component={Register} />
 
         {/* Admin Routes */}
