@@ -104,7 +104,7 @@ export default function AdminApplicationDetail() {
 
   const { data: application, isLoading, refetch } = useGetVanApplication(id, { query: { enabled: !!id } });
   const { data: messages } = useListVanMessages(id, { query: { enabled: !!id } });
-  const { data: vehiclesData } = useListVehicles({ status: '募集中' });
+  const { data: vehiclesData } = useListVehicles({ status: 'available' });
 
   const updateApp = useUpdateVanApplication();
   const sendProposal = useSendVanProposal();
