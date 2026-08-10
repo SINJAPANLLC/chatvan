@@ -278,10 +278,11 @@ export default function ContractChat() {
   const [, setLocation] = useLocation();
   const { data: me } = useGetMe();
 
-  const [messages, setMessages] = useState<any[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const [messages, setMessages]     = useState<any[]>([]);
+  const [loading, setLoading]       = useState(true);
   const [showEmergency, setShowEmergency] = useState(true);
   const [activeCategory, setActiveCategory] = useState<CategoryId | null>(null);
+  const [rentalCompany, setRentalCompany]   = useState<any>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const pollRef   = useRef<ReturnType<typeof setInterval>>();
 
@@ -290,6 +291,14 @@ export default function ContractChat() {
     if (r.ok) setMessages(await r.json());
     setLoading(false);
   };
+
+  useEffect(() => {
+    // レンタル会社情報をコントラクトから取得
+    fetch(API(`/van/contracts/${contractId}`), { headers: hdrs() })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.vehicle?.rentalCompany) setRentalCompany(d.vehicle.rentalCompany); })
+      .catch(() => {});
+  }, [contractId]);
 
   useEffect(() => {
     load();
@@ -331,16 +340,24 @@ export default function ContractChat() {
             className="w-full flex items-center justify-between px-4 py-2 text-xs text-muted-foreground hover:bg-muted/50 transition-colors"
           >
             <span className="flex items-center gap-1.5 font-medium text-foreground">
-              <Phone className="h-3.5 w-3.5 text-red-500" />緊急連絡先
+              <Phone className="h-3.5 w-3.5" />緊急連絡先
             </span>
             {showEmergency ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
           </button>
           {showEmergency && (
             <div className="px-4 pb-3 grid grid-cols-2 gap-2 text-xs">
-              <a href="tel:050-5526-9906" className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-red-700 hover:bg-red-100 transition-colors">
-                <Phone className="h-3.5 w-3.5 shrink-0" />
-                <span><span className="font-semibold block">SIN JAPAN</span>050-5526-9906</span>
-              </a>
+              {rentalCompany?.phone && (
+                <a href={`tel:${rentalCompany.phone}`} className="flex items-center gap-2 px-3 py-2 bg-muted border border-border rounded-lg hover:bg-muted/80 transition-colors">
+                  <Phone className="h-3.5 w-3.5 shrink-0" />
+                  <span><span className="font-semibold block">{rentalCompany.name ?? 'レンタル会社'}</span>{rentalCompany.phone}</span>
+                </a>
+              )}
+              {rentalCompany?.emergencyContact && (
+                <a href={`tel:${rentalCompany.emergencyContact}`} className="flex items-center gap-2 px-3 py-2 bg-muted border border-border rounded-lg hover:bg-muted/80 transition-colors">
+                  <Phone className="h-3.5 w-3.5 shrink-0" />
+                  <span><span className="font-semibold block">緊急（{rentalCompany.name}）</span>{rentalCompany.emergencyContact}</span>
+                </a>
+              )}
               <a href="tel:110" className="flex items-center gap-2 px-3 py-2 bg-muted border border-border rounded-lg hover:bg-muted/80 transition-colors">
                 <Phone className="h-3.5 w-3.5 shrink-0" />
                 <span><span className="font-semibold block">警察</span>110</span>
@@ -349,9 +366,9 @@ export default function ContractChat() {
                 <Phone className="h-3.5 w-3.5 shrink-0" />
                 <span><span className="font-semibold block">救急・消防</span>119</span>
               </a>
-              <a href="tel:0120-079-919" className="flex items-center gap-2 px-3 py-2 bg-muted border border-border rounded-lg hover:bg-muted/80 transition-colors">
+              <a href="tel:0570-00-8139" className="flex items-center gap-2 px-3 py-2 bg-muted border border-border rounded-lg hover:bg-muted/80 transition-colors">
                 <Phone className="h-3.5 w-3.5 shrink-0" />
-                <span><span className="font-semibold block">JAFロードサービス</span>0120-079-919</span>
+                <span><span className="font-semibold block">JAFロードサービス</span>0570-00-8139</span>
               </a>
             </div>
           )}
