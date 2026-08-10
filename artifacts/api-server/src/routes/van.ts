@@ -695,11 +695,21 @@ router.get("/van/applications/:id", requireAuth, async (req: Request, res: Respo
     const [idVerification] = await db.select().from(identityVerificationsTable)
       .where(eq(identityVerificationsTable.applicationId, id)).limit(1).catch(() => [null]);
 
-    // Get contract
-    const [contract] = await db.select().from(vanContractsTable)
-      .where(eq(vanContractsTable.applicationId, id)).limit(1).catch(() => [null]);
+    // Get contract (vehicle + rentalCompany を JOIN)
+    const contractRows = await db
+      .select({ contract: vanContractsTable, vehicle: vehiclesTable, company: rentalCompaniesTable })
+      .from(vanContractsTable)
+      .leftJoin(vehiclesTable, eq(vanContractsTable.vehicleId, vehiclesTable.id))
+      .leftJoin(rentalCompaniesTable, eq(vehiclesTable.rentalCompanyId, rentalCompaniesTable.id))
+      .where(eq(vanContractsTable.applicationId, id))
+      .limit(1)
+      .catch(() => []);
+    const contractRow = contractRows[0] ?? null;
+    const contract = contractRow
+      ? { ...contractRow.contract, vehicle: contractRow.vehicle ? { ...contractRow.vehicle, rentalCompany: contractRow.company } : null }
+      : null;
 
-    return res.json({ ...app, proposedVehicles, identityVerification: idVerification ?? null, contract: contract ?? null });
+    return res.json({ ...app, proposedVehicles, identityVerification: idVerification ?? null, contract });
   } catch (err) {
     console.error("get application error:", err);
     return res.status(500).json({ error: "Internal error" });
