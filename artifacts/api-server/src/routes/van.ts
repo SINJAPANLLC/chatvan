@@ -140,6 +140,64 @@ ${selfieB64 ? "3枚目: 本人セルフィー（免許証の顔写真と照合�
 }
 
 // ── AI自動審査 ──────────────────────────────────────────────────────────────
+/** 相対的な日付表現を YYYY-MM-DD と支払日（日）に変換する */
+function parseStartDate(raw: string | null | undefined): { date: string; paymentDay: number } {
+  const today = new Date();
+  const fmt = (d: Date) => d.toISOString().split("T")[0];
+
+  if (!raw) {
+    const next = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    return { date: fmt(next), paymentDay: 1 };
+  }
+
+  // YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const d = new Date(raw);
+    if (!isNaN(d.getTime())) return { date: raw, paymentDay: d.getDate() };
+  }
+
+  // 今月中 / 今すぐ / 即日
+  if (/今月|今すぐ|即日|すぐ/.test(raw)) {
+    return { date: fmt(today), paymentDay: today.getDate() };
+  }
+
+  // X月Y日
+  const mdMatch = raw.match(/(\d{1,2})月(\d{1,2})日/);
+  if (mdMatch) {
+    const m = parseInt(mdMatch[1]) - 1;
+    const d = parseInt(mdMatch[2]);
+    const year = m < today.getMonth() ? today.getFullYear() + 1 : today.getFullYear();
+    const date = new Date(year, m, d);
+    return { date: fmt(date), paymentDay: d };
+  }
+
+  // X月から / X月
+  const mMatch = raw.match(/(\d{1,2})月/);
+  if (mMatch) {
+    const m = parseInt(mMatch[1]) - 1;
+    const year = m < today.getMonth() ? today.getFullYear() + 1 : today.getFullYear();
+    const date = new Date(year, m, 1);
+    return { date: fmt(date), paymentDay: 1 };
+  }
+
+  // 来月
+  if (/来月/.test(raw)) {
+    const next = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    return { date: fmt(next), paymentDay: 1 };
+  }
+
+  // 来週
+  if (/来週/.test(raw)) {
+    const next = new Date(today);
+    next.setDate(next.getDate() + 7);
+    return { date: fmt(next), paymentDay: next.getDate() };
+  }
+
+  // デフォルト: 来月1日
+  const next = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+  return { date: fmt(next), paymentDay: 1 };
+}
+
 async function runAIScreening(appId: number) {
   try {
     const [app] = await db.select().from(vanApplicationsTable).where(eq(vanApplicationsTable.id, appId));
@@ -198,6 +256,7 @@ async function runAIScreening(appId: number) {
               .where(eq(vehiclesTable.id, vehicleId));
             if (vehicle) {
               const contractNumber = `CVN-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+              const { date: parsedStart, paymentDay } = parseStartDate(app.startDate);
               const [contract] = await db.insert(vanContractsTable).values({
                 applicationId: appId,
                 userId: app.userId!,
@@ -205,10 +264,11 @@ async function runAIScreening(appId: number) {
                 rentalCompanyId: vehicle.rentalCompanyId ?? undefined,
                 monthlyPrice: vehicle.monthlyPrice,
                 sinJapanFee: vehicle.sinJapanFee ?? "0",
-                startDate: app.startDate ?? null,
-                minimumTerm: vehicle.minPeriodMonths ?? 1,
+                startDate: parsedStart,
+                minimumTerm: 3,
+                paymentDay,
                 contractNumber,
-                platformOperator: "SIN JAPAN株式会社",
+                platformOperator: "合同会社SIN JAPAN",
                 status: "draft",
               }).returning();
 
@@ -259,7 +319,7 @@ const VAN_SYSTEM_PROMPT = `あなたは「Chat VAN」のAIアシスタントで�
 
 ## サービス概要
 Chat VANは、チャットで希望条件を伝えると最適な軽バンを提案するサービスです。
-運営会社はSIN JAPAN株式会社です。
+運営会社は合同会社SIN JAPANです。
 
 ## 絶対に聞いてはいけない情報（厳守）
 - 氏名・名前
@@ -267,20 +327,23 @@ Chat VANは、チャットで希望条件を伝えると最適な軽バンを提
 - メールアドレス
 これらはシステムで登録済みです。会話のどの段階でも、どんな理由でも聞いてはいけません。
 
-## ヒアリング項目（これだけ聞く）
-以下の8項目のみ収集してください。それ以外は聞かない。
+## ヒアリング項目（5項目のみ）
+以下の5項目だけ収集してください。保険・黒ナンバー・配送経験は聞かない。
 
 【基本情報（まず確認）】
 1. 利用する都道府県・エリア
-2. 利用開始希望日
+2. 利用開始希望日（必ず具体的な日付か月を確認する。「来週」「そのうち」など曖昧な場合は「何月何日頃を想定していますか？」と聞き直す）
 3. 希望月額料金（最安30,000円〜。選択肢は「30,000円」「40,000円」「50,000円」「50,000円以上」で提示）
 
 【詳細情報（基本が揃ったら確認）】
 4. 利用目的（Amazon配送/Uber Eats/軽貨物業/個人使用 など）
-5. 希望利用期間（選択肢は「3ヶ月」「6ヶ月」「1年」の3択のみ）
-6. 保険加入状況
-7. 黒ナンバーの取得状況
-8. 配送経験の有無
+5. 希望利用期間（選択肢は「3ヶ月」「6ヶ月」「1年以上」の3択のみ）
+
+## 開始日の確認ルール（重要）
+- 「来週」「来月」「すぐ」などは「何月何日頃ですか？」と1回だけ聞き直す
+- 「来月から」→ 来月1日として記録してOK
+- 「〇月〇日」「〇月から」と言ったら、それをそのまま記録
+- 具体的な月日が分かれば確認済みとして次へ進む
 
 ## 会話ルール
 - 1ターンに質問は1〜2項目まで
@@ -292,8 +355,11 @@ Chat VANは、チャットで希望条件を伝えると最適な軽バンを提
 質問するときは必ず選択肢を出力する:
 <options>["選択肢A", "選択肢B", "選択肢C"]</options>
 
+開始日を聞くときの選択肢例:
+<options>["今月中（最短）", "来月1日から", "日付を指定する"]</options>
+
 ## ヒアリング完了時の動作（重要）
-エリア・開始日・月額・目的・期間・保険・黒ナンバー・配送経験の8項目が揃ったら:
+エリア・開始日・月額・目的・期間の5項目が揃ったら:
 1. 「ありがとうございます！内容を確認して最適な車両をご提案いたします。しばらくお待ちください。」と伝える
 2. 返答の末尾に必ず以下の完了タグを出力する
 3. 完了タグを出力したら追加の質問は一切しない（氏名・連絡先も含め何も聞かない）
@@ -301,13 +367,10 @@ Chat VANは、チャットで希望条件を伝えると最適な軽バンを提
 <van_inquiry>
 {
   "area": "都道府県名",
-  "startDate": "YYYY-MM-DD または 来月 など",
+  "startDate": "YYYY-MM-DD形式（例: 2026-09-01）または「来月1日」「9月から」などの表現",
   "monthlyBudget": 30000,
   "purpose": "利用目的",
-  "durationMonths": 6,
-  "insuranceStatus": "加入済み/未加入/わからない",
-  "hasBlackNumber": true,
-  "hasDeliveryExperience": true
+  "durationMonths": 6
 }
 </van_inquiry>`;
 
@@ -395,17 +458,13 @@ router.post("/van/start", optionalAuth, async (req: Request, res: Response) => {
       await db.update(vanApplicationsTable).set({
         status: "hearing",
         area: inquiry.area as string,
-        startDate: inquiry.startDate as string,
+        startDate: parseStartDate(inquiry.startDate as string).date,
         monthlyBudget: inquiry.monthlyBudget as number,
         purpose: inquiry.purpose as string,
         durationMonths: inquiry.durationMonths as number,
-        insuranceStatus: inquiry.insuranceStatus as string,
-        hasBlackNumber: inquiry.hasBlackNumber as boolean,
-        hasDeliveryExperience: inquiry.hasDeliveryExperience as boolean,
-        // ユーザー登録情報を優先、inquiryにあれば上書き
-        applicantName: (inquiry.applicantName as string) ?? userInfo?.name ?? null,
-        phone: (inquiry.phone as string) ?? userInfo?.phone ?? null,
-        email: (inquiry.email as string) ?? userInfo?.email ?? null,
+        applicantName: userInfo?.name ?? null,
+        phone: userInfo?.phone ?? null,
+        email: userInfo?.email ?? null,
         updatedAt: new Date(),
       }).where(eq(vanApplicationsTable.id, app.id));
 
@@ -494,14 +553,10 @@ router.post("/van/applications/:id/messages", optionalAuth, async (req: Request,
       await db.update(vanApplicationsTable).set({
         status: "hearing",
         area,
-        startDate: (inquiry.startDate as string) ?? app.startDate,
+        startDate: parseStartDate((inquiry.startDate as string) ?? app.startDate).date,
         monthlyBudget: budget,
         purpose: (inquiry.purpose as string) ?? app.purpose,
         durationMonths: duration,
-        insuranceStatus: (inquiry.insuranceStatus as string) ?? app.insuranceStatus,
-        hasBlackNumber: (inquiry.hasBlackNumber as boolean) ?? app.hasBlackNumber,
-        hasDeliveryExperience: (inquiry.hasDeliveryExperience as boolean) ?? app.hasDeliveryExperience,
-        // ユーザー登録情報を優先（inquiryには氏名・連絡先は含まれなくなった）
         applicantName: userInfo?.name ?? app.applicantName,
         phone: userInfo?.phone ?? app.phone,
         email: userInfo?.email ?? app.email,
