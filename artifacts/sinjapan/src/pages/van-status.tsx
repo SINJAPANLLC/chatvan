@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useGetVanApplication } from '@workspace/api-client-react';
-import { Loader2, CheckCircle2, Clock, FileText, CreditCard, Truck, XCircle, ChevronLeft, ShieldCheck, MapPin, ScanFace, AlertCircle, RefreshCw } from 'lucide-react';
+import { Loader2, CheckCircle2, Clock, FileText, CreditCard, Truck, XCircle, ChevronLeft, MapPin, ScanFace, AlertCircle } from 'lucide-react';
+import EkycInlineForm from '@/components/EkycInlineForm';
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 const apiUrl = (p: string) => `${BASE}api${p}`;
@@ -32,28 +33,41 @@ export default function VanStatus() {
   const [, setLocation] = useLocation();
   const [ekycStatus, setEkycStatus] = useState<EkycStatus>('not_started');
   const [ekycRejReason, setEkycRejReason] = useState('');
+  const [showEkycForm, setShowEkycForm] = useState(false);
 
   const { data: application, isLoading, refetch } = useGetVanApplication(applicationId, {
     query: { enabled: !!applicationId },
   });
 
-  // eKYCステータスを取得
-  useEffect(() => {
+  // eKYCステータスを取得（applicationIdが変わっても呼べるよう useCallback）
+  const fetchEkyc = useCallback(() => {
+    if (!applicationId) return;
     fetch(apiUrl(`/van/applications/${applicationId}/identity-verification`), { headers: authHeader() })
       .then(r => r.ok ? r.json() : null)
       .then(d => {
-        if (d?.status) { setEkycStatus(d.status as EkycStatus); setEkycRejReason(d.rejectionReason ?? ''); }
+        if (d?.status) {
+          setEkycStatus(d.status as EkycStatus);
+          setEkycRejReason(d.rejectionReason ?? '');
+        }
       })
       .catch(() => {});
-  }, [applicationId, application?.status]);
+  }, [applicationId]);
 
-  // ステータスが変わるまでポーリング
+  useEffect(() => { fetchEkyc(); }, [fetchEkyc]);
+
+  // eKYC提出後: フォームを閉じて submitted 状態に即反映
+  const handleEkycSubmitted = useCallback(() => {
+    setShowEkycForm(false);
+    setEkycStatus('submitted');
+  }, []);
+
+  // ポーリング: 申込ステータス + eKYCステータスを同時に更新
   useEffect(() => {
     if (!application) return;
     if (application.status === 'active' || application.status === 'rejected') return;
-    const timer = setInterval(() => refetch(), 15_000);
+    const timer = setInterval(() => { refetch(); fetchEkyc(); }, 10_000);
     return () => clearInterval(timer);
-  }, [application?.status, refetch]);
+  }, [application?.status, refetch, fetchEkyc]);
 
   if (isLoading) {
     return (
@@ -145,68 +159,86 @@ export default function VanStatus() {
           {/* 現在のステップ詳細 */}
           <div className="rounded-2xl border-2 border-border p-8">
             {currentStep === 0 && (
-              <div className="text-center">
-                {/* eKYC 未提出 */}
-                {(ekycStatus === 'not_started') && (
+              <div>
+                {/* ── eKYC フォーム（未提出 or 否認） ── */}
+                {(ekycStatus === 'not_started' || ekycStatus === 'rejected') && (
                   <>
-                    <div className="w-14 h-14 rounded-full bg-blue-50 border-2 border-blue-200 flex items-center justify-center mx-auto mb-4">
-                      <ScanFace className="h-7 w-7 text-blue-600" />
-                    </div>
-                    <h2 className="text-lg font-bold mb-2">本人確認（eKYC）を行ってください</h2>
-                    <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
-                      運転免許証の表裏をアップロードしてください。AIが自動で確認します。通常数分で完了します。
-                    </p>
-                    <button
-                      onClick={() => setLocation('/identity-verification')}
-                      className="px-8 py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity flex items-center gap-2 mx-auto"
-                    >
-                      <ScanFace className="h-4 w-4" />本人確認を始める
-                    </button>
+                    {!showEkycForm ? (
+                      <div className="text-center">
+                        {ekycStatus === 'rejected' ? (
+                          <>
+                            <div className="w-14 h-14 rounded-full bg-red-50 border-2 border-red-200 flex items-center justify-center mx-auto mb-4">
+                              <AlertCircle className="h-7 w-7 text-red-500" />
+                            </div>
+                            <h2 className="text-lg font-bold mb-2">本人確認が確認できませんでした</h2>
+                            {ekycRejReason && (
+                              <p className="text-sm text-red-600 bg-red-50 rounded-lg px-4 py-2 mb-4 max-w-sm mx-auto">{ekycRejReason}</p>
+                            )}
+                            <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
+                              免許証の画像を確認のうえ、再度アップロードしてください。
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-14 h-14 rounded-full bg-blue-50 border-2 border-blue-200 flex items-center justify-center mx-auto mb-4">
+                              <ScanFace className="h-7 w-7 text-blue-600" />
+                            </div>
+                            <h2 className="text-lg font-bold mb-2">本人確認（eKYC）を行ってください</h2>
+                            <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
+                              運転免許証の表裏と顔写真をアップロードしてください。AIが自動で確認します。通常数分で完了します。
+                            </p>
+                          </>
+                        )}
+                        <button
+                          onClick={() => setShowEkycForm(true)}
+                          className="px-8 py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity flex items-center gap-2 mx-auto"
+                        >
+                          <ScanFace className="h-4 w-4" />
+                          {ekycStatus === 'rejected' ? '再提出する' : '本人確認を始める'}
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="flex items-center gap-3 mb-6">
+                          <button
+                            type="button"
+                            onClick={() => setShowEkycForm(false)}
+                            className="text-xs text-muted-foreground hover:text-foreground underline"
+                          >
+                            ← 戻る
+                          </button>
+                          <h2 className="text-base font-bold">本人確認書類の提出</h2>
+                        </div>
+                        <EkycInlineForm
+                          applicationId={applicationId}
+                          rejectionReason={ekycStatus === 'rejected' ? ekycRejReason : undefined}
+                          onSubmitted={handleEkycSubmitted}
+                        />
+                      </div>
+                    )}
                   </>
                 )}
 
-                {/* eKYC 提出済み・確認中 */}
+                {/* ── 提出済み・AI確認中 ── */}
                 {ekycStatus === 'submitted' && (
-                  <>
+                  <div className="text-center">
                     <div className="w-14 h-14 rounded-full bg-yellow-50 border-2 border-yellow-200 flex items-center justify-center mx-auto mb-4">
                       <Clock className="h-7 w-7 text-yellow-600" />
                     </div>
                     <h2 className="text-lg font-bold mb-2">本人確認書類を確認中です</h2>
                     <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                      提出いただいた免許証をAIが確認しています。通常数分で完了します。
+                      提出いただいた免許証・顔写真をAIが確認しています。通常数分で完了します。
                     </p>
                     <div className="mt-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
                       <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
-                      15秒ごとに自動更新
+                      10秒ごとに自動更新
                     </div>
-                  </>
+                  </div>
                 )}
 
-                {/* eKYC 否認 → 再提出 */}
-                {ekycStatus === 'rejected' && (
-                  <>
-                    <div className="w-14 h-14 rounded-full bg-red-50 border-2 border-red-200 flex items-center justify-center mx-auto mb-4">
-                      <AlertCircle className="h-7 w-7 text-red-500" />
-                    </div>
-                    <h2 className="text-lg font-bold mb-2">本人確認が確認できませんでした</h2>
-                    {ekycRejReason && (
-                      <p className="text-sm text-red-600 bg-red-50 rounded-lg px-4 py-2 mb-4 max-w-sm mx-auto">{ekycRejReason}</p>
-                    )}
-                    <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-6">
-                      免許証の画像を確認のうえ、再度アップロードしてください。
-                    </p>
-                    <button
-                      onClick={() => setLocation('/identity-verification')}
-                      className="px-8 py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity flex items-center gap-2 mx-auto"
-                    >
-                      <RefreshCw className="h-4 w-4" />再提出する
-                    </button>
-                  </>
-                )}
-
-                {/* eKYC 完了 → 審査中 or 承認済み */}
+                {/* ── eKYC 完了 → 審査中 or 承認済み ── */}
                 {(ekycStatus === 'verified' || (ekycStatus === 'not_started' && status === 'approved')) && (
-                  <>
+                  <div className="text-center">
                     <div className="w-14 h-14 rounded-full bg-yellow-50 border-2 border-yellow-200 flex items-center justify-center mx-auto mb-4">
                       <Clock className="h-7 w-7 text-yellow-600" />
                     </div>
@@ -224,9 +256,9 @@ export default function VanStatus() {
                     </p>
                     <div className="mt-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
                       <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
-                      15秒ごとに自動更新
+                      10秒ごとに自動更新
                     </div>
-                  </>
+                  </div>
                 )}
               </div>
             )}

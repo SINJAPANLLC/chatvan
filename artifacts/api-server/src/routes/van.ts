@@ -122,9 +122,18 @@ ${selfieB64 ? "3枚目: 本人セルフィー（免許証の顔写真と照合�
       userId: data.userId,
       title: result === "verified" ? "Chat VAN - 本人確認完了" : "Chat VAN - 本人確認 要再提出",
       message: result === "verified"
-        ? "本人確認（eKYC）が完了しました。次のステップに進みます。"
+        ? "本人確認（eKYC）が完了しました。審査に進みます。"
         : `本人確認が確認できませんでした: ${reason}。再度アップロードしてください。`,
     });
+
+    // eKYC verified → AI審査を自動起動（application_received状態のまま審査が未実行の場合）
+    if (result === "verified") {
+      const [app] = await db.select().from(vanApplicationsTable)
+        .where(eq(vanApplicationsTable.id, data.applicationId));
+      if (app && app.status === "application_received") {
+        setImmediate(() => runAIScreening(data.applicationId));
+      }
+    }
   } catch (err) {
     console.error("[eKYC] AI判定エラー:", err);
   }
