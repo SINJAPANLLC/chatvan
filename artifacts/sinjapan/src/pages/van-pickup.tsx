@@ -128,7 +128,7 @@ export default function VanPickup() {
   const company = contract?.vehicle?.rentalCompany as any;
   const pickupDate = contract?.startDate ?? contract?.start_date;
 
-  if (!contract || !company) {
+  if (!contract) {
     return (
       <div className="flex-1 max-w-2xl mx-auto w-full px-4 py-8">
         <button onClick={() => setLocation(`/van/${applicationId}/status`)}
@@ -137,7 +137,7 @@ export default function VanPickup() {
         </button>
         <div className="text-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground">レンタル会社情報を準備中です。しばらくお待ちください。</p>
+          <p className="text-muted-foreground">契約情報を準備中です。しばらくお待ちください。</p>
         </div>
       </div>
     );
