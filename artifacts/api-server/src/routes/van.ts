@@ -223,13 +223,18 @@ router.post("/van/applications/:id/messages", async (req: Request, res: Response
     await db.insert(vanMessagesTable).values({ vanApplicationId: appId, role: "assistant", content: aiText });
 
     if (inquiry && app.status === "new") {
+      const budget   = (inquiry.monthlyBudget as number) ?? app.monthlyBudget ?? 0;
+      const area     = (inquiry.area as string) ?? app.area ?? "";
+      const duration = (inquiry.durationMonths as number) ?? app.durationMonths ?? 0;
+
+      // ── 申込情報を更新 ─────────────────────────────────────────────────────
       await db.update(vanApplicationsTable).set({
         status: "hearing",
-        area: (inquiry.area as string) ?? app.area,
+        area,
         startDate: (inquiry.startDate as string) ?? app.startDate,
-        monthlyBudget: (inquiry.monthlyBudget as number) ?? app.monthlyBudget,
+        monthlyBudget: budget,
         purpose: (inquiry.purpose as string) ?? app.purpose,
-        durationMonths: (inquiry.durationMonths as number) ?? app.durationMonths,
+        durationMonths: duration,
         insuranceStatus: (inquiry.insuranceStatus as string) ?? app.insuranceStatus,
         hasBlackNumber: (inquiry.hasBlackNumber as boolean) ?? app.hasBlackNumber,
         hasDeliveryExperience: (inquiry.hasDeliveryExperience as boolean) ?? app.hasDeliveryExperience,
@@ -239,13 +244,87 @@ router.post("/van/applications/:id/messages", async (req: Request, res: Response
         updatedAt: new Date(),
       }).where(eq(vanApplicationsTable.id, appId));
 
-      const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
-      for (const admin of admins) {
-        await db.insert(notificationsTable).values({
-          userId: admin.id,
-          message: `軽バン相談が完了しました（ID: ${appId} / ${inquiry.applicantName}様）`,
-          title: 'Chat VAN相談',
+      // ── 自動車両マッチング ─────────────────────────────────────────────────
+      const allVehicles = await db
+        .select({ vehicle: vehiclesTable, company: rentalCompaniesTable })
+        .from(vehiclesTable)
+        .leftJoin(rentalCompaniesTable, eq(vehiclesTable.rentalCompanyId, rentalCompaniesTable.id))
+        .where(eq(vehiclesTable.status, "available"));
+
+      type ScoredVehicle = typeof allVehicles[0] & { score: number };
+      const scored: ScoredVehicle[] = allVehicles.map(row => {
+        const totalPrice = Number(row.vehicle.monthlyPrice)
+          + Number(row.vehicle.sinJapanFee ?? 0)
+          + Number(row.vehicle.insuranceFee ?? 0);
+        let score = 0;
+
+        // エリア一致（都道府県名が含まれていればOK）
+        const vPref = row.vehicle.prefecture ?? "";
+        if (area && vPref && (area.includes(vPref) || vPref.includes(area))) score += 30;
+
+        // 予算内（10%超過まで許容）
+        if (budget > 0 && totalPrice <= budget * 1.10) score += 25;
+        else if (budget > 0) score -= 20; // 予算オーバーはマイナス
+
+        // 最低利用期間をユーザーが満たしているか
+        const minPeriod = row.vehicle.minPeriodMonths ?? 1;
+        if (duration > 0 && duration >= minPeriod) score += 20;
+        else if (duration > 0) score -= 10;
+
+        // 価格が予算に近いほど高スコア（コスパ優先）
+        if (budget > 0 && totalPrice <= budget) {
+          score += Math.round((1 - totalPrice / budget) * 10); // 予算より安いほど+
+        }
+
+        return { ...row, score };
+      })
+        .filter(r => r.score > 0)                        // スコアがプラスのもののみ
+        .sort((a, b) => b.score - a.score)               // スコア降順
+        .slice(0, 3);                                    // 最大3台
+
+      if (scored.length > 0) {
+        // ── マッチする車両あり → 自動提案 ──────────────────────────────────
+        const vehicleIds = scored.map(r => r.vehicle.id);
+        await db.insert(vanProposalsTable).values({
+          applicationId: appId,
+          vehicleIds: JSON.stringify(vehicleIds),
+          message: "AI自動マッチングによる提案",
         });
+        await db.update(vanApplicationsTable)
+          .set({ status: "proposed", updatedAt: new Date() })
+          .where(eq(vanApplicationsTable.id, appId));
+
+        // ユーザーへ通知
+        if (app.userId) {
+          await db.insert(notificationsTable).values({
+            userId: app.userId,
+            title: "Chat VAN - 車両提案",
+            message: "条件に合う車両をご提案しました。チャット画面をご確認ください。",
+          });
+        }
+
+        // チャット内に提案メッセージを追加
+        const vehicleText = scored.map(r => {
+          const v = r.vehicle;
+          const price = Number(v.monthlyPrice) + Number(v.sinJapanFee ?? 0) + Number(v.insuranceFee ?? 0);
+          return `▼ ${v.maker} ${v.model}（${v.prefecture ?? ""}）\n月額: ¥${price.toLocaleString()}/月\n最低期間: ${v.minPeriodMonths}ヶ月以上`;
+        }).join("\n\n");
+        const proposalMsg = `条件に合う車両が見つかりました！以下の車両をご提案します。\n\n${vehicleText}\n\n「提案された車両を確認する」ボタンから詳細をご覧ください。`;
+        await db.insert(vanMessagesTable).values({
+          vanApplicationId: appId,
+          role: "assistant",
+          content: proposalMsg,
+        });
+      } else {
+        // ── マッチする車両なし → 管理者に手動提案を依頼 ───────────────────
+        const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
+        for (const admin of admins) {
+          await db.insert(notificationsTable).values({
+            userId: admin.id,
+            message: `軽バン相談が完了しました（ID: ${appId} / ${inquiry.applicantName}様）自動マッチングなし。手動提案をお願いします。`,
+            title: 'Chat VAN相談（要手動提案）',
+          });
+        }
       }
     }
 
