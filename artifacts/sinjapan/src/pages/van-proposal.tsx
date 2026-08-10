@@ -50,9 +50,9 @@ export default function VanProposal() {
       await acceptProposal.mutateAsync({ id: applicationId, data: { vehicleId } });
       toast({
         title: '申し込みが完了しました',
-        description: '担当者から手続きのご案内をご連絡いたします。',
+        description: '審査状況をご確認ください。',
       });
-      setLocation('/mypage');
+      setLocation(`/van/${applicationId}/status`);
     } catch {
       toast({ variant: 'destructive', title: 'エラー', description: '申し込みに失敗しました。' });
     }

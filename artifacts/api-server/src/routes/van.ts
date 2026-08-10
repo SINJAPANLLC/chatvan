@@ -693,6 +693,57 @@ router.post("/van/contracts/:id/agree-vehicle", requireAuth, async (req: Request
   }
 });
 
+// ── POST /van/contracts/:id/pay  ユーザーが決済を確定 ──────────────────────
+router.post("/van/contracts/:id/pay", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(String(req.params.id));
+    const { method } = req.body as { method?: string };
+
+    const [contract] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.id, id));
+    if (!contract) return res.status(404).json({ error: "Contract not found" });
+
+    // 契約・申込をアクティブに
+    await db.update(vanContractsTable)
+      .set({ status: "active" as any, updatedAt: new Date() })
+      .where(eq(vanContractsTable.id, id));
+
+    if (contract.applicationId) {
+      await db.update(vanApplicationsTable)
+        .set({ status: "active", updatedAt: new Date() })
+        .where(eq(vanApplicationsTable.id, contract.applicationId));
+    }
+
+    // 車両ステータスを「貸出中」に
+    await db.update(vehiclesTable)
+      .set({ status: "rented", updatedAt: new Date() })
+      .where(eq(vehiclesTable.id, contract.vehicleId));
+
+    // ユーザー通知
+    await db.insert(notificationsTable).values({
+      userId: contract.userId,
+      title: "Chat VAN - ご利用開始",
+      message: method === 'transfer'
+        ? "振込のご確認が完了しました。ご利用を開始できます。担当者よりご連絡いたします。"
+        : "お支払いが完了しました。ご利用を開始できます。担当者よりご連絡いたします。",
+    });
+
+    // 管理者通知
+    const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
+    for (const admin of admins) {
+      await db.insert(notificationsTable).values({
+        userId: admin.id,
+        title: "Chat VAN - 決済完了",
+        message: `決済が完了しました（契約ID: ${id} / 支払方法: ${method === 'transfer' ? '銀行振込' : 'カード'}）`,
+      });
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("pay error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
 // ── 免許証確認 ─────────────────────────────────────────────────────────────
 // ── GET /van/applications/:id/related ──────────────────────────────────────
 // 相談詳細画面の追加タブ用: 契約・保険・GPS・事故・審査・決済を一括取得

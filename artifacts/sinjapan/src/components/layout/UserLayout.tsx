@@ -1,11 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useGetMe, useLogout } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  Plus, LayoutDashboard, LogOut, Settings, Menu, X, MessageSquare, PanelLeftClose, PanelLeftOpen, User as UserIcon, Building2
+  Plus, LayoutDashboard, LogOut, Settings, Menu, X, MessageSquare, PanelLeftClose, PanelLeftOpen, User as UserIcon, Building2, History
 } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
+
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
+const apiUrl = (p: string) => `${BASE}api${p}`;
+
+type VanApp = { id: number; status: string; area: string | null; createdAt: string };
+
+function appLink(app: VanApp): string {
+  const { id, status } = app;
+  if (['new', 'hearing'].includes(status)) return `/van/${id}`;
+  if (status === 'proposed') return `/van/${id}/proposal`;
+  return `/van/${id}/status`;
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  new: '相談中', hearing: 'ヒアリング中', proposed: '提案あり',
+  application_received: '審査中', screening: '審査中', approved: '承認済み',
+  contracting: '契約手続き', pending_payment: '決済待ち',
+  active: '利用中', completed: '完了', rejected: '審査落ち',
+};
+const STATUS_DOT: Record<string, string> = {
+  new: 'bg-blue-400', hearing: 'bg-blue-400', proposed: 'bg-purple-400',
+  application_received: 'bg-yellow-400', screening: 'bg-yellow-400', approved: 'bg-green-400',
+  contracting: 'bg-indigo-400', pending_payment: 'bg-orange-400',
+  active: 'bg-emerald-500', completed: 'bg-gray-400', rejected: 'bg-red-400',
+};
 
 export function UserLayout({ children }: { children: React.ReactNode }) {
   const hasToken = !!localStorage.getItem('sinjapan_auth_token');
@@ -17,6 +42,18 @@ export function UserLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     return localStorage.getItem('sidebar_open') !== 'false';
   });
+  const [history, setHistory] = useState<VanApp[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    const token = localStorage.getItem('sinjapan_auth_token');
+    fetch(apiUrl('/van/my/applications'), {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then(r => r.ok ? r.json() : [])
+      .then((data: VanApp[]) => setHistory(data.slice(0, 8)))
+      .catch(() => {});
+  }, [user, pathname]); // pathname が変わるたびに再取得（新相談後に反映）
 
   const toggleSidebar = () => {
     setSidebarOpen(prev => {
@@ -55,7 +92,7 @@ export function UserLayout({ children }: { children: React.ReactNode }) {
         )}
       </div>
 
-      <nav className="flex-1 px-2 py-2 space-y-1">
+      <nav className="flex-1 px-2 py-2 overflow-y-auto">
         {user && (
           <Link href="/" onClick={onClose}>
             <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-foreground hover:bg-muted transition-colors">
@@ -64,13 +101,43 @@ export function UserLayout({ children }: { children: React.ReactNode }) {
             </button>
           </Link>
         )}
+
+        {/* 相談履歴 */}
+        {user && history.length > 0 && (
+          <div className="mt-3">
+            <p className="px-3 py-1 text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <History className="h-3 w-3" />相談履歴
+            </p>
+            <div className="mt-1 space-y-0.5">
+              {history.map(app => {
+                const link = appLink(app);
+                const isActive = pathname === link || pathname.startsWith(`/van/${app.id}`);
+                const label = app.area || `相談 #${app.id}`;
+                const statusLabel = STATUS_LABEL[app.status] ?? app.status;
+                const dot = STATUS_DOT[app.status] ?? 'bg-gray-400';
+                return (
+                  <Link key={app.id} href={link} onClick={onClose}>
+                    <button className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors ${isActive ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
+                      <span className="flex-1 text-xs truncate">{label}</span>
+                      <span className="text-[10px] shrink-0 opacity-70">{statusLabel}</span>
+                    </button>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {user && (
-          <Link href="/mypage" onClick={onClose}>
-            <button className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${pathname === '/mypage' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}>
-              <UserIcon className="h-4 w-4 shrink-0" />
-              マイページ
-            </button>
-          </Link>
+          <div className="mt-3">
+            <Link href="/mypage" onClick={onClose}>
+              <button className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${pathname === '/mypage' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}>
+                <UserIcon className="h-4 w-4 shrink-0" />
+                マイページ
+              </button>
+            </Link>
+          </div>
         )}
       </nav>
 
