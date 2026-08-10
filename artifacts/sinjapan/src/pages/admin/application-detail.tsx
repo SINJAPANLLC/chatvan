@@ -727,38 +727,89 @@ export default function AdminApplicationDetail() {
       {tab === 'gps' && (
         <div className="space-y-4">
           {relatedLoading ? <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-muted-foreground" /></div> : (
-            related?.gps?.length === 0 ? (
-              <div className="bg-card border border-border rounded-xl p-12 text-center text-muted-foreground text-sm">GPS機器はありません</div>
-            ) : related?.gps?.map((g: any) => {
-              const loc = g.last_location;
-              return (
-                <Section key={g.id} title={`GPS #${g.id} — ${g.maker ?? ''} ${g.model ?? ''} ${g.license_plate ?? ''}`}>
-                  <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-                    <DL label="デバイスID" value={g.device_id} />
-                    <DL label="ステータス" value={g.status} />
-                    <DL label="通信キャリア" value={g.carrier} />
-                    {loc && <>
-                      <DL label="緯度" value={loc.lat ?? loc.latitude} />
-                      <DL label="経度" value={loc.lng ?? loc.longitude} />
-                      <DL label="最終更新" value={loc.recorded_at ? format(new Date(loc.recorded_at), 'MM/dd HH:mm') : null} />
-                      <DL label="速度" value={loc.speed != null ? `${loc.speed} km/h` : null} />
-                      {(loc.lat ?? loc.latitude) && (
-                        <div className="col-span-2 sm:col-span-3">
+            <>
+              {/* ユーザー位置情報 */}
+              {(() => {
+                const locs: any[] = related?.userLocations ?? [];
+                const latest = locs[0];
+                return (
+                  <Section title={`ユーザー位置情報（${locs.length}件）`}>
+                    {!latest ? (
+                      <p className="text-sm text-muted-foreground">位置情報はまだ送信されていません。GPSに同意済みのユーザーが利用中になると自動で記録されます。</p>
+                    ) : (
+                      <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                        <DL label="緯度"     value={latest.latitude} />
+                        <DL label="経度"     value={latest.longitude} />
+                        <DL label="精度"     value={latest.accuracy != null ? `±${Math.round(Number(latest.accuracy))}m` : null} />
+                        <DL label="最終更新" value={latest.recorded_at ? format(new Date(latest.recorded_at), 'yyyy/MM/dd HH:mm:ss') : null} />
+                        <DL label="総記録数" value={`${locs.length}件`} />
+                        <div className="col-span-2 sm:col-span-3 flex gap-2 flex-wrap">
                           <a
-                            href={`https://maps.google.com/?q=${loc.lat ?? loc.latitude},${loc.lng ?? loc.longitude}`}
+                            href={`https://maps.google.com/?q=${latest.latitude},${latest.longitude}`}
                             target="_blank" rel="noopener noreferrer"
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-xs hover:bg-muted transition-colors"
                           >
-                            <MapPinned className="h-3.5 w-3.5" />Googleマップで開く
+                            <MapPinned className="h-3.5 w-3.5" />最新位置をGoogleマップで開く
                           </a>
                         </div>
-                      )}
-                    </>}
-                    {!loc && <div className="col-span-3 text-xs text-muted-foreground">位置情報なし</div>}
-                  </dl>
-                </Section>
-              );
-            })
+                        {locs.length > 1 && (
+                          <div className="col-span-2 sm:col-span-3">
+                            <p className="text-xs font-medium text-foreground mb-2">直近の記録</p>
+                            <div className="space-y-1 max-h-48 overflow-y-auto">
+                              {locs.slice(0, 20).map((l: any) => (
+                                <a key={l.id}
+                                  href={`https://maps.google.com/?q=${l.latitude},${l.longitude}`}
+                                  target="_blank" rel="noopener noreferrer"
+                                  className="flex items-center justify-between px-3 py-1.5 rounded-lg hover:bg-muted transition-colors text-xs gap-2"
+                                >
+                                  <span className="text-muted-foreground">{l.recorded_at ? format(new Date(l.recorded_at), 'MM/dd HH:mm:ss') : '-'}</span>
+                                  <span className="font-mono">{Number(l.latitude).toFixed(5)}, {Number(l.longitude).toFixed(5)}</span>
+                                  <MapPinned className="h-3 w-3 text-muted-foreground shrink-0" />
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </dl>
+                    )}
+                  </Section>
+                );
+              })()}
+
+              {/* 車両搭載GPSデバイス */}
+              {(related?.gps?.length === 0) ? (
+                <div className="bg-card border border-border rounded-xl p-8 text-center text-muted-foreground text-sm">車両搭載GPS機器はありません</div>
+              ) : related?.gps?.map((g: any) => {
+                const loc = g.last_location;
+                return (
+                  <Section key={g.id} title={`車両GPS #${g.id} — ${g.maker ?? ''} ${g.model ?? ''} ${g.license_plate ?? ''}`}>
+                    <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                      <DL label="デバイスID" value={g.device_id} />
+                      <DL label="ステータス" value={g.status} />
+                      <DL label="通信キャリア" value={g.carrier} />
+                      {loc && <>
+                        <DL label="緯度" value={loc.lat ?? loc.latitude} />
+                        <DL label="経度" value={loc.lng ?? loc.longitude} />
+                        <DL label="最終更新" value={loc.recorded_at ? format(new Date(loc.recorded_at), 'MM/dd HH:mm') : null} />
+                        <DL label="速度" value={loc.speed != null ? `${loc.speed} km/h` : null} />
+                        {(loc.lat ?? loc.latitude) && (
+                          <div className="col-span-2 sm:col-span-3">
+                            <a
+                              href={`https://maps.google.com/?q=${loc.lat ?? loc.latitude},${loc.lng ?? loc.longitude}`}
+                              target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-xs hover:bg-muted transition-colors"
+                            >
+                              <MapPinned className="h-3.5 w-3.5" />Googleマップで開く
+                            </a>
+                          </div>
+                        )}
+                      </>}
+                      {!loc && <div className="col-span-3 text-xs text-muted-foreground">位置情報なし</div>}
+                    </dl>
+                  </Section>
+                );
+              })}
+            </>
           )}
         </div>
       )}

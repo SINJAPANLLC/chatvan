@@ -460,9 +460,38 @@ export default function VanContract() {
         <p className="text-sm text-muted-foreground">契約番号: {contract.contractNumber ?? `CVN-${contract.id}`}</p>
       </div>
 
-      {/* オプション選択（契約概要の上） */}
+      {/* 契約概要 */}
+      <div className="rounded-xl border border-border overflow-hidden mb-6">
+        <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold">契約概要</div>
+        <div className="p-5 space-y-2.5 text-sm">
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">月額料金（税込）</span>
+            <span className="font-bold text-lg">¥{monthlyTax.toLocaleString()}<span className="text-xs font-normal text-muted-foreground ml-1">/月</span></span>
+          </div>
+          <div className="flex justify-between"><span className="text-muted-foreground">税抜</span><span>¥{monthlyBase.toLocaleString()}/月</span></div>
+          {contract.startDate && <div className="flex justify-between"><span className="text-muted-foreground">開始日</span><span>{contract.startDate}</span></div>}
+          {contract.minimumTerm && <div className="flex justify-between"><span className="text-muted-foreground">最低利用期間</span><span>{contract.minimumTerm}ヶ月</span></div>}
+          <div className="flex justify-between"><span className="text-muted-foreground">支払日</span><span>毎月{contract.paymentDay ?? 1}日</span></div>
+          {!alreadySigned && blackNumber && (
+            <div className="flex justify-between text-foreground">
+              <span className="text-muted-foreground flex items-center gap-1">
+                <FileText className="h-3.5 w-3.5" />黒ナンバー代理取得（初回のみ）
+              </span>
+              <span>+¥19,800</span>
+            </div>
+          )}
+          {!alreadySigned && blackNumber && (
+            <div className="flex justify-between pt-2.5 border-t border-border font-bold">
+              <span>初回お支払い合計</span>
+              <span className="text-base">¥{(monthlyTax + 19800).toLocaleString()}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* オプション選択 */}
       {!alreadySigned && (
-        <div className="rounded-xl border border-border overflow-hidden mb-4">
+        <div className="rounded-xl border border-border overflow-hidden mb-6">
           <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold">オプション（任意）</div>
           <div className="divide-y divide-border">
             {/* 黒ナンバー代理取得 */}
@@ -503,35 +532,6 @@ export default function VanContract() {
           </div>
         </div>
       )}
-
-      {/* 契約概要 */}
-      <div className="rounded-xl border border-border overflow-hidden mb-6">
-        <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold">契約概要</div>
-        <div className="p-5 space-y-2.5 text-sm">
-          <div className="flex justify-between items-center">
-            <span className="text-muted-foreground">月額料金（税込）</span>
-            <span className="font-bold text-lg">¥{monthlyTax.toLocaleString()}<span className="text-xs font-normal text-muted-foreground ml-1">/月</span></span>
-          </div>
-          <div className="flex justify-between"><span className="text-muted-foreground">税抜</span><span>¥{monthlyBase.toLocaleString()}/月</span></div>
-          {contract.startDate && <div className="flex justify-between"><span className="text-muted-foreground">開始日</span><span>{contract.startDate}</span></div>}
-          {contract.minimumTerm && <div className="flex justify-between"><span className="text-muted-foreground">最低利用期間</span><span>{contract.minimumTerm}ヶ月</span></div>}
-          <div className="flex justify-between"><span className="text-muted-foreground">支払日</span><span>毎月{contract.paymentDay ?? 1}日</span></div>
-          {!alreadySigned && blackNumber && (
-            <div className="flex justify-between text-foreground">
-              <span className="text-muted-foreground flex items-center gap-1">
-                <FileText className="h-3.5 w-3.5" />黒ナンバー代理取得（初回のみ）
-              </span>
-              <span>+¥19,800</span>
-            </div>
-          )}
-          {!alreadySigned && (blackNumber) && (
-            <div className="flex justify-between pt-2.5 border-t border-border font-bold">
-              <span>初回お支払い合計</span>
-              <span className="text-base">¥{(monthlyTax + (blackNumber ? 19800 : 0)).toLocaleString()}</span>
-            </div>
-          )}
-        </div>
-      </div>
 
       {alreadySigned ? (
         <>

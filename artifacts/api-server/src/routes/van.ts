@@ -1359,12 +1359,22 @@ router.get("/van/applications/:id/related", requireAuth, requireAdmin, async (re
       `) : { rows: [] },
     ]);
 
+    // ユーザー位置情報（最新50件）
+    const userLocations = await db.execute(sql`
+      SELECT id, latitude, longitude, accuracy, contract_id, recorded_at
+      FROM user_locations
+      WHERE user_id = ${userId}
+      ORDER BY recorded_at DESC
+      LIMIT 50
+    `);
+
     const toR = (r: any) => r?.rows ?? (Array.isArray(r) ? r : []);
 
     return res.json({
       contracts: toR(contracts),
       insurance: toR(insurance),
       gps: toR(gps),
+      userLocations: toR(userLocations),
       incidents: toR(incidents),
       screening: toR(screening),
       identityVerification: toR(identityVerification)[0] ?? null,
@@ -1624,6 +1634,35 @@ router.patch("/van/insurance-policies/:id", requireAuth, requireAdmin, async (re
     if (!result) return res.status(404).json({ error: "Not found" });
     return res.json(result);
   } catch (err) {
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── ユーザー位置情報 POST /van/location ────────────────────────────────────
+router.post("/van/location", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId: number | undefined = (req.session as any)?.userId;
+    const { latitude, longitude, accuracy, contractId } = req.body as {
+      latitude: number; longitude: number; accuracy?: number; contractId?: number;
+    };
+    if (latitude == null || longitude == null) return res.status(400).json({ error: "latitude/longitude required" });
+
+    // gps_consent 確認
+    if (contractId) {
+      const consentRow = await db.execute(sql`
+        SELECT gps_consent FROM van_contracts WHERE id = ${contractId} AND user_id = ${userId} LIMIT 1
+      `);
+      const row = ((consentRow as any)?.rows ?? consentRow)[0];
+      if (!row?.gps_consent) return res.status(403).json({ error: "GPS consent not granted" });
+    }
+
+    await db.execute(sql`
+      INSERT INTO user_locations (user_id, contract_id, latitude, longitude, accuracy, recorded_at)
+      VALUES (${userId}, ${contractId ?? null}, ${String(latitude)}, ${String(longitude)}, ${accuracy ?? null}, NOW())
+    `);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("location post error:", err);
     return res.status(500).json({ error: "Internal error" });
   }
 });
@@ -2093,6 +2132,18 @@ db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS black_number_r
 db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS insurance_referral_requested BOOLEAN DEFAULT false`).catch(() => {});
 db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS gps_consent BOOLEAN DEFAULT false`).catch(() => {});
 db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS options_fee NUMERIC(10,2) DEFAULT 0`).catch(() => {});
+db.execute(sql`
+  CREATE TABLE IF NOT EXISTS user_locations (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    contract_id INTEGER,
+    latitude TEXT NOT NULL,
+    longitude TEXT NOT NULL,
+    accuracy NUMERIC,
+    recorded_at TIMESTAMP DEFAULT NOW()
+  )
+`).catch(() => {});
+db.execute(sql`CREATE INDEX IF NOT EXISTS user_locations_user_id_idx ON user_locations(user_id, recorded_at DESC)`).catch(() => {});
 db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS inspection_doc TEXT`).catch(() => {});
 db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS compulsory_insurance_doc TEXT`).catch(() => {});
 
