@@ -4,6 +4,8 @@ import { useGetVanApplication } from '@workspace/api-client-react';
 import { Loader2, ChevronLeft, CreditCard, Building2, CheckCircle2, ShieldCheck, FileText as LicenseIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
+const BLACK_NUMBER_FEE = 19800;
+
 declare const Square: any;
 
 const apiUrl = (path: string) => `${import.meta.env.BASE_URL}api${path}`;
@@ -175,13 +177,59 @@ export default function VanPayment() {
   const [done, setDone] = useState(false);
   const [squareError, setSquareError] = useState<string | null>(null);
 
+  // オプション選択（契約データが来たら初期化）
+  const [blackNumber, setBlackNumber] = useState(false);
+  const [insuranceReferral, setInsuranceReferral] = useState(false);
+  const [optionsInitialized, setOptionsInitialized] = useState(false);
+  const [optionsUpdating, setOptionsUpdating] = useState(false);
+
   const cardRef = useRef<any>(null);
   const cardContainerRef = useRef<HTMLDivElement>(null);
 
-  const { data: application, isLoading } = useGetVanApplication(applicationId, {
+  const { data: application, isLoading, refetch } = useGetVanApplication(applicationId, {
     query: { enabled: !!applicationId },
   });
   const contract = (application as any)?.contract as any;
+
+  // 契約データ初回取得時にオプション状態を初期化
+  useEffect(() => {
+    if (contract && !optionsInitialized) {
+      setBlackNumber(!!contract.blackNumberRequested);
+      setInsuranceReferral(!!contract.insuranceReferralRequested);
+      setOptionsInitialized(true);
+    }
+  }, [contract, optionsInitialized]);
+
+  // オプション変更をサーバーに保存
+  const updateOptions = async (newBlackNumber: boolean, newInsurance: boolean) => {
+    if (!contract) return;
+    setOptionsUpdating(true);
+    try {
+      const r = await fetch(apiUrl(`/van/contracts/${contract.id}/options`), {
+        method: 'PATCH', credentials: 'include', headers: authHeader(),
+        body: JSON.stringify({ blackNumberRequested: newBlackNumber, insuranceReferralRequested: newInsurance }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d.error ?? '更新に失敗しました');
+      }
+      await refetch();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'エラー', description: e.message });
+    } finally {
+      setOptionsUpdating(false);
+    }
+  };
+
+  const handleBlackNumberChange = (checked: boolean) => {
+    setBlackNumber(checked);
+    updateOptions(checked, insuranceReferral);
+  };
+
+  const handleInsuranceChange = (checked: boolean) => {
+    setInsuranceReferral(checked);
+    updateOptions(blackNumber, checked);
+  };
 
   // Square SDK 初期化
   useEffect(() => {
@@ -233,7 +281,8 @@ export default function VanPayment() {
   const monthlyBase = Number(contract.monthlyPrice) + Number(contract.sinJapanFee ?? 0);
   const monthlyTax  = Math.floor(monthlyBase * 0.1);
   const monthlyTotal = monthlyBase + monthlyTax;
-  const optionsFee  = Number(contract.optionsFee ?? 0);
+  // ローカル選択状態から金額を計算（DBの値より優先）
+  const optionsFee  = blackNumber ? BLACK_NUMBER_FEE : 0;
   const total = monthlyTotal + optionsFee;
   const fmt   = (n: number) => `¥${Math.floor(n).toLocaleString()}`;
 
@@ -291,13 +340,69 @@ export default function VanPayment() {
         <p className="text-sm text-muted-foreground">最初の月額料金をお支払いください</p>
       </div>
 
+      {/* オプション選択 */}
+      <div className="rounded-xl border border-border overflow-hidden mb-6">
+        <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold flex items-center justify-between">
+          <span>オプション（任意）</span>
+          {optionsUpdating && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+        </div>
+        <div className="divide-y divide-border">
+          {/* 黒ナンバー */}
+          <label className="flex items-start gap-3 p-4 cursor-pointer hover:bg-muted/30 transition-colors">
+            <input
+              type="checkbox"
+              checked={blackNumber}
+              onChange={e => handleBlackNumberChange(e.target.checked)}
+              disabled={optionsUpdating}
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-foreground"
+            />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium flex items-center gap-1.5">
+                  <LicenseIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                  黒ナンバー代理取得
+                </span>
+                <span className="text-sm font-medium shrink-0">+¥19,800</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">提携行政書士が申請手続きを代行します。初回のみ加算。</p>
+              <p className="text-xs text-gray-900 font-medium mt-0.5">※ 取得手続きのため納車まで数日〜1週間程度お時間をいただきます。</p>
+              {blackNumber && (
+                <div className="mt-2 text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+                  <span className="font-medium">必要書類（郵送にてお送りください）</span><br />・住民票（発行3ヶ月以内）
+                </div>
+              )}
+            </div>
+          </label>
+          {/* 保険紹介 */}
+          <label className="flex items-start gap-3 p-4 cursor-pointer hover:bg-muted/30 transition-colors">
+            <input
+              type="checkbox"
+              checked={insuranceReferral}
+              onChange={e => handleInsuranceChange(e.target.checked)}
+              disabled={optionsUpdating}
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-foreground"
+            />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium flex items-center gap-1.5">
+                  <ShieldCheck className="h-4 w-4 text-muted-foreground shrink-0" />
+                  保険紹介
+                </span>
+                <span className="text-sm text-muted-foreground shrink-0">担当者より案内</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">黒・黄ナンバー対応の保険をご紹介します。</p>
+            </div>
+          </label>
+        </div>
+      </div>
+
       {/* 請求内訳 */}
       <div className="rounded-xl border border-border overflow-hidden mb-6">
         <div className="px-5 py-3 bg-muted/40 border-b border-border text-sm font-semibold">ご請求内訳（初回）</div>
         <div className="p-5 space-y-3 text-sm">
           <div className="flex justify-between"><span className="text-muted-foreground">月額料金（税抜）</span><span>{fmt(monthlyBase)}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">消費税（10%）</span><span>{fmt(monthlyTax)}</span></div>
-          {optionsFee > 0 && (
+          {blackNumber && (
             <div className="flex justify-between">
               <span className="text-muted-foreground flex items-center gap-1">
                 <LicenseIcon className="h-3.5 w-3.5" />黒ナンバー代理取得

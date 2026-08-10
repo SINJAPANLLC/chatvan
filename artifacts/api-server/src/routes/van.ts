@@ -1130,6 +1130,40 @@ router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request
   }
 });
 
+// ── PATCH /van/contracts/:id/options  支払い前にオプションを変更 ───────────
+router.patch("/van/contracts/:id/options", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(String(req.params.id));
+    const userId: number | undefined = (req.session as any)?.userId;
+    const { blackNumberRequested, insuranceReferralRequested } = req.body as {
+      blackNumberRequested?: boolean;
+      insuranceReferralRequested?: boolean;
+    };
+
+    const [contract] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.id, id));
+    if (!contract) return res.status(404).json({ error: "Not found" });
+    if (contract.userId !== userId) return res.status(403).json({ error: "Forbidden" });
+    if (contract.status !== "pending_payment") return res.status(400).json({ error: "支払い前のみ変更できます" });
+
+    const BLACK_NUMBER_FEE = 19800;
+    const optionsFee = blackNumberRequested ? BLACK_NUMBER_FEE : 0;
+
+    await db.execute(sql`
+      UPDATE van_contracts SET
+        black_number_requested = ${!!blackNumberRequested},
+        insurance_referral_requested = ${!!insuranceReferralRequested},
+        options_fee = ${optionsFee},
+        updated_at = NOW()
+      WHERE id = ${id}
+    `);
+
+    return res.json({ ok: true, optionsFee });
+  } catch (err) {
+    console.error("patch options error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
 // ── POST /van/contracts/:id/pay  ユーザーが決済を確定 ──────────────────────
 router.post("/van/contracts/:id/pay", requireAuth, async (req: Request, res: Response) => {
   try {

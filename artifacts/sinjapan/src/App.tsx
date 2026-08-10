@@ -57,6 +57,7 @@ const AdminIncidents        = lazy(() => import('@/pages/admin/incidents'));
 const AdminRecovery         = lazy(() => import('@/pages/admin/recovery'));
 const AdminPayments         = lazy(() => import('@/pages/admin/payments-van'));
 const AdminScreening        = lazy(() => import('@/pages/admin/screening'));
+const AdminInvoices         = lazy(() => import('@/pages/admin/invoices'));
 const AdminAuditLogs        = lazy(() => import('@/pages/admin/audit-logs'));
 
 const queryClient = new QueryClient({
@@ -123,6 +124,9 @@ function Router() {
         </Route>
         <Route path="/admin/payments">
           <AdminLayout><AdminPayments /></AdminLayout>
+        </Route>
+        <Route path="/admin/invoices">
+          <AdminLayout><AdminInvoices /></AdminLayout>
         </Route>
         <Route path="/admin/screening">
           <AdminLayout><AdminScreening /></AdminLayout>
