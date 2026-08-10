@@ -26,10 +26,10 @@ async function uploadPhoto(file: File): Promise<string> {
 
 /* ── カテゴリ定義 ─────────────────────────────────────── */
 const CATEGORIES = [
-  { id: 'accident',  icon: Car,         label: '交通事故',     color: 'bg-red-50 border-red-300 text-red-700',         desc: '衝突・接触事故が発生した場合' },
-  { id: 'breakdown', icon: Wrench,      label: '車両故障',     color: 'bg-orange-50 border-orange-300 text-orange-700', desc: 'エンジン不動・パンクなど' },
-  { id: 'theft',     icon: ShieldAlert, label: '盗難・不正使用', color: 'bg-purple-50 border-purple-300 text-purple-700', desc: '車両の盗難・無断使用' },
-  { id: 'other',     icon: HelpCircle,  label: 'その他トラブル', color: 'bg-muted border-border text-foreground',         desc: '上記に当てはまらない場合' },
+  { id: 'accident',  icon: Car,         label: '交通事故',     color: 'bg-muted border-border text-foreground', desc: '衝突・接触事故が発生した場合' },
+  { id: 'breakdown', icon: Wrench,      label: '車両故障',     color: 'bg-muted border-border text-foreground', desc: 'エンジン不動・パンクなど' },
+  { id: 'theft',     icon: ShieldAlert, label: '盗難・不正使用', color: 'bg-muted border-border text-foreground', desc: '車両の盗難・無断使用' },
+  { id: 'other',     icon: HelpCircle,  label: 'その他トラブル', color: 'bg-muted border-border text-foreground', desc: '上記に当てはまらない場合' },
 ] as const;
 type CategoryId = (typeof CATEGORIES)[number]['id'];
 
