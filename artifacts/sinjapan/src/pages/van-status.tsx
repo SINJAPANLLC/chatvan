@@ -509,16 +509,15 @@ export default function VanStatus() {
 
           {/* 解約申請 */}
           {!showReturnConfirm ? (
-            <div className="text-center">
-              {contract?.startDate && contract?.minimumTerm && !canRequestReturn(contract.startDate, Number(contract.minimumTerm)) ? (
+            <div className="text-center space-y-1">
+              <button onClick={() => setShowReturnConfirm(true)}
+                className="text-sm text-muted-foreground underline hover:text-foreground transition-colors">
+                解約を申請する
+              </button>
+              {contract?.startDate && contract?.minimumTerm && !canRequestReturn(contract.startDate, Number(contract.minimumTerm)) && (
                 <p className="text-xs text-muted-foreground">
-                  解約申請は{returnAvailableDate(contract.startDate, Number(contract.minimumTerm))}以降にご利用いただけます
+                  ※ 最低利用期間の関係で{returnAvailableDate(contract.startDate, Number(contract.minimumTerm))}以降に解約可能です
                 </p>
-              ) : (
-                <button onClick={() => setShowReturnConfirm(true)}
-                  className="text-sm text-muted-foreground underline hover:text-foreground transition-colors">
-                  解約を申請する
-                </button>
               )}
             </div>
           ) : (
