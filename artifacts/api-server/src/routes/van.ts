@@ -1005,10 +1005,10 @@ router.post("/van/contracts/:id/sign", requireAuth, async (req: Request, res: Re
       updatedAt: now,
     }).where(eq(vanContractsTable.id, id)).returning();
 
-    // アプリ側ステータスを pending_payment へ
+    // アプリ側ステータスを payment_pending へ
     if (updated.applicationId) {
       await db.update(vanApplicationsTable)
-        .set({ status: "pending_payment", updatedAt: now })
+        .set({ status: "payment_pending", updatedAt: now })
         .where(eq(vanApplicationsTable.id, updated.applicationId));
     }
 
