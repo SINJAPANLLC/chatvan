@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { Plus, History, ChevronRight, Loader2 } from 'lucide-react';
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
-const apiUrl = (p: string) => `${BASE}api${p}`;
+const apiUrl = (p: string) => `${import.meta.env.BASE_URL}api${p}`;
 const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem('sinjapan_auth_token') ?? ''}` });
 
 type VanApp = {
@@ -69,7 +68,7 @@ export default function VanHistory() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(apiUrl('/van/my/applications'), { headers: authHeader() })
+    fetch(apiUrl('/van/my/applications'), { credentials: 'include', headers: authHeader() })
       .then(r => r.ok ? r.json() : [])
       .then(setApps)
       .catch(() => setApps([]))

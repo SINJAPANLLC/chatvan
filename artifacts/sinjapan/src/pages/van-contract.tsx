@@ -341,6 +341,26 @@ export default function VanContract() {
   const contract = (application as any)?.contract as any;
   const alreadySigned = !!(contract?.platformContractAgreedAt && contract?.vehicleContractAgreedAt);
 
+  // signatureData は JSON 文字列 { meta, signature: "data:image/..." } として保存されている
+  const signatureImage = (() => {
+    if (!contract?.signatureData) return null;
+    try {
+      const parsed = JSON.parse(contract.signatureData);
+      return parsed?.signature ?? null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const signedAt = (() => {
+    try {
+      const d = new Date(contract?.platformContractAgreedAt);
+      return isNaN(d.getTime()) ? null : d.toLocaleString('ja-JP');
+    } catch {
+      return null;
+    }
+  })();
+
   const DOCS = [
     { title: 'プラットフォーム利用規約', content: PLATFORM_TERMS },
     { title: '個人情報の取扱いについて', content: PRIVACY_POLICY },
@@ -453,7 +473,7 @@ export default function VanContract() {
             <div>
               <p className="font-semibold text-sm">電子署名が完了しています</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                署名日時: {new Date(contract.platformContractAgreedAt).toLocaleString('ja-JP')}
+                {signedAt ? `署名日時: ${signedAt}` : '署名済み'}
               </p>
             </div>
           </div>
@@ -472,13 +492,13 @@ export default function VanContract() {
           ))}
 
           {/* 署名画像 */}
-          {contract.signatureData && (
+          {signatureImage && (
             <div className="rounded-xl border border-border overflow-hidden mb-6">
               <div className="px-5 py-3 border-b bg-muted/40 text-sm font-semibold flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4" />電子署名
               </div>
               <div className="p-5 bg-white flex justify-center">
-                <img src={contract.signatureData} alt="電子署名" className="max-h-24 object-contain opacity-80" />
+                <img src={signatureImage} alt="電子署名" className="max-h-24 object-contain opacity-80" />
               </div>
             </div>
           )}

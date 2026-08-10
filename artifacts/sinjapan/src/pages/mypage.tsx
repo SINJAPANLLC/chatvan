@@ -304,8 +304,8 @@ export default function MyPage() {
                         )}
                         <Link href={`/contract-chat/${contract.id}`}>
                           <button className="flex items-center gap-2 px-4 py-2 border border-border rounded-full text-sm hover:bg-muted transition-colors">
-                            <MessageSquare className="h-4 w-4" />
-                            担当者にメッセージ
+                            <AlertCircle className="h-4 w-4" />
+                            事故・トラブル報告
                           </button>
                         </Link>
                       </div>
