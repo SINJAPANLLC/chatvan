@@ -1004,32 +1004,49 @@ export default function AdminApplicationDetail() {
         <div className="space-y-4">
           {relatedLoading ? <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-muted-foreground" /></div> : (<>
             {/* 本人確認 */}
-            <Section title="本人確認（免許証）">
+            <Section title="本人確認（eKYC）">
               {!related?.identityVerification ? (
                 <p className="text-sm text-muted-foreground py-2 text-center">本人確認書類は未提出です</p>
-              ) : (
-                <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-                  <DL label="ステータス" value={<span className={`px-2 py-0.5 rounded-full text-xs ${
-                    related.identityVerification.status === 'approved' ? 'bg-green-100 text-green-700' :
-                    related.identityVerification.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                    'bg-yellow-100 text-yellow-700'
-                  }`}>{related.identityVerification.status}</span>} />
-                  <DL label="提出日" value={related.identityVerification.created_at ? format(new Date(related.identityVerification.created_at), 'yyyy/MM/dd') : null} />
-                  {related.identityVerification.front_image_path && (
-                    <div className="col-span-2 sm:col-span-3 flex gap-3 flex-wrap">
-                      {[['表面', related.identityVerification.front_image_path], ['裏面', related.identityVerification.back_image_path], ['自撮り', related.identityVerification.selfie_path]].filter(([, p]) => p).map(([label, path]) => (
-                        <div key={label as string}>
-                          <p className="text-xs text-muted-foreground mb-1">{label}</p>
-                          <img src={`${import.meta.env.BASE_URL}api/storage${path}`} alt={label as string} className="h-24 w-auto rounded-lg border border-border object-cover" />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {related.identityVerification.rejection_reason && (
-                    <DL label="却下理由" value={related.identityVerification.rejection_reason} span2 />
-                  )}
-                </dl>
-              )}
+              ) : (() => {
+                const iv = related.identityVerification;
+                const statusLabel: Record<string, string> = { verified: '確認済み', approved: '承認済み', rejected: '却下', pending: '審査中' };
+                const statusStyle: Record<string, string> = { verified: 'bg-muted text-foreground border border-border', approved: 'bg-muted text-foreground border border-border', rejected: 'bg-muted text-muted-foreground border border-border', pending: 'bg-muted text-muted-foreground border border-border' };
+                return (
+                  <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                    <DL label="ステータス" value={
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusStyle[iv.status] ?? 'bg-muted text-muted-foreground border border-border'}`}>
+                        {statusLabel[iv.status] ?? iv.status}
+                      </span>
+                    } />
+                    <DL label="提出日" value={iv.created_at ? format(new Date(iv.created_at), 'yyyy/MM/dd') : null} />
+                    <DL label="氏名" value={iv.full_name} />
+                    <DL label="生年月日" value={iv.birth_date} />
+                    <DL label="住所" value={iv.address} span2 />
+                    <DL label="免許証種別" value={iv.license_type} />
+                    <DL label="免許証番号" value={iv.license_number} />
+                    <DL label="有効期限" value={iv.license_expiry} />
+                    {iv.emergency_contact_name && <>
+                      <DL label="緊急連絡先" value={iv.emergency_contact_name} />
+                      <DL label="関係" value={iv.emergency_contact_relation} />
+                      <DL label="緊急連絡先電話" value={iv.emergency_contact_phone} />
+                    </>}
+                    {/* 免許証画像（license_front / license_back / selfie_photo） */}
+                    {(iv.license_front || iv.selfie_photo) && (
+                      <div className="col-span-2 sm:col-span-3 flex gap-3 flex-wrap">
+                        {[['免許証（表面）', iv.license_front], ['免許証（裏面）', iv.license_back], ['自撮り写真', iv.selfie_photo]].filter(([, p]) => p).map(([label, path]) => (
+                          <div key={label as string}>
+                            <p className="text-xs text-muted-foreground mb-1">{label}</p>
+                            <img src={`${import.meta.env.BASE_URL}api/storage${path}`} alt={label as string} className="h-28 w-auto rounded-lg border border-border object-cover" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {iv.rejection_reason && (
+                      <DL label="却下理由" value={iv.rejection_reason} span2 />
+                    )}
+                  </dl>
+                );
+              })()}
             </Section>
 
             {/* 審査結果 */}
