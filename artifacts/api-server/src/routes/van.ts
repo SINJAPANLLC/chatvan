@@ -1172,6 +1172,42 @@ ${c.special_terms ? `<h2>特記事項</h2><p style="white-space:pre-wrap">${c.sp
   }
 });
 
+// PATCH /van/contracts/:id/pickup  受け取り日時・場所の更新（管理者）
+router.patch("/van/contracts/:id/pickup", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(String(req.params.id));
+    const { pickupAddress, pickupDatetime, sendNotification } = req.body;
+
+    await db.execute(sql`
+      UPDATE van_contracts
+      SET pickup_address = ${pickupAddress ?? null},
+          pickup_datetime = ${pickupDatetime ? new Date(pickupDatetime) : null},
+          updated_at = NOW()
+      WHERE id = ${id}
+    `);
+
+    if (sendNotification) {
+      const row = await db.execute(sql`SELECT user_id FROM van_contracts WHERE id = ${id} LIMIT 1`);
+      const userId = ((row as any)?.rows ?? row)[0]?.user_id;
+      if (userId) {
+        const dtStr = pickupDatetime
+          ? new Date(pickupDatetime).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+          : '日時未定';
+        await db.insert(notificationsTable).values({
+          userId,
+          title: '【Chat VAN】車両受け取り日時・場所のご案内',
+          message: `受け取り日時: ${dtStr}\n受け取り場所: ${pickupAddress || '未定'}\n\nご不明な点はチャットよりお問い合わせください。`,
+        });
+      }
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("pickup update error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
 router.post("/van/contracts", requireAuth, requireAdmin, async (req: Request, res: Response) => {
   try {
     const body = req.body;
@@ -1197,6 +1233,27 @@ router.post("/van/contracts", requireAuth, requireAdmin, async (req: Request, re
     return res.status(201).json(contract);
   } catch (err) {
     console.error("create contract error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// PATCH /van/invoices/:id/status  請求書ステータス変更（管理者）
+router.patch("/van/invoices/:id/status", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(String(req.params.id));
+    const { status } = req.body; // 'pending' | 'paid' | 'overdue' | 'cancelled'
+    if (!['pending', 'paid', 'overdue', 'cancelled'].includes(status)) {
+      return res.status(400).json({ error: "Invalid status" });
+    }
+    await db.execute(sql`
+      UPDATE invoices
+      SET status = ${status},
+          paid_at = ${status === 'paid' ? sql`NOW()` : sql`NULL`}
+      WHERE id = ${id}
+    `);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("invoice status update error:", err);
     return res.status(500).json({ error: "Internal error" });
   }
 });
@@ -1796,10 +1853,15 @@ router.get("/van/applications/:id/related", requireAuth, requireAdmin, async (re
         SELECT pr.*, vc.id as contract_number
         FROM payment_retries pr
         LEFT JOIN van_contracts vc ON pr.contract_id = vc.id
-        WHERE pr.user_id = ${userId}
+        WHERE pr.contract_id = ANY(ARRAY[${sql.raw(contractIds.join(','))}]::int[])
         ORDER BY pr.attempted_at DESC
       `) : { rows: [] },
     ]);
+
+    // 請求書（invoicesはcontract_id未保持のためuser_id紐付け）
+    const invoices = await db.execute(sql`
+      SELECT * FROM invoices WHERE user_id = ${userId} ORDER BY created_at DESC
+    `);
 
     // ユーザー位置情報（最新50件）
     const userLocations = await db.execute(sql`
@@ -1821,6 +1883,7 @@ router.get("/van/applications/:id/related", requireAuth, requireAdmin, async (re
       screening: toR(screening),
       identityVerification: toR(identityVerification)[0] ?? null,
       payments: toR(payments),
+      invoices: toR(invoices),
     });
   } catch (err) {
     console.error("related data error:", err);
@@ -2588,6 +2651,8 @@ router.delete("/van/vehicles/:id", requireAuth, requireAdmin, async (req: Reques
 
 // ── マイグレーション ───────────────────────────────────────────────────────
 db.execute(sql`ALTER TABLE identity_verifications ADD COLUMN IF NOT EXISTS selfie_photo TEXT`).catch(() => {});
+db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS pickup_address TEXT`).catch(() => {});
+db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS pickup_datetime TIMESTAMPTZ`).catch(() => {});
 db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS pickup_photos TEXT`).catch(() => {});
 db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS pickup_documents TEXT`).catch(() => {});
 db.execute(sql`ALTER TABLE van_contracts ADD COLUMN IF NOT EXISTS black_number_requested BOOLEAN DEFAULT false`).catch(() => {});

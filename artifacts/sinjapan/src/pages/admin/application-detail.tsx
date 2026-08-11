@@ -8,7 +8,7 @@ import {
   useListVanMessages,
 } from '@workspace/api-client-react';
 import {
-  Loader2, ChevronLeft, Save, Send, Check, Printer,
+  Loader2, ChevronLeft, Save, Send, Check, Printer, Bell,
   User, Car, MessageSquare, FileText, CreditCard, ClipboardList,
   Phone, Mail, MapPin, Calendar, Banknote, Shield, BadgeCheck,
   Truck, Wrench, Camera, Package,
@@ -241,6 +241,31 @@ export default function AdminApplicationDetail() {
   const [selectedVehicles, setSelectedVehicles] = useState<number[]>([]);
   const [proposalMessage, setProposalMessage] = useState('');
 
+  // 受け取り日時場所
+  const [pickupForm, setPickupForm] = useState({ address: '', datetime: '' });
+  const [pickupSaving, setPickupSaving] = useState(false);
+
+  // 請求書ステータス変更
+  const [invoiceUpdating, setInvoiceUpdating] = useState<number | null>(null);
+  const updateInvoiceStatus = async (invoiceId: number, status: string) => {
+    setInvoiceUpdating(invoiceId);
+    try {
+      const token = localStorage.getItem('sinjapan_auth_token');
+      const r = await fetch(`${import.meta.env.BASE_URL}api/van/invoices/${invoiceId}/status`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (!r.ok) throw new Error();
+      const label: Record<string,string> = { paid: '入金済み', pending: '未払い', overdue: '延滞', cancelled: 'キャンセル' };
+      toast({ title: `請求書を「${label[status]}」に変更しました` });
+      setRelated(null);
+      loadRelated();
+    } catch {
+      toast({ variant: 'destructive', title: 'エラー', description: '更新に失敗しました' });
+    } finally { setInvoiceUpdating(null); }
+  };
+
   // 追加タブ用関連データ
   const [related, setRelated] = useState<any>(null);
   const [relatedLoading, setRelatedLoading] = useState(false);
@@ -261,6 +286,17 @@ export default function AdminApplicationDetail() {
   React.useEffect(() => {
     if (RELATED_TABS.includes(tab as Tab)) loadRelated();
   }, [tab]);
+
+  // 契約データからpickup情報を初期化
+  React.useEffect(() => {
+    if (!related) return;
+    const c = related.contracts?.[0];
+    if (!c) return;
+    setPickupForm({
+      address: c.pickup_address ?? '',
+      datetime: c.pickup_datetime ? new Date(c.pickup_datetime).toISOString().slice(0, 16) : '',
+    });
+  }, [related]);
 
   React.useEffect(() => {
     if (!application) return;
@@ -299,6 +335,30 @@ export default function AdminApplicationDetail() {
     } catch {
       toast({ variant: 'destructive', title: 'エラー', description: '更新に失敗しました' });
     }
+  };
+
+  const savePickup = async (sendNotif: boolean) => {
+    const contractId = related?.contracts?.[0]?.id;
+    if (!contractId) return;
+    setPickupSaving(true);
+    try {
+      const token = localStorage.getItem('sinjapan_auth_token');
+      const r = await fetch(`${import.meta.env.BASE_URL}api/van/contracts/${contractId}/pickup`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pickupAddress: pickupForm.address,
+          pickupDatetime: pickupForm.datetime || null,
+          sendNotification: sendNotif,
+        }),
+      });
+      if (!r.ok) throw new Error();
+      toast({ title: sendNotif ? '受け取り情報を保存し、通知を送信しました' : '受け取り情報を保存しました' });
+      setRelated(null);
+      loadRelated();
+    } catch {
+      toast({ variant: 'destructive', title: 'エラー', description: '保存に失敗しました' });
+    } finally { setPickupSaving(false); }
   };
 
   const saveCustomer = async () => {
@@ -445,6 +505,51 @@ export default function AdminApplicationDetail() {
                       保険紹介申請あり
                     </span>
                   )}
+                </div>
+              </Section>
+            )}
+
+            {/* 受け取り日時・場所 */}
+            {related && (related.contracts ?? []).length > 0 && (
+              <Section title="受け取り日時・場所">
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1.5">受け取り日時</label>
+                    <input
+                      type="datetime-local"
+                      value={pickupForm.datetime}
+                      onChange={e => setPickupForm(p => ({ ...p, datetime: e.target.value }))}
+                      className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm outline-none focus:border-foreground/50"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1.5">受け取り場所</label>
+                    <input
+                      type="text"
+                      value={pickupForm.address}
+                      onChange={e => setPickupForm(p => ({ ...p, address: e.target.value }))}
+                      placeholder="例：神奈川県横浜市中区○○1-2-3 駐車場"
+                      className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm outline-none focus:border-foreground/50"
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={() => savePickup(false)}
+                      disabled={pickupSaving}
+                      className="flex items-center gap-1 px-3 py-1.5 border border-border text-xs font-medium rounded-lg hover:bg-muted disabled:opacity-50"
+                    >
+                      {pickupSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                      保存
+                    </button>
+                    <button
+                      onClick={() => savePickup(true)}
+                      disabled={pickupSaving}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-foreground text-background text-xs font-medium rounded-lg hover:opacity-90 disabled:opacity-50"
+                    >
+                      {pickupSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Bell className="h-3 w-3" />}
+                      保存して通知を送る
+                    </button>
+                  </div>
                 </div>
               </Section>
             )}
@@ -1028,9 +1133,11 @@ export default function AdminApplicationDetail() {
       {tab === 'payment' && (
         <div className="space-y-4">
           {relatedLoading ? <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-muted-foreground" /></div> : (
-            <Section title={`決済履歴（${related?.payments?.length ?? 0}件）`}>
+            <>
+            {/* カード決済履歴 */}
+            <Section title={`カード決済履歴（${related?.payments?.length ?? 0}件）`}>
               {!related?.payments?.length ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">決済履歴はありません</p>
+                <p className="text-sm text-muted-foreground py-4 text-center">カード決済履歴はありません</p>
               ) : (
                 <table className="w-full text-sm">
                   <thead><tr className="text-xs text-muted-foreground border-b border-border">
@@ -1042,14 +1149,14 @@ export default function AdminApplicationDetail() {
                   </tr></thead>
                   <tbody className="divide-y divide-border">
                     {related.payments.map((p: any) => (
-                      <tr key={p.id} className="py-2">
+                      <tr key={p.id}>
                         <td className="py-2.5 font-mono text-xs">{p.period_month}</td>
                         <td className="py-2.5">¥{Number(p.amount).toLocaleString()}</td>
                         <td className="py-2.5">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            p.result === 'success' ? 'bg-green-100 text-green-700' :
-                            p.result === 'failed'  ? 'bg-red-100 text-red-700' :
-                            'bg-muted text-muted-foreground'
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${
+                            p.result === 'success' ? 'border-border bg-muted text-foreground' :
+                            p.result === 'failed'  ? 'border-border bg-muted text-muted-foreground' :
+                            'border-border bg-muted text-muted-foreground'
                           }`}>{{ success: '成功', failed: '失敗' }[p.result as string] ?? p.result ?? '-'}</span>
                         </td>
                         <td className="py-2.5 text-xs text-muted-foreground">{p.attempted_at ? format(new Date(p.attempted_at), 'MM/dd HH:mm') : '-'}</td>
@@ -1060,6 +1167,61 @@ export default function AdminApplicationDetail() {
                 </table>
               )}
             </Section>
+
+            {/* 請求書払い履歴 */}
+            <Section title={`請求書払い履歴（${related?.invoices?.length ?? 0}件）`}>
+              {!related?.invoices?.length ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">請求書はありません</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead><tr className="text-xs text-muted-foreground border-b border-border">
+                    <th className="pb-2 text-left">請求書番号</th>
+                    <th className="pb-2 text-left">対象期間</th>
+                    <th className="pb-2 text-left">金額（税込）</th>
+                    <th className="pb-2 text-left">ステータス</th>
+                    <th className="pb-2 text-left">支払期限</th>
+                    <th className="pb-2 text-left">入金日</th>
+                  </tr></thead>
+                  <tbody className="divide-y divide-border">
+                    {related.invoices.map((inv: any) => {
+                      const isUpdating = invoiceUpdating === inv.id;
+                      const STATUS_LABEL: Record<string,string> = { paid: '入金済み', pending: '未払い', overdue: '延滞', cancelled: 'キャンセル' };
+                      return (
+                      <tr key={inv.id}>
+                        <td className="py-2.5 font-mono text-xs">{inv.invoice_number}</td>
+                        <td className="py-2.5 text-xs text-muted-foreground">
+                          {inv.period_start ? format(new Date(inv.period_start), 'yyyy/MM/dd') : '-'}
+                          {' 〜 '}
+                          {inv.period_end ? format(new Date(inv.period_end), 'MM/dd') : '-'}
+                        </td>
+                        <td className="py-2.5 font-medium">¥{Number(inv.total_amount).toLocaleString()}</td>
+                        <td className="py-2.5">
+                          <select
+                            value={inv.status}
+                            disabled={isUpdating}
+                            onChange={e => updateInvoiceStatus(inv.id, e.target.value)}
+                            className="text-xs px-2 py-1 border border-border rounded-lg bg-background outline-none focus:border-foreground/50 disabled:opacity-50 cursor-pointer"
+                          >
+                            {Object.entries(STATUS_LABEL).map(([val, label]) => (
+                              <option key={val} value={val}>{label}</option>
+                            ))}
+                          </select>
+                          {isUpdating && <Loader2 className="inline h-3 w-3 animate-spin ml-1 text-muted-foreground" />}
+                        </td>
+                        <td className="py-2.5 text-xs text-muted-foreground">
+                          {inv.due_date ? format(new Date(inv.due_date), 'yyyy/MM/dd') : '-'}
+                        </td>
+                        <td className="py-2.5 text-xs text-muted-foreground">
+                          {inv.paid_at ? format(new Date(inv.paid_at), 'yyyy/MM/dd') : '-'}
+                        </td>
+                      </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </Section>
+            </>
           )}
         </div>
       )}
