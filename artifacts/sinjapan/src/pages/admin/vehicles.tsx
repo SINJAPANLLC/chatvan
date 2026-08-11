@@ -7,7 +7,7 @@ import {
   useListRentalCompanies,
   Vehicle,
 } from '@workspace/api-client-react';
-import { Loader2, Plus, Edit, Trash2, Save, Upload, X, ImageIcon, FileSearch, Camera } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Save, Upload, X, ImageIcon, FileSearch, Camera, FileText, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
@@ -91,6 +91,12 @@ export default function AdminVehicles() {
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
   const photoInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  // ── 書類 state ──
+  const [shakenDocPath, setShakenDocPath] = useState<string | null>(null);
+  const [jibaisekiDocPath, setJibaisekiDocPath] = useState<string | null>(null);
+  const [otherDocPaths, setOtherDocPaths] = useState<string[]>([]);
+  const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
+
   // ── 車検証 OCR state ──
   const [shakenParsing, setShakenParsing] = useState(false);
   const shakenInputRef = useRef<HTMLInputElement>(null);
@@ -106,6 +112,28 @@ export default function AdminVehicles() {
     } catch (e: any) {
       toast({ variant: 'destructive', title: e.message || 'アップロード失敗' });
     } finally { setUploadingIdx(null); }
+  };
+
+  const handleDocUpload = async (file: File, type: 'shaken' | 'jibaiseki' | 'other') => {
+    if (file.size > 20 * 1024 * 1024) { toast({ variant: 'destructive', title: '20MB以内のファイルを選択してください' }); return; }
+    setUploadingDoc(type);
+    try {
+      const path = await uploadPhoto(file, tok());
+      if (type === 'shaken') setShakenDocPath(path);
+      else if (type === 'jibaiseki') setJibaisekiDocPath(path);
+      else setOtherDocPaths(prev => [...prev, path]);
+      toast({ title: 'アップロードしました' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: e.message || 'アップロード失敗' });
+    } finally { setUploadingDoc(null); }
+  };
+
+  const triggerDocUpload = (type: 'shaken' | 'jibaiseki' | 'other') => {
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = 'image/*,application/pdf';
+    inp.onchange = (e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) handleDocUpload(f, type); };
+    inp.click();
   };
 
   const handleShakenOcr = async (file: File) => {
@@ -160,6 +188,7 @@ export default function AdminVehicles() {
       rentalCompanyId: '', status: 'available', notes: '',
     });
     setPhotoPaths(Array(MAX_PHOTOS).fill(null));
+    setShakenDocPath(null); setJibaisekiDocPath(null); setOtherDocPaths([]);
     setIsModalOpen(true);
   };
 
@@ -171,6 +200,9 @@ export default function AdminVehicles() {
       const padded = [...arr, ...Array(MAX_PHOTOS).fill(null)].slice(0, MAX_PHOTOS);
       setPhotoPaths(padded);
     } catch { setPhotoPaths(Array(MAX_PHOTOS).fill(null)); }
+    setShakenDocPath((v as any).shakenCertPath ?? null);
+    setJibaisekiDocPath((v as any).jibaisekiCertPath ?? null);
+    try { setOtherDocPaths(JSON.parse((v as any).otherDocsPaths || '[]')); } catch { setOtherDocPaths([]); }
     setIsModalOpen(true);
   };
 
@@ -180,6 +212,9 @@ export default function AdminVehicles() {
       const data: any = {
         ...formData,
         photos,
+        shakenCertPath: shakenDocPath,
+        jibaisekiCertPath: jibaisekiDocPath,
+        otherDocsPaths: JSON.stringify(otherDocPaths),
         year: formData.year ? Number(formData.year) : null,
         mileage: formData.mileage ? Number(formData.mileage) : null,
         monthlyPrice: Math.round(Number(formData.monthlyPrice)),
@@ -328,6 +363,63 @@ export default function AdminVehicles() {
                   </div>
                 );
               })}
+            </div>
+
+            {/* ── 書類 ── */}
+            <Section title="書類" />
+            <div className="col-span-2 space-y-2">
+              {/* 車検証 */}
+              {[
+                { label: '車検証', path: shakenDocPath, onSet: setShakenDocPath, type: 'shaken' as const },
+                { label: '自賠責保険証', path: jibaisekiDocPath, onSet: setJibaisekiDocPath, type: 'jibaiseki' as const },
+              ].map(({ label, path, onSet, type }) => (
+                <div key={type} className="flex items-center gap-3 p-3 border border-border rounded-lg bg-muted/30">
+                  <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
+                  <span className="text-sm font-medium w-28 shrink-0">{label}</span>
+                  {path ? (
+                    <div className="flex-1 flex items-center gap-2 min-w-0">
+                      <span className="text-xs text-muted-foreground truncate flex-1">{path.split('/').pop()}</span>
+                      <a href={API(`/storage${path}`)} target="_blank" rel="noopener noreferrer"
+                        className="shrink-0 p-1.5 text-muted-foreground hover:text-foreground"><ExternalLink className="h-3.5 w-3.5" /></a>
+                      <button type="button" onClick={() => onSet(null)}
+                        className="shrink-0 p-1.5 text-muted-foreground hover:text-destructive"><X className="h-3.5 w-3.5" /></button>
+                    </div>
+                  ) : (
+                    <button type="button" disabled={uploadingDoc === type}
+                      onClick={() => triggerDocUpload(type)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-border rounded-md hover:bg-muted transition disabled:opacity-50">
+                      {uploadingDoc === type ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                      アップロード
+                    </button>
+                  )}
+                </div>
+              ))}
+              {/* その他書類 */}
+              <div className="p-3 border border-border rounded-lg bg-muted/30 space-y-2">
+                <div className="flex items-center gap-3">
+                  <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
+                  <span className="text-sm font-medium w-28 shrink-0">その他書類</span>
+                  <button type="button" disabled={uploadingDoc === 'other'}
+                    onClick={() => triggerDocUpload('other')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-border rounded-md hover:bg-muted transition disabled:opacity-50">
+                    {uploadingDoc === 'other' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                    追加
+                  </button>
+                </div>
+                {otherDocPaths.length > 0 && (
+                  <div className="pl-8 space-y-1">
+                    {otherDocPaths.map((p, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground truncate flex-1">{p.split('/').pop()}</span>
+                        <a href={API(`/storage${p}`)} target="_blank" rel="noopener noreferrer"
+                          className="p-1 text-muted-foreground hover:text-foreground"><ExternalLink className="h-3 w-3" /></a>
+                        <button type="button" onClick={() => setOtherDocPaths(prev => prev.filter((_, j) => j !== i))}
+                          className="p-1 text-muted-foreground hover:text-destructive"><X className="h-3 w-3" /></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* ── 基本情報 ── */}
