@@ -612,73 +612,107 @@ export default function AdminApplicationDetail() {
               <p className="text-sm text-muted-foreground py-4 text-center">まだ提案した車両はありません。</p>
             ) : (
               <div className="space-y-4">
-                {proposedVehicles.map((v: any) => (
-                  <div key={v.id} className="border border-border rounded-xl p-4">
-                    <div className="flex items-start justify-between mb-3">
+                {proposedVehicles.map((v: any) => {
+                  const photos: string[] = (() => { try { return JSON.parse(v.photos ?? '[]'); } catch { return []; } })();
+                  return (
+                  <div key={v.id} className="border border-border rounded-xl overflow-hidden">
+                    {/* 写真ギャラリー */}
+                    {photos.length > 0 && (
+                      <div className="flex gap-1 overflow-x-auto bg-muted/30 p-2">
+                        {photos.map((p: string, i: number) => (
+                          <img key={i} src={`${import.meta.env.BASE_URL}api/storage${p}`} alt={`車両写真${i+1}`}
+                            className="h-40 w-auto rounded-lg object-cover shrink-0 border border-border" />
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="p-4 space-y-4">
+                      {/* ヘッダー */}
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-bold text-base">{v.maker} {v.model}{v.grade ? ` ${v.grade}` : ''}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {v.year ? `${v.year}年式` : '-'} / {v.prefecture}{v.locationDetail ? ` ${v.locationDetail}` : ''}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0 ml-3">
+                          <p className="text-xl font-bold">{yen(v.userPrice)}<span className="text-xs font-normal text-muted-foreground">/月（税込）</span></p>
+                          <span className="text-xs px-2 py-0.5 rounded-full border border-border bg-muted">{v.status}</span>
+                        </div>
+                      </div>
+
+                      {/* 基本スペック */}
                       <div>
-                        <p className="font-semibold text-sm">{v.maker} {v.model}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{v.year || '-'}年式 / {v.prefecture}</p>
+                        <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">基本スペック</p>
+                        <dl className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                          <DL label="ナンバー" value={v.licensePlate} />
+                          <DL label="車台番号(VIN)" value={v.vin} />
+                          <DL label="走行距離" value={v.mileage ? `${Number(v.mileage).toLocaleString()} km` : null} />
+                          <DL label="車検満了" value={v.inspectionExpiry} />
+                          <DL label="最低期間" value={v.minPeriodMonths ? `${v.minPeriodMonths}ヶ月〜` : null} />
+                          <DL label="最大期間" value={v.maxPeriodMonths ? `${v.maxPeriodMonths}ヶ月` : null} />
+                          <DL label="走行上限" value={v.mileageLimit ? `${Number(v.mileageLimit).toLocaleString()} km/月` : null} />
+                          <DL label="超過料金" value={v.excessMileageFee ? `${yen(v.excessMileageFee)}/km` : null} />
+                          <DL label="喫煙" value={v.smokingPolicy === 'no_smoking' ? '禁煙' : v.smokingPolicy === 'smoking_ok' ? '喫煙可' : v.smokingPolicy} />
+                          <DL label="黒ナンバー" value={v.blackNumberStatus} />
+                        </dl>
                       </div>
-                      <div className="text-right">
-                        <p className="text-lg font-bold">{yen(v.userPrice)}<span className="text-xs font-normal text-muted-foreground">/月</span></p>
-                        <span className={`text-xs px-2 py-0.5 rounded-full border ${
-                          v.status === '募集中' ? 'bg-green-50 text-green-700 border-green-200' :
-                          v.status === '貸出中' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                          'bg-gray-50 text-gray-600 border-gray-200'
-                        }`}>{v.status}</span>
+
+                      {/* 装備 */}
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">装備</p>
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            { label: 'ETC', val: v.hasEtc },
+                            { label: 'ドラレコ', val: v.hasDashcam },
+                            { label: 'バックカメラ', val: v.hasBackupCam },
+                          ].map(e => (
+                            <span key={e.label} className={`text-xs px-2.5 py-1 rounded-full border ${e.val ? 'border-border bg-muted text-foreground' : 'border-border text-muted-foreground line-through'}`}>
+                              {e.label}
+                            </span>
+                          ))}
+                        </div>
                       </div>
+
+                      {/* 保険情報 */}
+                      {(v.insuranceCompany || v.insuranceExpiry || v.compulsoryInsuranceExpiry) && (
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">保険情報</p>
+                          <dl className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                            <DL label="保険会社" value={v.insuranceCompany} />
+                            <DL label="証券番号" value={v.insurancePolicyNumber} />
+                            <DL label="保険連絡先" value={v.insuranceContact} />
+                            <DL label="任意保険満了" value={v.insuranceExpiry} />
+                            <DL label="自賠責満了" value={v.compulsoryInsuranceExpiry} />
+                          </dl>
+                        </div>
+                      )}
+
+                      {/* 料金内訳 */}
+                      <div className="bg-muted/40 rounded-lg p-3 text-xs space-y-1">
+                        <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">料金内訳</p>
+                        <div className="flex justify-between"><span className="text-muted-foreground">レンタル会社受取</span><span>{yen(v.monthlyPrice)}</span></div>
+                        <div className="flex justify-between"><span className="text-muted-foreground">SIN JAPAN手数料</span><span>{yen(v.sinJapanFee)}</span></div>
+                        <div className="flex justify-between"><span className="text-muted-foreground">保険料</span><span>{yen(v.insuranceFee)}</span></div>
+                        <div className="flex justify-between font-semibold border-t border-border pt-1 mt-1">
+                          <span>ユーザー月額（税込）</span><span>{yen(Math.round(v.userPrice * 1.1))}</span>
+                        </div>
+                      </div>
+
+                      {/* レンタル会社 */}
+                      {v.rentalCompany && (
+                        <div className="pt-3 border-t border-border text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground">レンタル会社：</span>
+                          {v.rentalCompany.name}
+                          {v.rentalCompany.phone && ` / TEL: ${v.rentalCompany.phone}`}
+                        </div>
+                      )}
+
+                      {v.notes && <p className="text-xs text-muted-foreground bg-muted/50 rounded p-2">{v.notes}</p>}
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mb-3">
-                      <div className="flex items-center gap-1.5 text-muted-foreground">
-                        <Truck className="h-3.5 w-3.5" />
-                        走行{v.mileage ? `${v.mileage.toLocaleString()}km` : '-'}
-                      </div>
-                      <div className="flex items-center gap-1.5 text-muted-foreground">
-                        <Wrench className="h-3.5 w-3.5" />
-                        車検{v.inspectionExpiry || '-'}
-                      </div>
-                      <div className="flex items-center gap-1.5 text-muted-foreground">
-                        <Calendar className="h-3.5 w-3.5" />
-                        最低{v.minPeriodMonths || 1}ヶ月〜
-                      </div>
-                      <div className="flex items-center gap-1.5 text-muted-foreground">
-                        <Camera className="h-3.5 w-3.5" />
-                        ETC:{v.hasEtc ? '✓' : '-'} / DR:{v.hasDashcam ? '✓' : '-'}
-                      </div>
-                    </div>
-                    {/* 料金内訳 */}
-                    <div className="bg-muted/40 rounded-lg p-3 text-xs space-y-1">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">レンタル会社受取</span>
-                        <span>{yen(v.monthlyPrice)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">SIN JAPAN手数料</span>
-                        <span>{yen(v.sinJapanFee)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">保険料</span>
-                        <span>{yen(v.insuranceFee)}</span>
-                      </div>
-                      <div className="flex justify-between font-semibold border-t border-border pt-1 mt-1">
-                        <span>ユーザー月額</span>
-                        <span>{yen(v.userPrice)}</span>
-                      </div>
-                    </div>
-                    {/* レンタル会社 */}
-                    {v.rentalCompany && (
-                      <div className="mt-3 pt-3 border-t border-border text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground">レンタル会社：</span>
-                        {v.rentalCompany.name}
-                        {v.rentalCompany.phone && ` / TEL: ${v.rentalCompany.phone}`}
-                        {v.locationDetail && ` / ${v.locationDetail}`}
-                      </div>
-                    )}
-                    {v.notes && (
-                      <p className="mt-2 text-xs text-muted-foreground bg-muted/50 rounded p-2">{v.notes}</p>
-                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </Section>
