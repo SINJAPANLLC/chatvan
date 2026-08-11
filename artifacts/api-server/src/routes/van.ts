@@ -740,9 +740,24 @@ router.get("/van/applications/:id", requireAuth, async (req: Request, res: Respo
       }
     }
 
-    // Get identity verification
-    const [idVerification] = await db.select().from(identityVerificationsTable)
-      .where(eq(identityVerificationsTable.applicationId, id)).limit(1).catch(() => [null]);
+    // Get identity verification — application_id優先、なければ user_id で最新のverifiedを取得
+    let idVerification: any = null;
+    const [byApp] = await db.select().from(identityVerificationsTable)
+      .where(eq(identityVerificationsTable.applicationId, id)).limit(1).catch(() => []);
+    if (byApp) {
+      idVerification = byApp;
+    } else {
+      const userId = app.userId;
+      if (userId) {
+        const rows = await db.execute(sql`
+          SELECT * FROM identity_verifications
+          WHERE user_id = ${userId}
+          ORDER BY CASE status WHEN 'verified' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, created_at DESC
+          LIMIT 1
+        `);
+        idVerification = ((rows as any)?.rows ?? rows)[0] ?? null;
+      }
+    }
 
     // Get contract (vehicle + rentalCompany を JOIN)
     const contractRows = await db
@@ -1651,9 +1666,13 @@ router.get("/van/applications/:id/related", requireAuth, requireAdmin, async (re
       db.execute(sql`
         SELECT s.* FROM screenings s WHERE s.application_id = ${appId} ORDER BY s.created_at DESC
       `),
-      // 本人確認
+      // 本人確認 — application_id優先、なければ user_id で最新のverifiedを取得
       db.execute(sql`
-        SELECT iv.* FROM identity_verifications iv WHERE iv.application_id = ${appId} ORDER BY iv.created_at DESC LIMIT 1
+        SELECT * FROM identity_verifications
+        WHERE application_id = ${appId}
+           OR (user_id = ${userId} AND application_id IS NULL)
+        ORDER BY CASE status WHEN 'verified' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, created_at DESC
+        LIMIT 1
       `),
     ]);
 

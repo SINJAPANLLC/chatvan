@@ -551,52 +551,44 @@ export default function AdminApplicationDetail() {
             </div>
           </Section>
 
-          <Section title="利用条件・資格情報">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="text-xs text-muted-foreground block mb-1.5">保険加入状況</label>
-                <select
-                  value={customerForm.insuranceStatus}
-                  onChange={e => setCustomerForm(prev => ({ ...prev, insuranceStatus: e.target.value }))}
-                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm outline-none focus:border-foreground/50"
-                >
-                  <option value="">未確認</option>
-                  <option value="加入済み">加入済み</option>
-                  <option value="未加入（これから加入）">未加入（これから加入）</option>
-                  <option value="わからない">わからない</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground block mb-1.5">黒ナンバー取得状況</label>
-                <select
-                  value={customerForm.hasBlackNumber}
-                  onChange={e => setCustomerForm(prev => ({ ...prev, hasBlackNumber: e.target.value }))}
-                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm outline-none focus:border-foreground/50"
-                >
-                  <option value="">未確認</option>
-                  <option value="true">取得済み</option>
-                  <option value="false">未取得</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground block mb-1.5">配送経験</label>
-                <select
-                  value={customerForm.hasDeliveryExperience}
-                  onChange={e => setCustomerForm(prev => ({ ...prev, hasDeliveryExperience: e.target.value }))}
-                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm outline-none focus:border-foreground/50"
-                >
-                  <option value="">未確認</option>
-                  <option value="true">あり</option>
-                  <option value="false">なし（初めて）</option>
-                </select>
-              </div>
-            </div>
-            <button onClick={saveCustomer} disabled={updateApp.isPending}
-              className="mt-4 flex items-center gap-1 px-3 py-1.5 bg-foreground text-background text-xs font-medium rounded-lg hover:opacity-90 disabled:opacity-50">
-              {updateApp.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
-              保存
-            </button>
-          </Section>
+          {/* eKYC サマリーカード */}
+          {(() => {
+            const iv = application.identityVerification as any;
+            if (!iv) return (
+              <Section title="本人確認（eKYC）">
+                <p className="text-sm text-muted-foreground py-2 text-center">本人確認書類は未提出です</p>
+              </Section>
+            );
+            const statusLabel: Record<string, string> = { verified: '確認済み', approved: '承認済み', rejected: '却下', pending: '審査中' };
+            return (
+              <Section title="本人確認（eKYC）">
+                <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                  <DL label="ステータス" value={
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-muted border border-border">
+                      {statusLabel[iv.status] ?? iv.status}
+                    </span>
+                  } />
+                  <DL label="提出日" value={iv.created_at ? format(new Date(iv.created_at), 'yyyy/MM/dd') : null} />
+                  <DL label="氏名" value={iv.full_name} />
+                  <DL label="生年月日" value={iv.birth_date} />
+                  <DL label="住所" value={iv.address} span2 />
+                  <DL label="免許証種別" value={iv.license_type} />
+                  <DL label="免許証番号" value={iv.license_number} />
+                  <DL label="有効期限" value={iv.license_expiry} />
+                  {(iv.license_front || iv.selfie_photo) && (
+                    <div className="col-span-2 sm:col-span-3 flex gap-3 flex-wrap">
+                      {[['免許証（表面）', iv.license_front], ['免許証（裏面）', iv.license_back], ['自撮り写真', iv.selfie_photo]].filter(([, p]) => p).map(([label, path]) => (
+                        <div key={label as string}>
+                          <p className="text-xs text-muted-foreground mb-1">{label}</p>
+                          <img src={`${import.meta.env.BASE_URL}api/storage${path}`} alt={label as string} className="h-28 w-auto rounded-lg border border-border object-cover" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </dl>
+              </Section>
+            );
+          })()}
         </div>
       )}
 
