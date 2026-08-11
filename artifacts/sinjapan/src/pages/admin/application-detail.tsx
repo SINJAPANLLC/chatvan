@@ -92,6 +92,128 @@ function DL({ label, value, span2 }: { label: string; value?: React.ReactNode; s
   );
 }
 
+// ─── 契約作成フォーム ─────────────────────────────────────────────────────────
+function CreateContractForm({ applicationId, userId, vehicles, onCreated }: {
+  applicationId: number;
+  userId: number;
+  vehicles: any[];
+  onCreated: () => void;
+}) {
+  const { toast } = useToast();
+  const [open, setOpen] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [form, setForm] = React.useState({
+    vehicleId: '',
+    monthlyPrice: '',
+    sinJapanFee: '5000',
+    startDate: '',
+    minimumTerm: '1',
+    paymentDay: '1',
+  });
+
+  const handleCreate = async () => {
+    if (!form.vehicleId || !form.monthlyPrice || !form.startDate) {
+      toast({ variant: 'destructive', title: '必須項目を入力してください' });
+      return;
+    }
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('sinjapan_auth_token');
+      const r = await fetch(`${import.meta.env.BASE_URL}api/van/contracts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          applicationId,
+          userId,
+          vehicleId: Number(form.vehicleId),
+          monthlyPrice: Number(form.monthlyPrice),
+          sinJapanFee: Number(form.sinJapanFee),
+          startDate: form.startDate,
+          minimumTerm: Number(form.minimumTerm),
+          paymentDay: Number(form.paymentDay),
+          status: 'draft',
+        }),
+      });
+      if (r.ok) {
+        toast({ title: '契約を作成しました' });
+        setOpen(false);
+        onCreated();
+      } else {
+        const err = await r.json();
+        toast({ variant: 'destructive', title: 'エラー', description: err.error ?? '作成に失敗しました' });
+      }
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-amber-800">契約がまだ作成されていません</p>
+          <p className="text-xs text-amber-600 mt-0.5">審査承認済みです。契約を作成してユーザーが署名・決済に進めるようにしてください。</p>
+        </div>
+        <button
+          onClick={() => setOpen(v => !v)}
+          className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-full hover:bg-amber-700 transition-colors"
+        >
+          <ScrollText className="h-4 w-4" />
+          契約を作成
+        </button>
+      </div>
+
+      {open && (
+        <div className="mt-5 pt-5 border-t border-amber-200 grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs font-medium text-amber-800 block mb-1">車両 *</label>
+            <select value={form.vehicleId} onChange={e => setForm(f => ({ ...f, vehicleId: e.target.value }))}
+              className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-white">
+              <option value="">選択してください</option>
+              {vehicles.map((v: any) => (
+                <option key={v.id} value={v.id}>{v.maker} {v.model}（{v.licensePlate ?? v.license_plate}）</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-amber-800 block mb-1">月額料金（税抜）*</label>
+            <input type="number" value={form.monthlyPrice} onChange={e => setForm(f => ({ ...f, monthlyPrice: e.target.value }))}
+              placeholder="35000" className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-white" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-amber-800 block mb-1">SIN JAPAN手数料</label>
+            <input type="number" value={form.sinJapanFee} onChange={e => setForm(f => ({ ...f, sinJapanFee: e.target.value }))}
+              className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-white" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-amber-800 block mb-1">利用開始日 *</label>
+            <input type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))}
+              className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-white" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-amber-800 block mb-1">最低利用期間（ヶ月）</label>
+            <input type="number" min="1" value={form.minimumTerm} onChange={e => setForm(f => ({ ...f, minimumTerm: e.target.value }))}
+              className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-white" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-amber-800 block mb-1">支払日（毎月N日）</label>
+            <input type="number" min="1" max="28" value={form.paymentDay} onChange={e => setForm(f => ({ ...f, paymentDay: e.target.value }))}
+              className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-white" />
+          </div>
+          <div className="col-span-2 flex justify-end gap-2">
+            <button onClick={() => setOpen(false)} className="px-4 py-2 text-sm border border-border rounded-full hover:bg-muted transition-colors">
+              キャンセル
+            </button>
+            <button onClick={handleCreate} disabled={saving}
+              className="px-4 py-2 text-sm bg-foreground text-background rounded-full font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2">
+              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              作成する
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function AdminApplicationDetail() {
   const [, params] = useRoute('/admin/applications/:id');
@@ -633,9 +755,20 @@ export default function AdminApplicationDetail() {
       {tab === 'contract' && (
         <div className="space-y-4">
           {relatedLoading ? <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-muted-foreground" /></div> : (
-            related?.contracts?.length === 0 ? (
+            <>
+            {/* 契約作成CTA — 契約なし かつ approved/contracting のとき */}
+            {related?.contracts?.length === 0 && ['approved','contracting'].includes(application.status) && (
+              <CreateContractForm
+                applicationId={id}
+                userId={application.userId!}
+                vehicles={vehiclesData?.vehicles ?? []}
+                onCreated={() => { setRelated(null); loadRelated(); }}
+              />
+            )}
+            {related?.contracts?.length === 0 && !['approved','contracting'].includes(application.status) && (
               <div className="bg-card border border-border rounded-xl p-12 text-center text-muted-foreground text-sm">契約はありません</div>
-            ) : related?.contracts?.map((c: any) => (
+            )}
+            {(related?.contracts ?? []).map((c: any) => (
               <Section key={c.id} title={`契約 #${c.id} — ${c.maker ?? ''} ${c.model ?? ''}`}>
                 <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
                   <DL label="ステータス" value={<span className="px-2 py-0.5 bg-muted rounded-full text-xs">{{
@@ -652,7 +785,8 @@ export default function AdminApplicationDetail() {
                   <DL label="登録日" value={c.created_at ? format(new Date(c.created_at), 'yyyy/MM/dd') : null} />
                 </dl>
               </Section>
-            ))
+            ))}
+            </>
           )}
         </div>
       )}

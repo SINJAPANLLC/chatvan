@@ -153,19 +153,23 @@ router.get("/company/contracts", requireAuth, requireRentalCompany, async (req: 
     const raw = rcId
       ? await db.execute(sql`
           SELECT vc.*, u.name as user_name, u.phone as user_phone, u.email as user_email,
-            v.maker, v.model, v.license_plate, v.prefecture
+            v.maker, v.model, v.license_plate, v.prefecture,
+            va.id as application_id, va.status as application_status
           FROM van_contracts vc
           LEFT JOIN users u ON vc.user_id = u.id
           LEFT JOIN vehicles v ON vc.vehicle_id = v.id
+          LEFT JOIN van_applications va ON vc.application_id = va.id
           WHERE v.rental_company_id = ${rcId}
           ORDER BY vc.created_at DESC
         `)
       : await db.execute(sql`
           SELECT vc.*, u.name as user_name, u.phone as user_phone, u.email as user_email,
-            v.maker, v.model, v.license_plate, v.prefecture
+            v.maker, v.model, v.license_plate, v.prefecture,
+            va.id as application_id, va.status as application_status
           FROM van_contracts vc
           LEFT JOIN users u ON vc.user_id = u.id
           LEFT JOIN vehicles v ON vc.vehicle_id = v.id
+          LEFT JOIN van_applications va ON vc.application_id = va.id
           ORDER BY vc.created_at DESC
         `);
     return res.json(toRows(raw));

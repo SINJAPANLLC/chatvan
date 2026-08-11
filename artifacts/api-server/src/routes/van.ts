@@ -1248,9 +1248,27 @@ router.post("/van/applications/:id/confirm-pickup", requireAuth, async (req: Req
       pickupDocuments?: string[];
     };
 
+    const userRole: string | undefined = (req.session as any)?.userRole;
     const [app] = await db.select().from(vanApplicationsTable).where(eq(vanApplicationsTable.id, appId));
     if (!app) return res.status(404).json({ error: "Not found" });
-    if (app.userId !== userId) return res.status(403).json({ error: "Forbidden" });
+    const isAdmin = userRole === 'admin';
+    const isOwner = app.userId === userId;
+    if (!isAdmin && !isOwner) {
+      // 協力会社が自社車両の場合も許可
+      if (userRole === 'company') {
+        const [contractForAuth] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.applicationId, appId));
+        const rcRows = await db.execute(sql`SELECT rental_company_id FROM users WHERE id = ${userId} LIMIT 1`);
+        const rcId = (rcRows as any).rows?.[0]?.rental_company_id ?? (rcRows as any)[0]?.rental_company_id;
+        if (contractForAuth?.vehicleId && rcId) {
+          const [veh] = await db.select().from(vehiclesTable).where(eq(vehiclesTable.id, contractForAuth.vehicleId));
+          if (veh?.rentalCompanyId !== rcId) return res.status(403).json({ error: "Forbidden" });
+        } else {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+      } else {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+    }
     if (app.status !== "delivery_pending") return res.status(400).json({ error: "受け取り確認は delivery_pending 状態のみ可能です" });
 
     await db.update(vanApplicationsTable)
@@ -1366,9 +1384,26 @@ router.post("/van/applications/:id/confirm-return", requireAuth, async (req: Req
       returnDocuments?: string[];
     };
 
+    const userRole2: string | undefined = (req.session as any)?.userRole;
     const [app] = await db.select().from(vanApplicationsTable).where(eq(vanApplicationsTable.id, appId));
     if (!app) return res.status(404).json({ error: "Not found" });
-    if (app.userId !== userId) return res.status(403).json({ error: "Forbidden" });
+    const isAdmin2 = userRole2 === 'admin';
+    const isOwner2 = app.userId === userId;
+    if (!isAdmin2 && !isOwner2) {
+      if (userRole2 === 'company') {
+        const [contractForAuth2] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.applicationId, appId));
+        const rcRows2 = await db.execute(sql`SELECT rental_company_id FROM users WHERE id = ${userId} LIMIT 1`);
+        const rcId2 = (rcRows2 as any).rows?.[0]?.rental_company_id ?? (rcRows2 as any)[0]?.rental_company_id;
+        if (contractForAuth2?.vehicleId && rcId2) {
+          const [veh2] = await db.select().from(vehiclesTable).where(eq(vehiclesTable.id, contractForAuth2.vehicleId));
+          if (veh2?.rentalCompanyId !== rcId2) return res.status(403).json({ error: "Forbidden" });
+        } else {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+      } else {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+    }
     if (app.status !== "return_pending") return res.status(400).json({ error: "返却確認は return_pending 状態のみ可能です" });
 
     await db.update(vanApplicationsTable)
