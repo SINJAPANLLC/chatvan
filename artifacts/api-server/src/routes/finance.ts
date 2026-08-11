@@ -212,21 +212,16 @@ router.get("/admin/finance/van/pl", requireAdmin, async (req, res): Promise<void
   }
 
   const result = Object.values(merged).map((r: any) => {
-    // 売上 = 請求書 + カード（実績） ＋ 契約ベース（ポテンシャル）を全部出す
-    const revenue = r.cardRevenue + r.invoiceRevenue + r.contractRevenue;
-    const cost    = r.contractCost;
     return {
       month:           r.month,
-      revenue,          // 全合計
-      cardRevenue:     r.cardRevenue,
-      invoiceRevenue:  r.invoiceRevenue,
-      invoicePaid:     r.invoicePaid,
-      contractRevenue: r.contractRevenue, // 月額契約ベース
-      cost:            r.contractCost,
-      grossProfit:     r.contractProfit,
-      profitRate:      r.contractRevenue > 0
-        ? Math.round(r.contractProfit / r.contractRevenue * 1000) / 10 : 0,
-      contractCount:   r.contractCount ?? 0,
+      cardRevenue:     r.cardRevenue    ?? 0,
+      invoiceRevenue:  r.invoiceRevenue ?? 0,
+      contractRevenue: r.contractRevenue ?? 0,
+      contractCost:    r.contractCost   ?? 0,
+      grossProfit:     r.contractProfit  ?? 0,
+      profitRate:      (r.contractRevenue ?? 0) > 0
+        ? Math.round((r.contractProfit ?? 0) / r.contractRevenue * 1000) / 10 : 0,
+      contractCount:   r.contractCount  ?? 0,
     };
   });
   res.json(result);
