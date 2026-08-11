@@ -880,26 +880,26 @@ router.get("/van/dashboard", requireAuth, requireAdmin, async (req: Request, res
     let thisMonthRevenue = 0, thisMonthGrossProfit = 0, totalRevenue = 0;
 
     await Promise.allSettled([
-      // 今月の売上見込 (アクティブ契約 monthly_price + sin_japan_fee)
+      // 今月の売上見込 (アクティブ契約 税込: (monthly_price + sin_japan_fee) × 1.1)
       db.execute(sql`
         SELECT
-          COALESCE(SUM(monthly_price + COALESCE(sin_japan_fee,0)), 0) AS grand_total,
-          COALESCE(SUM(COALESCE(sin_japan_fee, 0)), 0)                AS fee_total
+          COALESCE(SUM(ROUND((monthly_price + COALESCE(sin_japan_fee,0)) * 1.1)), 0) AS grand_total,
+          COALESCE(SUM(ROUND(COALESCE(sin_japan_fee, 0) * 1.1)), 0)                  AS fee_total
         FROM van_contracts WHERE status = 'active'
       `).then((r: any) => {
         const d = (r?.rows ?? r)?.[0] ?? {};
         thisMonthRevenue    = Number(d.grand_total ?? 0);
         thisMonthGrossProfit = Number(d.fee_total  ?? 0);
       }),
-      // カード売上 (Square決済成功)
+      // カード売上 (Square決済成功 — 実際の請求額なので税込そのまま)
       db.execute(sql`SELECT COALESCE(SUM(amount),0) AS total FROM payment_retries WHERE result = 'success'`)
         .then((r: any) => { cardRevenue = Number((r?.rows ?? r)?.[0]?.total ?? 0); }),
-      // 請求書売上 (invoices 支払済)
+      // 請求書売上 (invoices 支払済 — total_amount は税込で保存済み)
       db.execute(sql`SELECT COALESCE(SUM(total_amount),0) AS total FROM invoices WHERE status = 'paid'`)
         .then((r: any) => { invoiceRevenue = Number((r?.rows ?? r)?.[0]?.total ?? 0); }),
-      // 黒ナンバー売上・件数
+      // 黒ナンバー売上・件数 (税込: options_fee × 1.1)
       db.execute(sql`
-        SELECT COUNT(*) AS cnt, COALESCE(SUM(COALESCE(options_fee,0)),0) AS total
+        SELECT COUNT(*) AS cnt, COALESCE(SUM(ROUND(COALESCE(options_fee,0) * 1.1)),0) AS total
         FROM van_contracts WHERE black_number_requested = true
       `).then((r: any) => {
         const d = (r?.rows ?? r)?.[0] ?? {};
