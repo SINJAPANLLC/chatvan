@@ -2646,6 +2646,39 @@ router.post("/van/rental-companies/:id/invite", requireAuth, requireAdmin, async
   }
 });
 
+// POST /api/users  管理者によるユーザー新規作成
+router.post("/users", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { name, email, password, companyName, phone, role, preferredPaymentMethod } = req.body;
+    if (!name || !email || !password) return res.status(400).json({ error: "name・email・passwordは必須です" });
+
+    const existing = await db.execute(sql`SELECT id FROM users WHERE email = ${email} LIMIT 1`);
+    if (((existing as any)?.rows ?? existing).length > 0) {
+      return res.status(409).json({ error: "このメールアドレスは既に使用されています" });
+    }
+
+    const bcrypt = await import("bcryptjs");
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const raw = await db.execute(sql`
+      INSERT INTO users (email, password_hash, name, company_name, phone, role, preferred_payment_method, created_at)
+      VALUES (
+        ${email}, ${passwordHash}, ${name},
+        ${companyName ?? null}, ${phone ?? null},
+        ${role ?? 'user'},
+        ${preferredPaymentMethod ?? 'card'},
+        NOW()
+      )
+      RETURNING id, email, name, company_name, phone, role, created_at
+    `);
+    const user = ((raw as any)?.rows ?? raw)[0];
+    return res.status(201).json(user);
+  } catch (err) {
+    console.error("create user error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
 // ── Rental Companies ───────────────────────────────────────────────────────
 router.get("/van/rental-companies", requireAuth, async (req: Request, res: Response) => {
   try {

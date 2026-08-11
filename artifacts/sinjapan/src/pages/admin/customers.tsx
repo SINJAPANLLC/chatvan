@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useListUsers } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Search, X, Save, ChevronRight, Trash2 } from 'lucide-react';
+import { Loader2, Search, X, Save, ChevronRight, Trash2, UserPlus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -60,6 +60,38 @@ export default function AdminCustomers() {
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // ユーザー追加
+  const [showAdd, setShowAdd] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [addForm, setAddForm] = useState({ name: '', email: '', password: '', companyName: '', phone: '', role: 'user', preferredPaymentMethod: 'card' });
+  const setAdd = (k: string, v: string) => setAddForm(p => ({ ...p, [k]: v }));
+
+  const handleAdd = async () => {
+    if (!addForm.name || !addForm.email || !addForm.password) {
+      toast({ variant: 'destructive', title: '氏名・メール・パスワードは必須です' });
+      return;
+    }
+    setAdding(true);
+    try {
+      const token = localStorage.getItem('sinjapan_auth_token');
+      const res = await fetch(`/api/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(addForm),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? '');
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      setShowAdd(false);
+      setAddForm({ name: '', email: '', password: '', companyName: '', phone: '', role: 'user', preferredPaymentMethod: 'card' });
+      toast({ title: `ユーザー「${json.name}」を作成しました` });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: e.message || '作成に失敗しました' });
+    } finally {
+      setAdding(false);
+    }
+  };
 
   useEffect(() => {
     if (selected) {
@@ -150,7 +182,68 @@ export default function AdminCustomers() {
             onChange={e => setQuery(e.target.value)}
           />
         </div>
+        <Button onClick={() => setShowAdd(true)} className="flex items-center gap-1.5">
+          <UserPlus className="h-4 w-4" />ユーザー追加
+        </Button>
       </div>
+
+      {/* ユーザー追加モーダル */}
+      {showAdd && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowAdd(false)}>
+          <div className="bg-card border border-border rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold">ユーザーを追加</h2>
+              <button onClick={() => setShowAdd(false)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+            </div>
+
+            <div className="space-y-3">
+              <Field label="氏名 *">
+                <Input value={addForm.name} onChange={e => setAdd('name', e.target.value)} placeholder="山田 太郎" />
+              </Field>
+              <Field label="メールアドレス *">
+                <Input type="email" value={addForm.email} onChange={e => setAdd('email', e.target.value)} placeholder="example@example.com" />
+              </Field>
+              <Field label="パスワード *">
+                <Input type="password" value={addForm.password} onChange={e => setAdd('password', e.target.value)} placeholder="初期パスワード" />
+              </Field>
+              <Field label="会社名">
+                <Input value={addForm.companyName} onChange={e => setAdd('companyName', e.target.value)} placeholder="株式会社〇〇" />
+              </Field>
+              <Field label="電話番号">
+                <Input value={addForm.phone} onChange={e => setAdd('phone', e.target.value)} placeholder="090-0000-0000" />
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="権限">
+                  <Select value={addForm.role} onValueChange={v => setAdd('role', v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="user">一般</SelectItem>
+                      <SelectItem value="admin">管理者</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="支払い方法">
+                  <Select value={addForm.preferredPaymentMethod} onValueChange={v => setAdd('preferredPaymentMethod', v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="card">カード</SelectItem>
+                      <SelectItem value="invoice">請求書</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="flex-1" onClick={() => setShowAdd(false)}>キャンセル</Button>
+              <Button className="flex-1 gap-1.5" onClick={handleAdd} disabled={adding}>
+                {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                作成する
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="relative">
         {/* テーブル */}
