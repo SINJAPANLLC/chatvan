@@ -899,6 +899,63 @@ router.get("/van/dashboard", requireAuth, requireAdmin, async (req: Request, res
   }
 });
 
+// ── GET /van/dashboard/calendar ───────────────────────────────────────────
+router.get("/van/dashboard/calendar", requireAuth, requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const events: { date: string; type: string; label: string; id: number }[] = [];
+
+    // 返却予定 (return_pending contracts → start_date + minimum_term 概算 or returns テーブル)
+    const returnRows = await db.execute(sql`
+      SELECT r.id, r.requested_return_date AS date, u.name AS user_name
+      FROM returns r
+      LEFT JOIN users u ON r.user_id = u.id
+      WHERE r.status IN ('requested','approved') AND r.requested_return_date IS NOT NULL
+    `).catch(() => [] as any);
+    for (const r of ((returnRows as any).rows ?? returnRows)) {
+      if (r.date) events.push({ date: r.date.slice(0, 10), type: 'return', label: `返却: ${r.user_name ?? '—'}`, id: r.id });
+    }
+
+    // 納車予定 (delivery_pending applications)
+    const deliveryRows = await db.execute(sql`
+      SELECT va.id, vc.start_date AS date, u.name AS user_name
+      FROM van_applications va
+      LEFT JOIN van_contracts vc ON vc.application_id = va.id
+      LEFT JOIN users u ON va.user_id = u.id
+      WHERE va.status = 'delivery_pending' AND vc.start_date IS NOT NULL
+    `).catch(() => [] as any);
+    for (const r of ((deliveryRows as any).rows ?? deliveryRows)) {
+      if (r.date) events.push({ date: r.date.slice(0, 10), type: 'delivery', label: `納車: ${r.user_name ?? '—'}`, id: r.id });
+    }
+
+    // 保険期限 (30日以内)
+    const insuranceRows = await db.execute(sql`
+      SELECT ip.id, ip.expiry_date AS date, v.maker || ' ' || v.model AS vehicle
+      FROM insurance_policies ip
+      LEFT JOIN vehicles v ON ip.vehicle_id = v.id
+      WHERE ip.status = 'active' AND ip.expiry_date <= to_char(NOW() + INTERVAL '60 days', 'YYYY-MM-DD')
+    `).catch(() => [] as any);
+    for (const r of ((insuranceRows as any).rows ?? insuranceRows)) {
+      if (r.date) events.push({ date: r.date.slice(0, 10), type: 'insurance', label: `保険期限: ${r.vehicle ?? '—'}`, id: r.id });
+    }
+
+    // 事故報告日
+    const incidentRows = await db.execute(sql`
+      SELECT i.id, COALESCE(i.occurred_at, to_char(i.created_at, 'YYYY-MM-DD')) AS date, u.name AS user_name
+      FROM van_incidents i
+      LEFT JOIN users u ON i.user_id = u.id
+      WHERE i.status = 'reported'
+    `).catch(() => [] as any);
+    for (const r of ((incidentRows as any).rows ?? incidentRows)) {
+      if (r.date) events.push({ date: String(r.date).slice(0, 10), type: 'incident', label: `事故報告: ${r.user_name ?? '—'}`, id: r.id });
+    }
+
+    return res.json(events.sort((a, b) => a.date.localeCompare(b.date)));
+  } catch (err) {
+    console.error("calendar error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
 // ── Contracts ──────────────────────────────────────────────────────────────
 router.get("/van/contracts", requireAuth, async (req: Request, res: Response) => {
   try {
