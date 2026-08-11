@@ -819,7 +819,7 @@ router.get("/van/dashboard", requireAuth, requireAdmin, async (req: Request, res
     const [
       [newConsultations], [pendingReview], [proposalSent],
       [activeApplications], [activeContracts], [returningSoon],
-      [totalVehicles], [availableVehicles],
+      [totalVehicles], [availableVehicles], [unpaidContracts],
     ] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(vanApplicationsTable).where(eq(vanApplicationsTable.status, "new")),
       db.select({ count: sql<number>`count(*)` }).from(vanApplicationsTable).where(eq(vanApplicationsTable.status, "hearing")),
@@ -830,39 +830,67 @@ router.get("/van/dashboard", requireAuth, requireAdmin, async (req: Request, res
       db.select({ count: sql<number>`count(*)` }).from(vanContractsTable).where(eq(vanContractsTable.status, "return_pending" as any)),
       db.select({ count: sql<number>`count(*)` }).from(vehiclesTable),
       db.select({ count: sql<number>`count(*)` }).from(vehiclesTable).where(eq(vehiclesTable.status, "available")),
+      db.select({ count: sql<number>`count(*)` }).from(vanContractsTable).where(eq(vanContractsTable.status, "payment_issue" as any)),
     ]);
 
+    // 今月の売上見込 = アクティブ契約の月額合計
     const [revenueRow] = await db.select({ total: sql<number>`coalesce(sum(monthly_price), 0)` })
       .from(vanContractsTable).where(eq(vanContractsTable.status, "active" as any));
 
-    // Payment issues count
-    let paymentIssues = 0;
+    // 累積売上 = settlements 完了分の user_payment_amount 合計（なければ payment_retries 成功分）
+    let totalRevenue = 0;
     try {
-      const [piRow] = await db.select({ count: sql<number>`count(*)` }).from(paymentRetriesTable)
-        .where(and(eq(paymentRetriesTable.result, 'failed'), sql`attempted_at > NOW() - INTERVAL '7 days'`));
-      paymentIssues = Number(piRow?.count ?? 0);
-    } catch { /* table may not exist yet */ }
+      const [settlementRow] = await db.execute(sql`
+        SELECT COALESCE(SUM(user_payment_amount), 0) AS total FROM settlements WHERE status = 'completed'
+      `) as any;
+      const rows = settlementRow?.rows ?? (Array.isArray(settlementRow) ? settlementRow : []);
+      totalRevenue = Number(rows[0]?.total ?? settlementRow?.total ?? 0);
+    } catch {
+      // settlements テーブルが空の場合は payment_retries 成功分で代替
+      try {
+        const [prRow] = await db.execute(sql`
+          SELECT COALESCE(SUM(amount), 0) AS total FROM payment_retries WHERE result = 'success'
+        `) as any;
+        const rows2 = prRow?.rows ?? (Array.isArray(prRow) ? prRow : []);
+        totalRevenue = Number(rows2[0]?.total ?? prRow?.total ?? 0);
+      } catch { /* ignore */ }
+    }
 
-    // Insurance expiring soon
-    let insuranceAlerts = 0;
-    try {
-      const [insRow] = await db.select({ count: sql<number>`count(*)` }).from(insurancePoliciesTable)
-        .where(and(eq(insurancePoliciesTable.status, 'active' as any), sql`expiry_date <= to_char(NOW() + INTERVAL '30 days', 'YYYY-MM-DD')`));
-      insuranceAlerts = Number(insRow?.count ?? 0);
-    } catch { /* table may not exist yet */ }
+    // リスク指標
+    let openIncidents = 0, paymentFailures7d = 0, openBreakdowns = 0, pendingReturns = 0, insuranceAlerts = 0;
+    await Promise.allSettled([
+      db.execute(sql`SELECT COUNT(*) AS c FROM van_incidents WHERE status = 'reported'`)
+        .then((r: any) => { openIncidents = Number((r?.rows ?? r)?.[0]?.c ?? 0); }),
+      db.select({ count: sql<number>`count(*)` }).from(paymentRetriesTable)
+        .where(and(eq(paymentRetriesTable.result, 'failed'), sql`attempted_at > NOW() - INTERVAL '7 days'`))
+        .then(([r]) => { paymentFailures7d = Number(r?.count ?? 0); }),
+      db.execute(sql`SELECT COUNT(*) AS c FROM breakdowns WHERE status = 'reported'`)
+        .then((r: any) => { openBreakdowns = Number((r?.rows ?? r)?.[0]?.c ?? 0); }),
+      db.execute(sql`SELECT COUNT(*) AS c FROM returns WHERE status = 'requested'`)
+        .then((r: any) => { pendingReturns = Number((r?.rows ?? r)?.[0]?.c ?? 0); }),
+      db.select({ count: sql<number>`count(*)` }).from(insurancePoliciesTable)
+        .where(and(eq(insurancePoliciesTable.status, 'active' as any), sql`expiry_date <= to_char(NOW() + INTERVAL '30 days', 'YYYY-MM-DD')`))
+        .then(([r]) => { insuranceAlerts = Number(r?.count ?? 0); }),
+    ]);
 
     return res.json({
+      // KPI
       newConsultations: Number(newConsultations.count),
       pendingReview: Number(pendingReview.count),
       proposalSent: Number(proposalSent.count),
       activeApplications: Number(activeApplications.count),
       activeContracts: Number(activeContracts.count),
       returningSoon: Number(returningSoon.count),
-      totalRevenue: Number(revenueRow?.total ?? 0),
       thisMonthRevenue: Number(revenueRow?.total ?? 0),
+      totalRevenue,
       totalVehicles: Number(totalVehicles.count),
       availableVehicles: Number(availableVehicles.count),
-      paymentIssues,
+      // リスク
+      unpaidContracts: Number(unpaidContracts.count),
+      paymentFailures7d,
+      openIncidents,
+      openBreakdowns,
+      pendingReturns,
       insuranceAlerts,
     });
   } catch (err) {
