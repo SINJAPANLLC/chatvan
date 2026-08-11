@@ -1489,6 +1489,42 @@ router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request
   }
 });
 
+// POST /van/payment-retries/:id/manual-success  管理者が手動で入金確認
+router.post("/van/payment-retries/:id/manual-success", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(String(req.params.id));
+    const { note } = req.body;
+    const rows = await db.execute(sql`
+      SELECT pr.*, vc.user_id FROM payment_retries pr
+      LEFT JOIN van_contracts vc ON pr.contract_id = vc.id
+      WHERE pr.id = ${id} LIMIT 1
+    `);
+    const pr: any = ((rows as any)?.rows ?? rows)[0];
+    if (!pr) return res.status(404).json({ error: "Not found" });
+
+    await db.execute(sql`
+      UPDATE payment_retries
+      SET result = 'success',
+          failure_reason = ${note ? `[手動入金確認] ${note}` : '[手動入金確認]'},
+          attempted_at = NOW()
+      WHERE id = ${id}
+    `);
+
+    if (pr.user_id) {
+      await db.insert(notificationsTable).values({
+        userId: pr.user_id,
+        title: "Chat VAN - お支払いを確認しました",
+        message: `${pr.period_month ?? ''}分のお支払いを確認しました（¥${Number(pr.amount ?? 0).toLocaleString()}）。`,
+      });
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("manual-success error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
 // ── PATCH /van/contracts/:id/options  支払い前にオプションを変更 ───────────
 router.patch("/van/contracts/:id/options", requireAuth, async (req: Request, res: Response) => {
   try {

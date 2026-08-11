@@ -245,6 +245,27 @@ export default function AdminApplicationDetail() {
   const [pickupForm, setPickupForm] = useState({ address: '', datetime: '' });
   const [pickupSaving, setPickupSaving] = useState(false);
 
+  // カード決済 手動入金確認
+  const [paymentConfirming, setPaymentConfirming] = useState<number | null>(null);
+  const manualPaymentSuccess = async (paymentId: number) => {
+    if (!confirm('この決済を手動で入金確認しますか？ユーザーに通知が送られます。')) return;
+    setPaymentConfirming(paymentId);
+    try {
+      const token = localStorage.getItem('sinjapan_auth_token');
+      const r = await fetch(`${import.meta.env.BASE_URL}api/van/payment-retries/${paymentId}/manual-success`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!r.ok) throw new Error();
+      toast({ title: '手動入金確認しました。ユーザーに通知を送信しました。' });
+      setRelated(null);
+      loadRelated();
+    } catch {
+      toast({ variant: 'destructive', title: 'エラー', description: '更新に失敗しました' });
+    } finally { setPaymentConfirming(null); }
+  };
+
   // 請求書ステータス変更
   const [invoiceUpdating, setInvoiceUpdating] = useState<number | null>(null);
   const updateInvoiceStatus = async (invoiceId: number, status: string) => {
@@ -1146,6 +1167,7 @@ export default function AdminApplicationDetail() {
                     <th className="pb-2 text-left">結果</th>
                     <th className="pb-2 text-left">試行日</th>
                     <th className="pb-2 text-left">理由</th>
+                    <th className="pb-2 text-left"></th>
                   </tr></thead>
                   <tbody className="divide-y divide-border">
                     {related.payments.map((p: any) => (
@@ -1160,7 +1182,21 @@ export default function AdminApplicationDetail() {
                           }`}>{{ success: '成功', failed: '失敗' }[p.result as string] ?? p.result ?? '-'}</span>
                         </td>
                         <td className="py-2.5 text-xs text-muted-foreground">{p.attempted_at ? format(new Date(p.attempted_at), 'MM/dd HH:mm') : '-'}</td>
-                        <td className="py-2.5 text-xs text-muted-foreground max-w-[200px] truncate">{p.failure_reason ?? '-'}</td>
+                        <td className="py-2.5 text-xs text-muted-foreground max-w-[160px] truncate">{p.failure_reason ?? '-'}</td>
+                        <td className="py-2.5">
+                          {p.result === 'failed' && (
+                            <button
+                              onClick={() => manualPaymentSuccess(p.id)}
+                              disabled={paymentConfirming === p.id}
+                              className="flex items-center gap-1 px-2.5 py-1 text-xs border border-border rounded-lg hover:bg-muted disabled:opacity-50 whitespace-nowrap"
+                            >
+                              {paymentConfirming === p.id
+                                ? <Loader2 className="h-3 w-3 animate-spin" />
+                                : <Check className="h-3 w-3" />}
+                              手動入金確認
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
