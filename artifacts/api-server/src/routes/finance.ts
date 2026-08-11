@@ -254,8 +254,8 @@ router.get("/admin/finance/van/rental-payments", requireAdmin, async (req, res):
       rc.address         AS rental_company_address,
       vc.id              AS contract_id,
       vc.monthly_price,
-      v.name             AS vehicle_name,
-      v.registration_number AS vehicle_number,
+      CONCAT(v.maker, ' ', v.model) AS vehicle_name,
+      v.license_plate    AS vehicle_number,
       v.maker            AS vehicle_maker,
       u.name             AS user_name,
       u.company_name     AS user_company
@@ -326,7 +326,7 @@ router.get("/admin/finance/van/rental-payment-statement", requireAdmin, async (r
     SELECT
       rc.name AS rc_name, rc.address AS rc_address, rc.email AS rc_email, rc.phone AS rc_phone,
       vc.id AS contract_id, vc.monthly_price,
-      v.name AS vehicle_name, v.registration_number AS vehicle_number, v.maker,
+      CONCAT(v.maker, ' ', v.model) AS vehicle_name, v.license_plate AS vehicle_number, v.maker,
       u.name AS user_name, u.company_name AS user_company
     FROM van_contracts vc
     JOIN rental_companies rc ON vc.rental_company_id = rc.id
