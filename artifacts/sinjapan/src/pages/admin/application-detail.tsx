@@ -570,6 +570,34 @@ export default function AdminApplicationDetail() {
               </Section>
             );
           })()}
+
+          {/* 審査結果カード */}
+          <Section title={`審査結果（${related?.screening?.length ?? 0}件）`}>
+            {relatedLoading ? (
+              <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+            ) : !related?.screening?.length ? (
+              <p className="text-sm text-muted-foreground py-2 text-center">審査記録はありません</p>
+            ) : related.screening.map((s: any) => (
+              <div key={s.id} className="border border-border rounded-xl p-4 mb-3 last:mb-0">
+                <div className="flex items-center justify-between mb-2">
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+                    s.result === 'approved'    ? 'bg-muted border-border text-foreground' :
+                    s.result === 'rejected'    ? 'bg-muted border-border text-muted-foreground' :
+                    s.result === 'conditional' ? 'bg-muted border-border text-foreground' :
+                    'bg-muted border-border text-muted-foreground'
+                  }`}>
+                    {s.result === 'approved' ? '承認' : s.result === 'rejected' ? '否決' : s.result === 'conditional' ? '条件付き承認' : '審査中'}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {s.created_at ? format(new Date(s.created_at), 'yyyy/MM/dd HH:mm') : ''}
+                  </span>
+                </div>
+                {s.reason && <p className="text-sm mb-1"><span className="text-xs text-muted-foreground block mb-0.5">審査理由</span>{s.reason}</p>}
+                {s.conditions && <p className="text-sm mb-1"><span className="text-xs text-muted-foreground block mb-0.5">承認条件</span>{s.conditions}</p>}
+                {s.risk_notes && <p className="text-xs bg-muted border border-border rounded-lg p-3 mt-1">{s.risk_notes}</p>}
+              </div>
+            ))}
+          </Section>
         </div>
       )}
 
