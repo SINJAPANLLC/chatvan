@@ -518,7 +518,6 @@ export default function AdminApplicationDetail() {
                 { label: '氏名', key: 'applicantName', placeholder: '山田 太郎' },
                 { label: '電話番号', key: 'phone', placeholder: '090-1234-5678' },
                 { label: 'メールアドレス', key: 'email', placeholder: 'yamada@example.com' },
-                { label: '生年月日', key: 'dob', placeholder: '1990-01-15' },
               ].map(f => (
                 <div key={f.key}>
                   <label className="text-xs text-muted-foreground block mb-1.5">{f.label}</label>
@@ -530,24 +529,6 @@ export default function AdminApplicationDetail() {
                   />
                 </div>
               ))}
-              <div className="sm:col-span-2">
-                <label className="text-xs text-muted-foreground block mb-1.5">住所</label>
-                <input
-                  value={customerForm.address}
-                  onChange={e => setCustomerForm(prev => ({ ...prev, address: e.target.value }))}
-                  placeholder="神奈川県横浜市中区○○1-2-3"
-                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm outline-none focus:border-foreground/50"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="text-xs text-muted-foreground block mb-1.5">運転免許証情報</label>
-                <input
-                  value={customerForm.licenseInfo}
-                  onChange={e => setCustomerForm(prev => ({ ...prev, licenseInfo: e.target.value }))}
-                  placeholder="普通免許 / 有効期限: 2028-01-15 / 番号: 123456789012"
-                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm outline-none focus:border-foreground/50"
-                />
-              </div>
             </div>
           </Section>
 
