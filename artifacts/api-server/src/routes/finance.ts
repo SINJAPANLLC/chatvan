@@ -327,6 +327,7 @@ router.get("/admin/finance/van/rental-payment-statement", requireAdmin, async (r
   const rows = await db.execute(sql`
     SELECT
       rc.name AS rc_name, rc.address AS rc_address, rc.email AS rc_email, rc.phone AS rc_phone,
+      rc.bank_information AS bank_information,
       vc.id AS contract_id, vc.monthly_price,
       CONCAT(v.maker, ' ', v.model) AS vehicle_name, v.license_plate AS vehicle_number, v.maker,
       u.name AS user_name, u.company_name AS user_company
@@ -342,6 +343,25 @@ router.get("/admin/finance/van/rental-payment-statement", requireAdmin, async (r
 
   const fmt = (n: number) => new Intl.NumberFormat('ja-JP').format(Math.round(n));
   const rcName = contracts[0]?.rc_name ?? '—';
+
+  // 振込先口座パース
+  let bankHtml = '';
+  try {
+    const bi = JSON.parse(contracts[0]?.bank_information ?? 'null');
+    if (bi?.bankName || bi?.accountNumber) {
+      bankHtml = `
+    <div style="margin-bottom:32px; background:#f9f9f9; border:1px solid #e5e5e5; border-radius:8px; padding:16px 20px;">
+      <div style="font-size:11px;color:#888;margin-bottom:8px;font-weight:600;letter-spacing:.04em;">振込先口座</div>
+      <div style="font-size:14px;line-height:1.9;">
+        ${bi.bankName ? `<span>${bi.bankName}</span>` : ''}
+        ${bi.branchName ? `&nbsp;${bi.branchName}` : ''}
+        ${bi.accountType ? `&nbsp;${bi.accountType}` : ''}
+        ${bi.accountNumber ? `&nbsp;<strong>${bi.accountNumber}</strong>` : ''}
+        ${bi.accountHolder ? `<br>口座名義：<strong>${bi.accountHolder}</strong>` : ''}
+      </div>
+    </div>`;
+    }
+  } catch { /* no bank info */ }
   const totalExTax = contracts.reduce((s, r) => s + Number(r.monthly_price ?? 0), 0);
   const totalTax   = Math.round(totalExTax * 0.1);
   const total      = totalExTax + totalTax;
@@ -405,6 +425,8 @@ router.get("/admin/finance/van/rental-payment-statement", requireAdmin, async (r
     <div class="amount-label">お支払い合計金額</div>
     <div class="amount-value">¥${fmt(total)}</div>
   </div>
+
+  ${bankHtml}
 
   <table>
     <thead>

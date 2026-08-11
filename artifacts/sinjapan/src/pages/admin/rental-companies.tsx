@@ -12,6 +12,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 const API = (path: string) => `${import.meta.env.BASE_URL}api${path}`;
 const token = () => localStorage.getItem('sinjapan_auth_token') ?? '';
 
+type BankInfo = { bankName: string; branchName: string; accountType: string; accountNumber: string; accountHolder: string };
+const BANK_DEFAULTS: BankInfo = { bankName: '', branchName: '', accountType: '普通', accountNumber: '', accountHolder: '' };
+function parsedBank(raw?: string | null): BankInfo {
+  if (!raw) return { ...BANK_DEFAULTS };
+  try { return { ...BANK_DEFAULTS, ...JSON.parse(raw) }; } catch { return { ...BANK_DEFAULTS }; }
+}
+function encodeBank(b: BankInfo): string { return JSON.stringify(b); }
+
 export default function AdminRentalCompanies() {
   const { data: companies, isLoading, refetch } = useListRentalCompanies();
   const { toast } = useToast();
@@ -265,6 +273,62 @@ export default function AdminRentalCompanies() {
                 placeholder="例: 関東全域、神奈川県"
               />
             </div>
+            {/* 振込先口座 */}
+            <div className="space-y-3 pt-1">
+              <p className="text-sm font-semibold border-b pb-1">振込先口座</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">銀行名</label>
+                  <input type="text"
+                    value={parsedBank(formData.bankInformation).bankName}
+                    onChange={e => setFormData({...formData, bankInformation: encodeBank({...parsedBank(formData.bankInformation), bankName: e.target.value})})}
+                    placeholder="例: ○○銀行"
+                    className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:border-foreground/50"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">支店名</label>
+                  <input type="text"
+                    value={parsedBank(formData.bankInformation).branchName}
+                    onChange={e => setFormData({...formData, bankInformation: encodeBank({...parsedBank(formData.bankInformation), branchName: e.target.value})})}
+                    placeholder="例: 渋谷支店"
+                    className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:border-foreground/50"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">口座種別</label>
+                  <select
+                    value={parsedBank(formData.bankInformation).accountType || '普通'}
+                    onChange={e => setFormData({...formData, bankInformation: encodeBank({...parsedBank(formData.bankInformation), accountType: e.target.value})})}
+                    className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:border-foreground/50 bg-background"
+                  >
+                    <option value="普通">普通</option>
+                    <option value="当座">当座</option>
+                  </select>
+                </div>
+                <div className="space-y-1 col-span-2">
+                  <label className="text-xs text-muted-foreground">口座番号</label>
+                  <input type="text"
+                    value={parsedBank(formData.bankInformation).accountNumber}
+                    onChange={e => setFormData({...formData, bankInformation: encodeBank({...parsedBank(formData.bankInformation), accountNumber: e.target.value})})}
+                    placeholder="例: 1234567"
+                    className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:border-foreground/50"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">口座名義（カナ）</label>
+                <input type="text"
+                  value={parsedBank(formData.bankInformation).accountHolder}
+                  onChange={e => setFormData({...formData, bankInformation: encodeBank({...parsedBank(formData.bankInformation), accountHolder: e.target.value})})}
+                  placeholder="例: カブシキガイシャ〇〇"
+                  className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:border-foreground/50"
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium">備考</label>
               <textarea 
