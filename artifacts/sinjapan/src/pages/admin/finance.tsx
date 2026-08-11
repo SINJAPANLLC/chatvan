@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Loader2, CheckCircle, Send, RefreshCw } from 'lucide-react';
+import { Loader2, CheckCircle, Send, RefreshCw, ExternalLink, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -450,11 +450,135 @@ function CardReconcile() {
   );
 }
 
+// ─── レンタル会社支払い ────────────────────────────────────────────────────────
+function RentalPayments() {
+  const now = new Date();
+  const [year,  setYear]  = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [data,  setData]  = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const currentYear = now.getFullYear();
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setData(await apiFetch(`/api/admin/finance/van/rental-payments?year=${year}&month=${month}`)); }
+    catch { setData(null); }
+    finally { setLoading(false); }
+  }, [year, month]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const statementUrl = (rcId: number) =>
+    `${import.meta.env.BASE_URL}api/admin/finance/van/rental-payment-statement?rentalCompanyId=${rcId}&year=${year}&month=${month}`;
+
+  return (
+    <div className="space-y-5">
+      {/* 年月セレクター */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex gap-1">
+          {[currentYear - 1, currentYear, currentYear + 1].map(y => (
+            <button key={y} onClick={() => setYear(y)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${year === y ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:text-foreground'}`}>
+              {y}年
+            </button>
+          ))}
+        </div>
+        <select value={month} onChange={e => setMonth(Number(e.target.value))}
+          className="px-3 py-1.5 border border-border rounded-lg text-sm bg-background outline-none focus:border-foreground/50 cursor-pointer">
+          {MONTHS.map((label, i) => (
+            <option key={i} value={i + 1}>{label}</option>
+          ))}
+        </select>
+        <button onClick={load} className="text-muted-foreground hover:text-foreground"><RefreshCw className="h-4 w-4" /></button>
+      </div>
+
+      {/* 概要バナー */}
+      {data && !loading && (
+        <div className="rounded-xl border border-border bg-muted/30 p-4 grid grid-cols-3 gap-4 text-sm">
+          <div>
+            <p className="text-xs text-muted-foreground">対象期間</p>
+            <p className="font-medium">{data.billingPeriod}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">支払期限</p>
+            <p className="font-semibold">{data.dueDate}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">支払いサイト</p>
+            <p className="font-medium">{data.paymentCycle}</p>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : !data?.companies?.length ? (
+        <div className="text-center py-12 text-muted-foreground text-sm">対象の契約がありません</div>
+      ) : (
+        <div className="space-y-4">
+          {data.companies.map((co: any) => (
+            <div key={co.rentalCompanyId} className="rounded-xl border border-border overflow-hidden">
+              {/* 会社ヘッダー */}
+              <div className="flex items-center justify-between px-5 py-4 bg-muted/20 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <Building2 className="h-5 w-5 text-muted-foreground shrink-0" />
+                  <div>
+                    <p className="font-semibold">{co.rentalCompanyName}</p>
+                    <p className="text-xs text-muted-foreground">{[co.email, co.phone].filter(Boolean).join(' ／ ')}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">支払合計</p>
+                    <p className="text-lg font-bold">{yen(co.totalAmount)}</p>
+                  </div>
+                  <a href={statementUrl(co.rentalCompanyId)} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-foreground text-background text-xs font-medium rounded-lg hover:opacity-90 transition whitespace-nowrap">
+                    <ExternalLink className="h-3.5 w-3.5" />支払い明細
+                  </a>
+                </div>
+              </div>
+              {/* 契約一覧 */}
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/10">
+                    <th className="px-5 py-2.5 text-left text-xs font-medium text-muted-foreground">車両名</th>
+                    <th className="px-5 py-2.5 text-left text-xs font-medium text-muted-foreground">ナンバー</th>
+                    <th className="px-5 py-2.5 text-left text-xs font-medium text-muted-foreground">利用者</th>
+                    <th className="px-5 py-2.5 text-right text-xs font-medium text-muted-foreground">月額</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border bg-card">
+                  {co.contracts.map((c: any) => (
+                    <tr key={c.contractId} className="hover:bg-muted/20 transition-colors">
+                      <td className="px-5 py-3">{c.vehicleName}</td>
+                      <td className="px-5 py-3 text-xs text-muted-foreground font-mono">{c.vehicleNumber}</td>
+                      <td className="px-5 py-3 text-muted-foreground">{c.userName}</td>
+                      <td className="px-5 py-3 text-right font-semibold">{yen(c.monthlyPrice)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+
+          {/* 全社合計 */}
+          <div className="rounded-xl border border-foreground bg-foreground text-background px-5 py-4 flex items-center justify-between">
+            <span className="font-bold">当月支払い合計</span>
+            <span className="text-2xl font-bold">{yen(data.companies.reduce((s: number, co: any) => s + co.totalAmount, 0))}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── メインページ ──────────────────────────────────────────────────────────────
 const MAIN_TABS = [
   { key: 'pl',      label: 'PL（損益計算書）' },
   { key: 'invoice', label: '請求書消し込み' },
   { key: 'card',    label: 'カード消し込み' },
+  { key: 'rental',  label: 'レンタル会社支払い' },
 ];
 
 export default function AdminFinance() {
@@ -477,6 +601,7 @@ export default function AdminFinance() {
       {tab === 'pl'      && <PLTable year={year} setYear={setYear} />}
       {tab === 'invoice' && <InvoiceReconcile />}
       {tab === 'card'    && <CardReconcile />}
+      {tab === 'rental'  && <RentalPayments />}
     </div>
   );
 }
