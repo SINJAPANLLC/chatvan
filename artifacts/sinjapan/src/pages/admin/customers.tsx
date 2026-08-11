@@ -10,6 +10,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
+function roleLabel(role: string) {
+  if (role === 'admin') return '管理者';
+  if (role === 'rental_company') return '協力会社';
+  return '一般';
+}
+
 function badge(role: string) {
   return role === 'admin'
     ? 'bg-foreground text-background'
@@ -284,7 +290,7 @@ export default function AdminCustomers() {
                     <td className="px-5 py-3.5 text-muted-foreground">{user.phone || '—'}</td>
                     <td className="px-5 py-3.5">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${badge(user.role)}`}>
-                        {user.role === 'admin' ? '管理者' : '一般'}
+                        {roleLabel(user.role)}
                       </span>
                     </td>
                     <td className="px-5 py-3.5">
@@ -360,6 +366,7 @@ export default function AdminCustomers() {
                         <SelectContent>
                           <SelectItem value="user">一般</SelectItem>
                           <SelectItem value="admin">管理者</SelectItem>
+                          <SelectItem value="rental_company">協力会社</SelectItem>
                         </SelectContent>
                       </Select>
                     </Field>
@@ -403,7 +410,7 @@ export default function AdminCustomers() {
                     <InfoRow label="請求先住所" value={selected.billingAddress} />
                     <InfoRow label="権限" value={
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${badge(selected.role)}`}>
-                        {selected.role === 'admin' ? '管理者' : '一般'}
+                        {roleLabel(selected.role)}
                       </span>
                     } />
                     <InfoRow label="登録日" value={format(new Date(selected.createdAt), 'yyyy/MM/dd HH:mm')} />
