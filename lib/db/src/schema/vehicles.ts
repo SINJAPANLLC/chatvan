@@ -61,8 +61,9 @@ export const vehiclesTable = pgTable("vehicles", {
   sinJapanFee: numeric("sin_japan_fee", { precision: 10, scale: 2 }).default("0"), // Chat VAN手数料
   insuranceFee: numeric("insurance_fee", { precision: 10, scale: 2 }).default("0"),
   shakenCertPath: text("shaken_cert_path"),
+  kensakushoCertPath: text("kensakusho_cert_path"),
   jibaisekiCertPath: text("jibaiseki_cert_path"),
-  otherDocsPaths: text("other_docs_paths"),
+  ninniHokenCertPath: text("ninni_hoken_cert_path"),
   color: text("color"),
   engineDisplacement: text("engine_displacement"),
   fuelType: text("fuel_type"),
