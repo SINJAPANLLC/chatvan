@@ -815,6 +815,7 @@ export default function AdminApplicationDetail() {
             {(related?.contracts ?? []).map((c: any) => {
               const vPhotos: string[] = (() => { try { return JSON.parse(c.vehicle_photos ?? '[]'); } catch { return []; } })();
               const pickupPhotos: string[] = (() => { try { return JSON.parse(c.pickup_photos ?? '[]'); } catch { return []; } })();
+              const returnPhotos: string[] = (() => { try { return JSON.parse(c.return_photos ?? '[]'); } catch { return []; } })();
               const returnDocs: string[] = (() => { try { return JSON.parse(c.return_documents ?? '[]'); } catch { return []; } })();
               const sig = (() => { try { const p = JSON.parse(c.signature_data ?? 'null'); return p?.signature ?? null; } catch { return null; } })();
               const CONTRACT_STATUS: Record<string, string> = {
@@ -836,14 +837,23 @@ export default function AdminApplicationDetail() {
 
                 <div className="p-4 space-y-5">
                   {/* ヘッダー */}
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="font-bold">{c.maker} {c.model}{c.grade ? ` ${c.grade}` : ''}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">契約番号: {c.contract_number ?? `#${c.id}`}</p>
                     </div>
-                    <span className="text-xs px-2.5 py-1 rounded-full border border-border bg-muted shrink-0 ml-2">
-                      {CONTRACT_STATUS[c.status] ?? c.status}
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <a
+                        href={`${import.meta.env.BASE_URL}api/van/contracts/${c.id}/print`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="text-xs px-3 py-1.5 rounded-lg border border-border hover:bg-muted flex items-center gap-1"
+                      >
+                        📄 契約書PDF
+                      </a>
+                      <span className="text-xs px-2.5 py-1 rounded-full border border-border bg-muted">
+                        {CONTRACT_STATUS[c.status] ?? c.status}
+                      </span>
+                    </div>
                   </div>
 
                   {/* 契約内容 */}
@@ -926,17 +936,34 @@ export default function AdminApplicationDetail() {
                   )}
 
                   {/* 納車時写真 */}
-                  {pickupPhotos.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">納車時写真</p>
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">納車時写真</p>
+                    {pickupPhotos.length > 0 ? (
                       <div className="flex gap-2 flex-wrap">
                         {pickupPhotos.map((p, i) => (
                           <img key={i} src={`${import.meta.env.BASE_URL}api/storage${p}`} alt={`納車写真${i+1}`}
                             className="h-28 w-auto rounded-lg border border-border object-cover" />
                         ))}
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <p className="text-sm text-muted-foreground">まだ写真がありません</p>
+                    )}
+                  </div>
+
+                  {/* 返却時写真 */}
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">返却時写真</p>
+                    {returnPhotos.length > 0 ? (
+                      <div className="flex gap-2 flex-wrap">
+                        {returnPhotos.map((p, i) => (
+                          <img key={i} src={`${import.meta.env.BASE_URL}api/storage${p}`} alt={`返却写真${i+1}`}
+                            className="h-28 w-auto rounded-lg border border-border object-cover" />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">まだ写真がありません</p>
+                    )}
+                  </div>
 
                   {/* 返却書類 */}
                   {returnDocs.length > 0 && (

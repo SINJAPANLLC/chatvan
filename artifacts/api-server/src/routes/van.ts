@@ -1082,6 +1082,96 @@ router.get("/van/contracts/:id", requireAuth, async (req: Request, res: Response
   }
 });
 
+// GET /van/contracts/:id/print  契約書印刷用HTML
+router.get("/van/contracts/:id/print", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(String(req.params.id));
+    const rows = await db.execute(sql`
+      SELECT vc.*, v.maker, v.model, v.license_plate, v.prefecture, v.year,
+        v.inspection_expiry, v.mileage_limit, v.smoking_policy, v.vin,
+        rc.name as rc_name, rc.phone as rc_phone,
+        u.name as user_name, u.phone as user_phone, u.email as user_email
+      FROM van_contracts vc
+      LEFT JOIN vehicles v ON vc.vehicle_id = v.id
+      LEFT JOIN rental_companies rc ON v.rental_company_id = rc.id
+      LEFT JOIN users u ON vc.user_id = u.id
+      WHERE vc.id = ${id}
+      LIMIT 1
+    `);
+    const c: any = ((rows as any)?.rows ?? rows)[0];
+    if (!c) return res.status(404).send("Not found");
+    const sig = (() => { try { const p = JSON.parse(c.signature_data ?? 'null'); return p?.signature ?? null; } catch { return null; } })();
+    const fmt = (d: string | null) => d ? new Date(d).toLocaleDateString('ja-JP') : '—';
+    const yen = (v: any) => v ? `¥${Number(v).toLocaleString()}` : '—';
+    const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<title>契約書 ${c.contract_number ?? `#${c.id}`}</title>
+<style>
+  body{font-family:'Helvetica Neue',Arial,sans-serif;max-width:800px;margin:40px auto;padding:0 24px;color:#111;font-size:14px;line-height:1.6}
+  h1{font-size:22px;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:24px}
+  h2{font-size:15px;border-left:4px solid #111;padding-left:10px;margin:28px 0 10px}
+  table{width:100%;border-collapse:collapse;margin-bottom:16px}
+  td,th{border:1px solid #ddd;padding:8px 12px;font-size:13px}
+  th{background:#f5f5f5;font-weight:600;width:36%;text-align:left}
+  .sig{border:1px solid #ddd;border-radius:4px;padding:4px;max-height:80px}
+  .footer{margin-top:48px;font-size:12px;color:#666;text-align:center}
+  @media print{body{margin:0}button{display:none}}
+</style></head><body>
+<button onclick="window.print()" style="float:right;padding:8px 16px;background:#111;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">印刷</button>
+<h1>車両貸渡契約書</h1>
+<p style="text-align:right;color:#666">契約番号: <strong>${c.contract_number ?? `CVN-${c.id}`}</strong></p>
+
+<h2>契約当事者</h2>
+<table>
+  <tr><th>利用者氏名</th><td>${c.user_name ?? '—'}</td></tr>
+  <tr><th>電話番号</th><td>${c.user_phone ?? '—'}</td></tr>
+  <tr><th>メールアドレス</th><td>${c.user_email ?? '—'}</td></tr>
+  <tr><th>貸渡事業者</th><td>${c.rc_name ?? '—'}${c.rc_phone ? ` / TEL: ${c.rc_phone}` : ''}</td></tr>
+  <tr><th>プラットフォーム</th><td>${c.platform_operator ?? '合同会社SIN JAPAN'}</td></tr>
+</table>
+
+<h2>車両情報</h2>
+<table>
+  <tr><th>車名</th><td>${c.maker ?? ''} ${c.model ?? ''}</td></tr>
+  <tr><th>ナンバー</th><td>${c.license_plate ?? '—'}</td></tr>
+  <tr><th>車台番号</th><td>${c.vin ?? '—'}</td></tr>
+  <tr><th>年式</th><td>${c.year ? `${c.year}年式` : '—'}</td></tr>
+  <tr><th>都道府県</th><td>${c.prefecture ?? '—'}</td></tr>
+  <tr><th>車検満了</th><td>${fmt(c.inspection_expiry)}</td></tr>
+  <tr><th>喫煙</th><td>${c.smoking_policy === 'no_smoking' ? '禁煙' : c.smoking_policy === 'smoking_ok' ? '喫煙可' : (c.smoking_policy ?? '—')}</td></tr>
+  <tr><th>走行上限</th><td>${c.mileage_limit ? `${Number(c.mileage_limit).toLocaleString()} km/月` : '制限なし'}</td></tr>
+</table>
+
+<h2>契約条件</h2>
+<table>
+  <tr><th>月額利用料</th><td>${yen(c.monthly_price)}</td></tr>
+  <tr><th>開始日</th><td>${fmt(c.start_date)}</td></tr>
+  <tr><th>終了予定日</th><td>${fmt(c.planned_end_date ?? c.end_date)}</td></tr>
+  <tr><th>支払日</th><td>${c.payment_day ? `毎月${c.payment_day}日` : '—'}</td></tr>
+  <tr><th>支払方法</th><td>${c.payment_method === 'invoice' ? '請求書払い' : c.payment_method === 'card' ? 'カード決済' : (c.payment_method ?? '—')}</td></tr>
+  <tr><th>最低利用期間</th><td>${c.minimum_term ? `${c.minimum_term}ヶ月` : '—'}</td></tr>
+</table>
+
+<h2>同意記録</h2>
+<table>
+  <tr><th>プラットフォーム契約同意</th><td>${fmt(c.platform_contract_agreed_at)}</td></tr>
+  <tr><th>車両貸渡契約同意</th><td>${fmt(c.vehicle_contract_agreed_at)}</td></tr>
+  <tr><th>利用規約同意</th><td>${fmt(c.terms_agreed_at)}</td></tr>
+  <tr><th>GPS利用同意</th><td>${c.gps_consent ? '同意済み' : '未同意'}</td></tr>
+</table>
+
+${sig ? `<h2>電子署名</h2><img src="${sig}" class="sig" alt="電子署名" />` : ''}
+${c.special_terms ? `<h2>特記事項</h2><p style="white-space:pre-wrap">${c.special_terms}</p>` : ''}
+
+<div class="footer">本書類は Chat VAN（合同会社SIN JAPAN）が発行した電子契約書です。</div>
+</body></html>`;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(html);
+  } catch (err) {
+    console.error("contract print error:", err);
+    return res.status(500).send("Internal error");
+  }
+});
+
 router.post("/van/contracts", requireAuth, requireAdmin, async (req: Request, res: Response) => {
   try {
     const body = req.body;
@@ -1642,7 +1732,7 @@ router.get("/van/applications/:id/related", requireAuth, requireAdmin, async (re
     if (!userId) return res.status(404).json({ error: "Application not found" });
 
     const [contracts, incidents, screening, identityVerification] = await Promise.all([
-      // 契約
+      // 契約（この相談に紐づく1件のみ）
       db.execute(sql`
         SELECT vc.*,
           v.maker, v.model, v.license_plate, v.prefecture, v.year, v.mileage,
@@ -1654,7 +1744,7 @@ router.get("/van/applications/:id/related", requireAuth, requireAdmin, async (re
         FROM van_contracts vc
         LEFT JOIN vehicles v ON vc.vehicle_id = v.id
         LEFT JOIN rental_companies rc ON v.rental_company_id = rc.id
-        WHERE vc.user_id = ${userId}
+        WHERE vc.application_id = ${appId}
         ORDER BY vc.created_at DESC
       `),
       // 事故
