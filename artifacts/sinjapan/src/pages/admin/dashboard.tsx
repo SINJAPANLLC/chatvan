@@ -16,12 +16,12 @@ const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem('sinja
 interface Notification { id: number; title: string; message: string; readStatus: boolean; createdAt: string; }
 interface CalEvent { date: string; type: 'return' | 'delivery' | 'insurance' | 'incident'; label: string; id: number; }
 
-// ── カラー設定 ────────────────────────────────────────────────────────────────
-const EVENT_COLOR: Record<string, string> = {
-  return:    'bg-orange-400',
-  delivery:  'bg-blue-400',
-  insurance: 'bg-yellow-400',
-  incident:  'bg-red-500',
+// カレンダードット：モノクロでサイズ差で区別
+const EVENT_DOT: Record<string, string> = {
+  return:    'bg-foreground/80',
+  delivery:  'bg-foreground',
+  insurance: 'bg-foreground/40',
+  incident:  'bg-foreground',
 };
 const EVENT_ICON: Record<string, React.ReactNode> = {
   return:    <RotateCcw className="h-3 w-3" />,
@@ -50,12 +50,12 @@ function KpiCard({ icon, label, value, sub, dark }: { icon: React.ReactNode; lab
 // ── 未対応一覧 ────────────────────────────────────────────────────────────────
 function UnresolvedPanel({ stats }: { stats: any }) {
   const items = [
-    { label: '事故・トラブル報告', count: stats.openIncidents ?? 0, icon: <Flame className="h-4 w-4 text-red-500" />, href: '/admin/incidents', urgent: true },
-    { label: '未決済契約', count: stats.unpaidContracts ?? 0, icon: <CreditCard className="h-4 w-4 text-red-500" />, href: '/admin/contracts', urgent: true },
-    { label: '決済失敗（7日以内）', count: stats.paymentFailures7d ?? 0, icon: <AlertTriangle className="h-4 w-4 text-orange-500" />, href: '/admin/contracts', urgent: false },
-    { label: '車両故障報告', count: stats.openBreakdowns ?? 0, icon: <Wrench className="h-4 w-4 text-orange-500" />, href: '/admin/contracts', urgent: false },
-    { label: '返却申請（未対応）', count: stats.pendingReturns ?? 0, icon: <RotateCcw className="h-4 w-4 text-yellow-600" />, href: '/admin/contracts', urgent: false },
-    { label: '保険期限30日以内', count: stats.insuranceAlerts ?? 0, icon: <AlertTriangle className="h-4 w-4 text-yellow-600" />, href: '/admin/contracts', urgent: false },
+    { label: '事故・トラブル報告',   count: stats.openIncidents    ?? 0, icon: <Flame       className="h-4 w-4 text-foreground" />, href: '/admin/incidents', urgent: true  },
+    { label: '未決済契約',           count: stats.unpaidContracts  ?? 0, icon: <CreditCard   className="h-4 w-4 text-foreground" />, href: '/admin/contracts', urgent: true  },
+    { label: '決済失敗（7日以内）',  count: stats.paymentFailures7d ?? 0, icon: <AlertTriangle className="h-4 w-4 text-muted-foreground" />, href: '/admin/contracts', urgent: false },
+    { label: '車両故障報告',          count: stats.openBreakdowns   ?? 0, icon: <Wrench       className="h-4 w-4 text-muted-foreground" />, href: '/admin/contracts', urgent: false },
+    { label: '返却申請（未対応）',   count: stats.pendingReturns   ?? 0, icon: <RotateCcw    className="h-4 w-4 text-muted-foreground" />, href: '/admin/contracts', urgent: false },
+    { label: '保険期限30日以内',     count: stats.insuranceAlerts  ?? 0, icon: <AlertTriangle className="h-4 w-4 text-muted-foreground" />, href: '/admin/contracts', urgent: false },
   ];
   const total = items.reduce((s, i) => s + i.count, 0);
 
@@ -63,28 +63,24 @@ function UnresolvedPanel({ stats }: { stats: any }) {
     <Card className="border-border shadow-sm flex flex-col">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-red-500" />
+          <AlertTriangle className="h-4 w-4 text-foreground" />
           未対応一覧
-          {total > 0 && (
-            <span className="ml-auto text-xs font-medium px-2 py-0.5 bg-red-100 text-red-600 rounded-full">{total}件</span>
-          )}
-          {total === 0 && (
-            <span className="ml-auto text-xs font-medium px-2 py-0.5 bg-green-100 text-green-600 rounded-full">問題なし</span>
-          )}
+          {total > 0
+            ? <span className="ml-auto text-xs font-medium px-2 py-0.5 bg-foreground text-background rounded-full">{total}件</span>
+            : <span className="ml-auto text-xs font-medium px-2 py-0.5 bg-muted text-muted-foreground rounded-full">問題なし</span>
+          }
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-1 space-y-1">
         {items.map(item => (
           <Link key={item.label} href={item.href}>
             <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors cursor-pointer ${
-              item.count > 0
-                ? item.urgent ? 'bg-red-50 hover:bg-red-100' : 'bg-orange-50 hover:bg-orange-100'
-                : 'hover:bg-muted/50'
+              item.count > 0 ? 'bg-muted hover:bg-muted/70' : 'hover:bg-muted/50'
             }`}>
               {item.icon}
               <span className="text-xs flex-1">{item.label}</span>
               <span className={`text-sm font-bold tabular-nums ${
-                item.count > 0 ? (item.urgent ? 'text-red-600' : 'text-orange-600') : 'text-muted-foreground'
+                item.count > 0 ? 'text-foreground' : 'text-muted-foreground'
               }`}>
                 {item.count}
               </span>
@@ -119,10 +115,10 @@ function NotificationsPanel() {
     <Card className="border-border shadow-sm flex flex-col">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
-          <Bell className="h-4 w-4 text-primary" />
+          <Bell className="h-4 w-4" />
           通知
           {unread > 0 && (
-            <span className="ml-auto text-xs font-medium px-2 py-0.5 bg-primary text-primary-foreground rounded-full">{unread}</span>
+            <span className="ml-auto text-xs font-medium px-2 py-0.5 bg-foreground text-background rounded-full">{unread}</span>
           )}
         </CardTitle>
       </CardHeader>
@@ -136,11 +132,11 @@ function NotificationsPanel() {
             key={n.id}
             onClick={() => !n.readStatus && markRead(n.id)}
             className={`px-3 py-2.5 rounded-lg text-xs cursor-pointer transition-colors ${
-              n.readStatus ? 'text-muted-foreground hover:bg-muted/30' : 'bg-primary/5 border border-primary/10 hover:bg-primary/10'
+              n.readStatus ? 'text-muted-foreground hover:bg-muted/30' : 'bg-muted border border-border hover:bg-muted/70'
             }`}
           >
             <div className="flex items-start gap-2">
-              {!n.readStatus && <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />}
+              {!n.readStatus && <span className="mt-1 h-1.5 w-1.5 rounded-full bg-foreground shrink-0" />}
               <div className="flex-1 min-w-0">
                 <p className={`font-medium truncate ${n.readStatus ? '' : 'text-foreground'}`}>{n.title}</p>
                 <p className="text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
@@ -158,7 +154,7 @@ function NotificationsPanel() {
 function CalendarPanel() {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth()); // 0-indexed
+  const [month, setMonth] = useState(today.getMonth());
   const [events, setEvents] = useState<CalEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
@@ -171,7 +167,7 @@ function CalendarPanel() {
   }, []);
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0=Sun
+  const firstDayOfWeek = new Date(year, month, 1).getDay();
 
   const eventsByDate = events.reduce<Record<string, CalEvent[]>>((acc, e) => {
     (acc[e.date] ??= []).push(e);
@@ -190,7 +186,7 @@ function CalendarPanel() {
     <Card className="border-border shadow-sm flex flex-col">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
-          <CalendarDays className="h-4 w-4 text-primary" />
+          <CalendarDays className="h-4 w-4" />
           カレンダー
           <div className="ml-auto flex items-center gap-1">
             <button onClick={prevMonth} className="p-1 hover:bg-muted rounded-md transition-colors"><ChevronLeft className="h-4 w-4" /></button>
@@ -206,8 +202,8 @@ function CalendarPanel() {
           <div className="space-y-3">
             {/* 曜日ヘッダー */}
             <div className="grid grid-cols-7 text-center">
-              {['日','月','火','水','木','金','土'].map((d, i) => (
-                <span key={d} className={`text-xs font-medium pb-1 ${i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-muted-foreground'}`}>{d}</span>
+              {['日','月','火','水','木','金','土'].map(d => (
+                <span key={d} className="text-xs font-medium pb-1 text-muted-foreground">{d}</span>
               ))}
             </div>
             {/* 日付グリッド */}
@@ -222,14 +218,14 @@ function CalendarPanel() {
                 return (
                   <button key={d} onClick={() => setSelected(isSelected ? null : ds)}
                     className={`flex flex-col items-center py-1 rounded-lg text-xs transition-colors ${
-                      isSelected ? 'bg-primary text-primary-foreground' :
-                      isToday ? 'bg-primary/10 font-bold' : 'hover:bg-muted'
+                      isSelected ? 'bg-foreground text-background' :
+                      isToday    ? 'bg-muted font-bold border border-border' : 'hover:bg-muted'
                     }`}>
-                    <span className={`leading-tight ${i % 7 === 0 && firstDayOfWeek === 0 ? 'text-red-400' : ''}`}>{d}</span>
+                    <span className="leading-tight">{d}</span>
                     {dayEvents.length > 0 && (
                       <div className="flex gap-0.5 mt-0.5 flex-wrap justify-center">
                         {dayEvents.slice(0, 3).map((e, ei) => (
-                          <span key={ei} className={`h-1.5 w-1.5 rounded-full ${EVENT_COLOR[e.type] ?? 'bg-gray-400'} ${isSelected ? 'opacity-80' : ''}`} />
+                          <span key={ei} className={`h-1.5 w-1.5 rounded-full ${EVENT_DOT[e.type] ?? 'bg-foreground/50'} ${isSelected ? 'opacity-60' : ''}`} />
                         ))}
                       </div>
                     )}
@@ -241,7 +237,7 @@ function CalendarPanel() {
             <div className="flex gap-3 flex-wrap pt-1 border-t border-border/40">
               {Object.entries({ delivery: '納車', return: '返却', incident: '事故', insurance: '保険期限' }).map(([k, label]) => (
                 <span key={k} className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <span className={`h-2 w-2 rounded-full ${EVENT_COLOR[k]}`} />{label}
+                  <span className={`h-2 w-2 rounded-full ${EVENT_DOT[k]}`} />{label}
                 </span>
               ))}
             </div>
@@ -253,7 +249,7 @@ function CalendarPanel() {
                   <p className="text-xs text-muted-foreground">予定なし</p>
                 ) : selectedEvents.map((e, i) => (
                   <div key={i} className="flex items-center gap-2 text-xs">
-                    <span className={`h-2 w-2 rounded-full shrink-0 ${EVENT_COLOR[e.type]}`} />
+                    <span className={`h-2 w-2 rounded-full shrink-0 ${EVENT_DOT[e.type]}`} />
                     <span className="flex items-center gap-1">{EVENT_ICON[e.type]}{e.label}</span>
                   </div>
                 ))}
@@ -274,41 +270,31 @@ function RevenueBreakdown({ stats, fmt }: { stats: any; fmt: (v: number) => stri
       value: fmt(stats.cardRevenue ?? 0),
       sub: 'Square決済累計',
       icon: <CreditCard className="h-4 w-4" />,
-      color: 'text-blue-600',
-      bg: 'bg-blue-50 border-blue-100',
     },
     {
       label: '請求書売上',
       value: fmt(stats.invoiceRevenue ?? 0),
       sub: '振込・請求累計',
       icon: <Receipt className="h-4 w-4" />,
-      color: 'text-violet-600',
-      bg: 'bg-violet-50 border-violet-100',
     },
     {
       label: '黒ナンバー売上',
       value: fmt(stats.blackNumberRevenue ?? 0),
       sub: `${stats.blackNumberCount ?? 0}件`,
       icon: <Car className="h-4 w-4" />,
-      color: 'text-gray-700',
-      bg: 'bg-gray-50 border-gray-200',
     },
     {
       label: '保険紹介',
       value: `${stats.insuranceCount ?? 0} 件`,
       sub: '紹介申請累計',
       icon: <ShieldCheck className="h-4 w-4" />,
-      color: 'text-emerald-600',
-      bg: 'bg-emerald-50 border-emerald-100',
     },
     {
       label: '今月の粗利',
       value: fmt(stats.thisMonthGrossProfit ?? 0),
       sub: `売上見込 ${fmt(stats.thisMonthRevenue ?? 0)}`,
       icon: <TrendingUp className="h-4 w-4" />,
-      color: 'text-amber-600',
-      bg: 'bg-amber-50 border-amber-100',
-      wide: true,
+      accent: true,
     },
   ];
 
@@ -320,13 +306,13 @@ function RevenueBreakdown({ stats, fmt }: { stats: any; fmt: (v: number) => stri
       </h2>
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {items.map(item => (
-          <div key={item.label} className={`border rounded-xl p-4 ${item.bg}`}>
-            <div className={`flex items-center gap-1.5 mb-2 ${item.color}`}>
+          <div key={item.label} className={`border rounded-xl p-4 ${item.accent ? 'bg-foreground text-background border-foreground' : 'bg-muted/40 border-border'}`}>
+            <div className={`flex items-center gap-1.5 mb-2 ${item.accent ? 'text-background/70' : 'text-muted-foreground'}`}>
               {item.icon}
               <span className="text-xs font-medium">{item.label}</span>
             </div>
-            <p className={`text-xl font-bold tabular-nums ${item.color}`}>{item.value}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{item.sub}</p>
+            <p className={`text-xl font-bold tabular-nums ${item.accent ? 'text-background' : 'text-foreground'}`}>{item.value}</p>
+            <p className={`text-xs mt-0.5 ${item.accent ? 'text-background/60' : 'text-muted-foreground'}`}>{item.sub}</p>
           </div>
         ))}
       </div>
@@ -358,24 +344,9 @@ export default function Dashboard() {
 
       {/* ── Row 1: KPI ─────────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-4">
-        <KpiCard
-          icon={<FileText className="h-3.5 w-3.5" />}
-          label="新規相談"
-          value={stats.newConsultations}
-          sub="対応が必要な相談"
-        />
-        <KpiCard
-          icon={<CheckCircle2 className="h-3.5 w-3.5" />}
-          label="契約中"
-          value={stats.activeContracts}
-          sub="稼働中の車両"
-        />
-        <KpiCard
-          icon={<Car className="h-3.5 w-3.5" />}
-          label="空き車両"
-          value={`${stats.availableVehicles} / ${stats.totalVehicles}`}
-          sub="提案可能な車両"
-        />
+        <KpiCard icon={<FileText className="h-3.5 w-3.5" />}    label="新規相談" value={stats.newConsultations} sub="対応が必要な相談" />
+        <KpiCard icon={<CheckCircle2 className="h-3.5 w-3.5" />} label="契約中"   value={stats.activeContracts}  sub="稼働中の車両" />
+        <KpiCard icon={<Car className="h-3.5 w-3.5" />}          label="空き車両" value={`${stats.availableVehicles} / ${stats.totalVehicles}`} sub="提案可能な車両" />
       </div>
 
       {/* ── Row 1.5: 売上内訳 ─────────────────────────────────────────── */}
