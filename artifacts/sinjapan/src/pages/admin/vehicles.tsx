@@ -326,17 +326,17 @@ export default function AdminVehicles() {
           <div className="grid grid-cols-2 gap-x-4 gap-y-4 py-2">
 
             {/* ── 車検証 AI読み取り ── */}
-            <div className="col-span-2 rounded-xl border border-blue-200 bg-blue-50/60 p-4 flex items-center gap-4">
-              <FileSearch className="h-8 w-8 text-blue-500 shrink-0" />
+            <div className="col-span-2 rounded-xl border border-border bg-muted/40 p-4 flex items-center gap-4">
+              <FileSearch className="h-8 w-8 text-muted-foreground shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-blue-800">車検証で自動入力</p>
-                <p className="text-xs text-blue-600 mt-0.5">車検証の画像をアップロードするとAIが情報を読み取り自動入力します</p>
+                <p className="text-sm font-semibold">車検証で自動入力</p>
+                <p className="text-xs text-muted-foreground mt-0.5">車検証の画像をアップロードするとAIが情報を読み取り自動入力します</p>
               </div>
               <input ref={shakenInputRef} type="file" accept="image/*,application/pdf" className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleShakenOcr(f); e.target.value = ''; }} />
               <button type="button" disabled={shakenParsing}
                 onClick={() => shakenInputRef.current?.click()}
-                className="shrink-0 flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-60 transition">
+                className="shrink-0 flex items-center gap-2 px-4 py-2 bg-foreground text-background text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-60 transition">
                 {shakenParsing ? <><Loader2 className="h-4 w-4 animate-spin" />読み取り中...</> : <><Upload className="h-4 w-4" />アップロード</>}
               </button>
             </div>
