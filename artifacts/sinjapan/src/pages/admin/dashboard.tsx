@@ -311,7 +311,7 @@ export default function Dashboard() {
           icon={<JpyIcon className="h-3.5 w-3.5" />}
           label="今月の売上見込"
           value={fmt(stats.thisMonthRevenue)}
-          sub={`累積 ${fmt(stats.totalRevenue)}`}
+          sub={`粗利 ${fmt(stats.thisMonthGrossProfit ?? 0)} ／ 累積 ${fmt(stats.totalRevenue)}`}
           dark
         />
       </div>

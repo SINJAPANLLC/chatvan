@@ -833,9 +833,17 @@ router.get("/van/dashboard", requireAuth, requireAdmin, async (req: Request, res
       db.select({ count: sql<number>`count(*)` }).from(vanContractsTable).where(eq(vanContractsTable.status, "payment_issue" as any)),
     ]);
 
-    // 今月の売上見込 = アクティブ契約の月額合計
-    const [revenueRow] = await db.select({ total: sql<number>`coalesce(sum(monthly_price), 0)` })
-      .from(vanContractsTable).where(eq(vanContractsTable.status, "active" as any));
+    // 今月の売上見込 = monthly_price + sin_japan_fee（税抜き、アクティブ契約合計）
+    const [revenueRow] = await db.execute(sql`
+      SELECT
+        COALESCE(SUM(monthly_price), 0)                          AS base_total,
+        COALESCE(SUM(COALESCE(sin_japan_fee, 0)), 0)             AS fee_total,
+        COALESCE(SUM(monthly_price + COALESCE(sin_japan_fee,0)), 0) AS grand_total
+      FROM van_contracts WHERE status = 'active'
+    `) as any;
+    const revenueData = (revenueRow?.rows ?? revenueRow)?.[0] ?? {};
+    const thisMonthRevenue = Number(revenueData.grand_total ?? 0);
+    const thisMonthGrossProfit = Number(revenueData.fee_total ?? 0);
 
     // 累積売上 = settlements 完了分の user_payment_amount 合計（なければ payment_retries 成功分）
     let totalRevenue = 0;
@@ -881,7 +889,8 @@ router.get("/van/dashboard", requireAuth, requireAdmin, async (req: Request, res
       activeApplications: Number(activeApplications.count),
       activeContracts: Number(activeContracts.count),
       returningSoon: Number(returningSoon.count),
-      thisMonthRevenue: Number(revenueRow?.total ?? 0),
+      thisMonthRevenue,
+      thisMonthGrossProfit,
       totalRevenue,
       totalVehicles: Number(totalVehicles.count),
       availableVehicles: Number(availableVehicles.count),
@@ -1164,6 +1173,22 @@ router.post("/van/contracts/:id/sign", requireAuth, async (req: Request, res: Re
         title: "Chat VAN - 契約署名完了",
         message: `契約書への電子署名が完了しました（契約ID: ${id}）。`,
       });
+      // 黒ナンバー代理取得の申請通知
+      if (blackNumberRequested) {
+        await db.insert(notificationsTable).values({
+          userId: admin.id,
+          title: "🚗 黒ナンバー代理取得の依頼",
+          message: `契約ID: ${id} のユーザーが黒ナンバー代理取得を希望しています。手続きを進めてください。`,
+        });
+      }
+      // 保険紹介の申請通知
+      if (insuranceReferralRequested) {
+        await db.insert(notificationsTable).values({
+          userId: admin.id,
+          title: "🛡️ 保険紹介の依頼",
+          message: `契約ID: ${id} のユーザーが保険紹介を希望しています。担当者から連絡してください。`,
+        });
+      }
     }
     await db.insert(notificationsTable).values({
       userId: userId!,
