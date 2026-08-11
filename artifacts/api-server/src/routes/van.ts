@@ -875,36 +875,46 @@ router.get("/van/dashboard", requireAuth, requireAdmin, async (req: Request, res
       db.select({ count: sql<number>`count(*)` }).from(vanContractsTable).where(eq(vanContractsTable.status, "payment_issue" as any)),
     ]);
 
-    // 今月の売上見込 = monthly_price + sin_japan_fee（税抜き、アクティブ契約合計）
-    const [revenueRow] = await db.execute(sql`
-      SELECT
-        COALESCE(SUM(monthly_price), 0)                          AS base_total,
-        COALESCE(SUM(COALESCE(sin_japan_fee, 0)), 0)             AS fee_total,
-        COALESCE(SUM(monthly_price + COALESCE(sin_japan_fee,0)), 0) AS grand_total
-      FROM van_contracts WHERE status = 'active'
-    `) as any;
-    const revenueData = (revenueRow?.rows ?? revenueRow)?.[0] ?? {};
-    const thisMonthRevenue = Number(revenueData.grand_total ?? 0);
-    const thisMonthGrossProfit = Number(revenueData.fee_total ?? 0);
+    // 売上内訳を並列取得
+    let cardRevenue = 0, invoiceRevenue = 0, blackNumberRevenue = 0, blackNumberCount = 0, insuranceCount = 0;
+    let thisMonthRevenue = 0, thisMonthGrossProfit = 0, totalRevenue = 0;
 
-    // 累積売上 = settlements 完了分の user_payment_amount 合計（なければ payment_retries 成功分）
-    let totalRevenue = 0;
-    try {
-      const [settlementRow] = await db.execute(sql`
-        SELECT COALESCE(SUM(user_payment_amount), 0) AS total FROM settlements WHERE status = 'completed'
-      `) as any;
-      const rows = settlementRow?.rows ?? (Array.isArray(settlementRow) ? settlementRow : []);
-      totalRevenue = Number(rows[0]?.total ?? settlementRow?.total ?? 0);
-    } catch {
-      // settlements テーブルが空の場合は payment_retries 成功分で代替
-      try {
-        const [prRow] = await db.execute(sql`
-          SELECT COALESCE(SUM(amount), 0) AS total FROM payment_retries WHERE result = 'success'
-        `) as any;
-        const rows2 = prRow?.rows ?? (Array.isArray(prRow) ? prRow : []);
-        totalRevenue = Number(rows2[0]?.total ?? prRow?.total ?? 0);
-      } catch { /* ignore */ }
-    }
+    await Promise.allSettled([
+      // 今月の売上見込 (アクティブ契約 monthly_price + sin_japan_fee)
+      db.execute(sql`
+        SELECT
+          COALESCE(SUM(monthly_price + COALESCE(sin_japan_fee,0)), 0) AS grand_total,
+          COALESCE(SUM(COALESCE(sin_japan_fee, 0)), 0)                AS fee_total
+        FROM van_contracts WHERE status = 'active'
+      `).then((r: any) => {
+        const d = (r?.rows ?? r)?.[0] ?? {};
+        thisMonthRevenue    = Number(d.grand_total ?? 0);
+        thisMonthGrossProfit = Number(d.fee_total  ?? 0);
+      }),
+      // カード売上 (Square決済成功)
+      db.execute(sql`SELECT COALESCE(SUM(amount),0) AS total FROM payment_retries WHERE result = 'success'`)
+        .then((r: any) => { cardRevenue = Number((r?.rows ?? r)?.[0]?.total ?? 0); }),
+      // 請求書売上 (settlements完了)
+      db.execute(sql`SELECT COALESCE(SUM(user_payment_amount),0) AS total FROM settlements WHERE status = 'completed'`)
+        .then((r: any) => { invoiceRevenue = Number((r?.rows ?? r)?.[0]?.total ?? 0); }),
+      // 黒ナンバー売上・件数
+      db.execute(sql`
+        SELECT COUNT(*) AS cnt, COALESCE(SUM(COALESCE(options_fee,0)),0) AS total
+        FROM van_contracts WHERE black_number_requested = true
+      `).then((r: any) => {
+        const d = (r?.rows ?? r)?.[0] ?? {};
+        blackNumberRevenue = Number(d.total ?? 0);
+        blackNumberCount   = Number(d.cnt   ?? 0);
+      }),
+      // 保険紹介件数
+      db.execute(sql`SELECT COUNT(*) AS cnt FROM van_contracts WHERE insurance_referral_requested = true`)
+        .then((r: any) => { insuranceCount = Number((r?.rows ?? r)?.[0]?.cnt ?? 0); }),
+      // 累積売上（settlements完了 → fallback: payment_retries成功）
+      db.execute(sql`SELECT COALESCE(SUM(user_payment_amount),0) AS total FROM settlements WHERE status = 'completed'`)
+        .then((r: any) => { totalRevenue = Number((r?.rows ?? r)?.[0]?.total ?? 0); })
+        .catch(() => db.execute(sql`SELECT COALESCE(SUM(amount),0) AS total FROM payment_retries WHERE result = 'success'`)
+          .then((r: any) => { totalRevenue = Number((r?.rows ?? r)?.[0]?.total ?? 0); })),
+    ]);
 
     // リスク指標
     let openIncidents = 0, paymentFailures7d = 0, openBreakdowns = 0, pendingReturns = 0, insuranceAlerts = 0;
@@ -934,6 +944,11 @@ router.get("/van/dashboard", requireAuth, requireAdmin, async (req: Request, res
       thisMonthRevenue,
       thisMonthGrossProfit,
       totalRevenue,
+      cardRevenue,
+      invoiceRevenue,
+      blackNumberRevenue,
+      blackNumberCount,
+      insuranceCount,
       totalVehicles: Number(totalVehicles.count),
       availableVehicles: Number(availableVehicles.count),
       // リスク

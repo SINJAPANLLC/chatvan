@@ -6,6 +6,7 @@ import {
   Loader2, Car, FileText, CheckCircle2,
   AlertTriangle, Wrench, RotateCcw, CreditCard,
   Flame, Bell, ChevronLeft, ChevronRight, CalendarDays,
+  Receipt, ShieldCheck, TrendingUp,
 } from 'lucide-react';
 
 const API = (path: string) => `${import.meta.env.BASE_URL}api${path}`;
@@ -265,6 +266,74 @@ function CalendarPanel() {
   );
 }
 
+// ── 売上内訳 ──────────────────────────────────────────────────────────────────
+function RevenueBreakdown({ stats, fmt }: { stats: any; fmt: (v: number) => string }) {
+  const items = [
+    {
+      label: 'カード売上',
+      value: fmt(stats.cardRevenue ?? 0),
+      sub: 'Square決済累計',
+      icon: <CreditCard className="h-4 w-4" />,
+      color: 'text-blue-600',
+      bg: 'bg-blue-50 border-blue-100',
+    },
+    {
+      label: '請求書売上',
+      value: fmt(stats.invoiceRevenue ?? 0),
+      sub: '振込・請求累計',
+      icon: <Receipt className="h-4 w-4" />,
+      color: 'text-violet-600',
+      bg: 'bg-violet-50 border-violet-100',
+    },
+    {
+      label: '黒ナンバー売上',
+      value: fmt(stats.blackNumberRevenue ?? 0),
+      sub: `${stats.blackNumberCount ?? 0}件`,
+      icon: <Car className="h-4 w-4" />,
+      color: 'text-gray-700',
+      bg: 'bg-gray-50 border-gray-200',
+    },
+    {
+      label: '保険紹介',
+      value: `${stats.insuranceCount ?? 0} 件`,
+      sub: '紹介申請累計',
+      icon: <ShieldCheck className="h-4 w-4" />,
+      color: 'text-emerald-600',
+      bg: 'bg-emerald-50 border-emerald-100',
+    },
+    {
+      label: '今月の粗利',
+      value: fmt(stats.thisMonthGrossProfit ?? 0),
+      sub: `売上見込 ${fmt(stats.thisMonthRevenue ?? 0)}`,
+      icon: <TrendingUp className="h-4 w-4" />,
+      color: 'text-amber-600',
+      bg: 'bg-amber-50 border-amber-100',
+      wide: true,
+    },
+  ];
+
+  return (
+    <div>
+      <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
+        <JpyIcon className="h-4 w-4 text-muted-foreground" />
+        売上内訳
+      </h2>
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        {items.map(item => (
+          <div key={item.label} className={`border rounded-xl p-4 ${item.bg}`}>
+            <div className={`flex items-center gap-1.5 mb-2 ${item.color}`}>
+              {item.icon}
+              <span className="text-xs font-medium">{item.label}</span>
+            </div>
+            <p className={`text-xl font-bold tabular-nums ${item.color}`}>{item.value}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{item.sub}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── メイン ────────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const { data: stats, isLoading } = useGetVanDashboard();
@@ -288,7 +357,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Row 1: KPI ─────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <KpiCard
           icon={<FileText className="h-3.5 w-3.5" />}
           label="新規相談"
@@ -307,14 +376,10 @@ export default function Dashboard() {
           value={`${stats.availableVehicles} / ${stats.totalVehicles}`}
           sub="提案可能な車両"
         />
-        <KpiCard
-          icon={<JpyIcon className="h-3.5 w-3.5" />}
-          label="今月の売上見込"
-          value={fmt(stats.thisMonthRevenue)}
-          sub={`粗利 ${fmt(stats.thisMonthGrossProfit ?? 0)} ／ 累積 ${fmt(stats.totalRevenue)}`}
-          dark
-        />
       </div>
+
+      {/* ── Row 1.5: 売上内訳 ─────────────────────────────────────────── */}
+      <RevenueBreakdown stats={stats} fmt={fmt} />
 
       {/* ── Row 2: 3パネル ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
