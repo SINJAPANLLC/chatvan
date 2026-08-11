@@ -1644,8 +1644,13 @@ router.get("/van/applications/:id/related", requireAuth, requireAdmin, async (re
     const [contracts, incidents, screening, identityVerification] = await Promise.all([
       // 契約
       db.execute(sql`
-        SELECT vc.*, v.maker, v.model, v.license_plate, v.prefecture,
-          rc.name as rental_company_name
+        SELECT vc.*,
+          v.maker, v.model, v.license_plate, v.prefecture, v.year, v.mileage,
+          v.inspection_expiry, v.has_etc, v.has_dashcam, v.has_backup_cam,
+          v.photos as vehicle_photos, v.vin, v.grade, v.smoking_policy,
+          v.insurance_company, v.insurance_expiry, v.compulsory_insurance_expiry,
+          v.mileage_limit, v.excess_mileage_fee,
+          rc.name as rental_company_name, rc.phone as rental_company_phone
         FROM van_contracts vc
         LEFT JOIN vehicles v ON vc.vehicle_id = v.id
         LEFT JOIN rental_companies rc ON v.rental_company_id = rc.id

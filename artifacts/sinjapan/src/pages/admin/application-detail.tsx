@@ -812,24 +812,153 @@ export default function AdminApplicationDetail() {
             {related?.contracts?.length === 0 && !['approved','contracting'].includes(application.status) && (
               <div className="bg-card border border-border rounded-xl p-12 text-center text-muted-foreground text-sm">契約はありません</div>
             )}
-            {(related?.contracts ?? []).map((c: any) => (
-              <Section key={c.id} title={`契約 #${c.id} — ${c.maker ?? ''} ${c.model ?? ''}`}>
-                <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-                  <DL label="ステータス" value={<span className="px-2 py-0.5 bg-muted rounded-full text-xs">{{
-                    pending_payment: '決済待ち', active: '利用中', delivery_pending: '納車待ち',
-                    return_pending: '返却予定', payment_issue: '支払い問題',
-                    completed: '契約終了', cancelled: '解約',
-                  }[c.status as string] ?? c.status}</span>} />
-                  <DL label="ナンバー" value={c.license_plate} />
-                  <DL label="都道府県" value={c.prefecture} />
-                  <DL label="月額" value={c.monthly_price ? `¥${Number(c.monthly_price).toLocaleString()}` : null} />
-                  <DL label="開始日" value={c.start_date} />
-                  <DL label="支払日" value={c.payment_day ? `毎月${c.payment_day}日` : null} />
-                  <DL label="レンタル会社" value={c.rental_company_name} />
-                  <DL label="登録日" value={c.created_at ? format(new Date(c.created_at), 'yyyy/MM/dd') : null} />
-                </dl>
-              </Section>
-            ))}
+            {(related?.contracts ?? []).map((c: any) => {
+              const vPhotos: string[] = (() => { try { return JSON.parse(c.vehicle_photos ?? '[]'); } catch { return []; } })();
+              const pickupPhotos: string[] = (() => { try { return JSON.parse(c.pickup_photos ?? '[]'); } catch { return []; } })();
+              const returnDocs: string[] = (() => { try { return JSON.parse(c.return_documents ?? '[]'); } catch { return []; } })();
+              const sig = (() => { try { const p = JSON.parse(c.signature_data ?? 'null'); return p?.signature ?? null; } catch { return null; } })();
+              const CONTRACT_STATUS: Record<string, string> = {
+                pending_payment: '決済待ち', active: '利用中', delivery_pending: '納車待ち',
+                return_pending: '返却予定', payment_issue: '支払い問題',
+                completed: '契約終了', cancelled: '解約',
+              };
+              return (
+              <div key={c.id} className="border border-border rounded-xl overflow-hidden">
+                {/* 車両写真 */}
+                {vPhotos.length > 0 && (
+                  <div className="flex gap-1 overflow-x-auto bg-muted/30 p-2">
+                    {vPhotos.map((p, i) => (
+                      <img key={i} src={`${import.meta.env.BASE_URL}api/storage${p}`} alt={`車両写真${i+1}`}
+                        className="h-36 w-auto rounded-lg object-cover shrink-0 border border-border" />
+                    ))}
+                  </div>
+                )}
+
+                <div className="p-4 space-y-5">
+                  {/* ヘッダー */}
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-bold">{c.maker} {c.model}{c.grade ? ` ${c.grade}` : ''}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">契約番号: {c.contract_number ?? `#${c.id}`}</p>
+                    </div>
+                    <span className="text-xs px-2.5 py-1 rounded-full border border-border bg-muted shrink-0 ml-2">
+                      {CONTRACT_STATUS[c.status] ?? c.status}
+                    </span>
+                  </div>
+
+                  {/* 契約内容 */}
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">契約内容</p>
+                    <dl className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                      <DL label="月額" value={c.monthly_price ? `¥${Number(c.monthly_price).toLocaleString()}` : null} />
+                      <DL label="開始日" value={c.start_date} />
+                      <DL label="終了予定" value={c.planned_end_date ?? c.end_date} />
+                      <DL label="支払日" value={c.payment_day ? `毎月${c.payment_day}日` : null} />
+                      <DL label="支払方法" value={c.payment_method === 'invoice' ? '請求書払い' : c.payment_method === 'card' ? 'カード' : c.payment_method} />
+                      <DL label="最低期間" value={c.minimum_term ? `${c.minimum_term}ヶ月` : null} />
+                    </dl>
+                  </div>
+
+                  {/* 車両スペック */}
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">車両スペック</p>
+                    <dl className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                      <DL label="ナンバー" value={c.license_plate} />
+                      <DL label="VIN" value={c.vin} />
+                      <DL label="都道府県" value={c.prefecture} />
+                      <DL label="年式" value={c.year ? `${c.year}年式` : null} />
+                      <DL label="走行距離" value={c.mileage ? `${Number(c.mileage).toLocaleString()} km` : null} />
+                      <DL label="車検満了" value={c.inspection_expiry} />
+                      <DL label="走行上限" value={c.mileage_limit ? `${Number(c.mileage_limit).toLocaleString()} km/月` : null} />
+                      <DL label="超過料金" value={c.excess_mileage_fee ? `¥${Number(c.excess_mileage_fee).toLocaleString()}/km` : null} />
+                      <DL label="喫煙" value={c.smoking_policy === 'no_smoking' ? '禁煙' : c.smoking_policy === 'smoking_ok' ? '喫煙可' : c.smoking_policy} />
+                    </dl>
+                    <div className="flex gap-2 mt-2">
+                      {[['ETC', c.has_etc], ['ドラレコ', c.has_dashcam], ['バックカメラ', c.has_backup_cam]].map(([lbl, val]) => (
+                        <span key={lbl as string} className={`text-xs px-2.5 py-1 rounded-full border ${val ? 'border-border bg-muted' : 'border-border text-muted-foreground line-through'}`}>{lbl}</span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* レンタル会社 */}
+                  {(c.rental_company_name || c.platform_operator) && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">会社情報</p>
+                      <dl className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                        <DL label="レンタル会社" value={c.rental_company_name} />
+                        <DL label="電話" value={c.rental_company_phone} />
+                        <DL label="プラットフォーム" value={c.platform_operator} />
+                      </dl>
+                    </div>
+                  )}
+
+                  {/* 締結書類・同意 */}
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">締結書類・同意記録</p>
+                    <div className="space-y-2 text-sm">
+                      {[
+                        { label: 'プラットフォーム契約同意', val: c.platform_contract_agreed_at },
+                        { label: '車両貸渡契約同意', val: c.vehicle_contract_agreed_at },
+                        { label: '利用規約同意', val: c.terms_agreed_at },
+                      ].map(({ label, val }) => (
+                        <div key={label} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+                          <span className="text-sm">{label}</span>
+                          {val ? (
+                            <span className="text-xs text-muted-foreground">{format(new Date(val), 'yyyy/MM/dd HH:mm')}</span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">未同意</span>
+                          )}
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between py-1.5 border-b border-border">
+                        <span className="text-sm">GPS利用同意</span>
+                        <span className={`text-xs ${c.gps_consent ? 'text-foreground' : 'text-muted-foreground'}`}>{c.gps_consent ? '同意済み' : '未同意'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 電子署名 */}
+                  {sig && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">電子署名</p>
+                      <img src={sig} alt="電子署名" className="h-20 border border-border rounded-lg bg-white p-1" />
+                    </div>
+                  )}
+
+                  {/* 納車時写真 */}
+                  {pickupPhotos.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">納車時写真</p>
+                      <div className="flex gap-2 flex-wrap">
+                        {pickupPhotos.map((p, i) => (
+                          <img key={i} src={`${import.meta.env.BASE_URL}api/storage${p}`} alt={`納車写真${i+1}`}
+                            className="h-28 w-auto rounded-lg border border-border object-cover" />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 返却書類 */}
+                  {returnDocs.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">返却書類</p>
+                      <div className="flex gap-2 flex-wrap">
+                        {returnDocs.map((p, i) => (
+                          <a key={i} href={`${import.meta.env.BASE_URL}api/storage${p}`} target="_blank" rel="noopener noreferrer"
+                            className="text-xs px-3 py-1.5 rounded-lg border border-border hover:bg-muted flex items-center gap-1">
+                            📄 書類 {i + 1}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 特記事項 */}
+                  {c.special_terms && <p className="text-xs bg-muted rounded-lg p-3"><span className="font-medium block mb-1">特記事項</span>{c.special_terms}</p>}
+                </div>
+              </div>
+              );
+            })}
             </>
           )}
         </div>
