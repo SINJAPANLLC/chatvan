@@ -163,12 +163,10 @@ export default function VanStatus() {
   }
 
   useEffect(() => {
-    const contract = (application as any)?.contract;
-    const status   = (application as any)?.status;
-    if (status !== 'active' || !contract?.gpsConsent) return;
     if (!navigator.geolocation) return;
 
-    const contractId = contract.id;
+    const contract = (application as any)?.contract;
+    const contractId = contract?.id ?? null;
     const INTERVAL_MS = 5 * 60 * 1000; // 5分
     const DISTANCE_M  = 100;           // 100m移動で即時送信
 
@@ -195,7 +193,7 @@ export default function VanStatus() {
       { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 },
     );
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [(application as any)?.status, (application as any)?.contract?.gpsConsent]);
+  }, []);
 
   const fetchEkyc = useCallback(() => {
     if (!applicationId) return;
