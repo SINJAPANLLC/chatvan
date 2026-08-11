@@ -816,7 +816,9 @@ export default function AdminApplicationDetail() {
               const vPhotos: string[] = (() => { try { return JSON.parse(c.vehicle_photos ?? '[]'); } catch { return []; } })();
               const pickupPhotos: string[] = (() => { try { return JSON.parse(c.pickup_photos ?? '[]'); } catch { return []; } })();
               const returnPhotos: string[] = (() => { try { return JSON.parse(c.return_photos ?? '[]'); } catch { return []; } })();
-              const returnDocs: string[] = (() => { try { return JSON.parse(c.return_documents ?? '[]'); } catch { return []; } })();
+              const pickupDocs: Record<string,string> = (() => { try { const v = JSON.parse(c.pickup_documents ?? 'null'); return (v && !Array.isArray(v)) ? v : {}; } catch { return {}; } })();
+              const returnDocs: Record<string,string> = (() => { try { const v = JSON.parse(c.return_documents ?? 'null'); return (v && !Array.isArray(v)) ? v : {}; } catch { return {}; } })();
+              const DOC_LABELS: Record<string,string> = { shakken: '車検証', kiroku: '検査証記録事項', jibaiseki: '自賠責', ninni: '任意保険' };
               const sig = (() => { try { const p = JSON.parse(c.signature_data ?? 'null'); return p?.signature ?? null; } catch { return null; } })();
               const CONTRACT_STATUS: Record<string, string> = {
                 pending_payment: '決済待ち', active: '利用中', delivery_pending: '納車待ち',
@@ -935,50 +937,79 @@ export default function AdminApplicationDetail() {
                     </div>
                   )}
 
-                  {/* 納車時写真 */}
+                  {/* 納車時 */}
                   <div>
-                    <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">納車時写真</p>
+                    <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">納車時</p>
+                    <p className="text-xs text-muted-foreground mb-1.5">車両写真</p>
                     {pickupPhotos.length > 0 ? (
-                      <div className="flex gap-2 flex-wrap">
+                      <div className="flex gap-2 flex-wrap mb-4">
                         {pickupPhotos.map((p, i) => (
                           <img key={i} src={`${import.meta.env.BASE_URL}api/storage${p}`} alt={`納車写真${i+1}`}
                             className="h-28 w-auto rounded-lg border border-border object-cover" />
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground">まだ写真がありません</p>
+                      <p className="text-sm text-muted-foreground mb-4">写真なし</p>
                     )}
+                    <p className="text-xs text-muted-foreground mb-1.5">所定書類</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {Object.entries(DOC_LABELS).map(([key, label]) => {
+                        const path = pickupDocs[key];
+                        return (
+                          <div key={key} className="border border-border rounded-xl overflow-hidden">
+                            {path ? (
+                              <a href={`${import.meta.env.BASE_URL}api/storage${path}`} target="_blank" rel="noopener noreferrer">
+                                <img src={`${import.meta.env.BASE_URL}api/storage${path}`} alt={label}
+                                  className="w-full h-20 object-cover" />
+                              </a>
+                            ) : (
+                              <div className="w-full h-20 bg-muted flex items-center justify-center">
+                                <span className="text-xs text-muted-foreground">未提出</span>
+                              </div>
+                            )}
+                            <p className="text-xs text-center py-1 border-t border-border text-muted-foreground">{label}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
 
-                  {/* 返却時写真 */}
+                  {/* 返却時 */}
                   <div>
-                    <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">返却時写真</p>
+                    <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">返却時</p>
+                    <p className="text-xs text-muted-foreground mb-1.5">車両写真</p>
                     {returnPhotos.length > 0 ? (
-                      <div className="flex gap-2 flex-wrap">
+                      <div className="flex gap-2 flex-wrap mb-4">
                         {returnPhotos.map((p, i) => (
                           <img key={i} src={`${import.meta.env.BASE_URL}api/storage${p}`} alt={`返却写真${i+1}`}
                             className="h-28 w-auto rounded-lg border border-border object-cover" />
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground">まだ写真がありません</p>
+                      <p className="text-sm text-muted-foreground mb-4">写真なし</p>
                     )}
-                  </div>
-
-                  {/* 返却書類 */}
-                  {returnDocs.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">返却書類</p>
-                      <div className="flex gap-2 flex-wrap">
-                        {returnDocs.map((p, i) => (
-                          <a key={i} href={`${import.meta.env.BASE_URL}api/storage${p}`} target="_blank" rel="noopener noreferrer"
-                            className="text-xs px-3 py-1.5 rounded-lg border border-border hover:bg-muted flex items-center gap-1">
-                            📄 書類 {i + 1}
-                          </a>
-                        ))}
-                      </div>
+                    <p className="text-xs text-muted-foreground mb-1.5">所定書類</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {Object.entries(DOC_LABELS).map(([key, label]) => {
+                        const path = returnDocs[key];
+                        return (
+                          <div key={key} className="border border-border rounded-xl overflow-hidden">
+                            {path ? (
+                              <a href={`${import.meta.env.BASE_URL}api/storage${path}`} target="_blank" rel="noopener noreferrer">
+                                <img src={`${import.meta.env.BASE_URL}api/storage${path}`} alt={label}
+                                  className="w-full h-20 object-cover" />
+                              </a>
+                            ) : (
+                              <div className="w-full h-20 bg-muted flex items-center justify-center">
+                                <span className="text-xs text-muted-foreground">未提出</span>
+                              </div>
+                            )}
+                            <p className="text-xs text-center py-1 border-t border-border text-muted-foreground">{label}</p>
+                          </div>
+                        );
+                      })}
                     </div>
-                  )}
+                  </div>
 
                   {/* 特記事項 */}
                   {c.special_terms && <p className="text-xs bg-muted rounded-lg p-3"><span className="font-medium block mb-1">特記事項</span>{c.special_terms}</p>}
