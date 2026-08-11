@@ -430,6 +430,26 @@ export default function AdminApplicationDetail() {
               </dl>
             </Section>
 
+            {/* オプション申請 */}
+            {related && (related.contracts ?? []).some((c: any) => c.black_number_requested || c.insurance_referral_requested) && (
+              <Section title="オプション申請">
+                <div className="flex flex-wrap gap-2">
+                  {(related.contracts ?? []).some((c: any) => c.black_number_requested) && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-foreground text-background text-xs font-medium rounded-full">
+                      <BadgeCheck className="h-3.5 w-3.5" />
+                      黒ナンバー取得申請あり
+                    </span>
+                  )}
+                  {(related.contracts ?? []).some((c: any) => c.insurance_referral_requested) && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-foreground text-background text-xs font-medium rounded-full">
+                      <Shield className="h-3.5 w-3.5" />
+                      保険紹介申請あり
+                    </span>
+                  )}
+                </div>
+              </Section>
+            )}
+
             {/* 管理メモ */}
             <Section title="管理メモ（内部用）">
               <textarea
