@@ -10,8 +10,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "react-markdown": "^10.1.0",
-    "@workspace/object-storage-web": "workspace:*"
+    "@types/leaflet": "^1.9.22",
+    "@workspace/object-storage-web": "workspace:*",
+    "leaflet": "^1.9.4",
+    "react-markdown": "^10.1.0"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",

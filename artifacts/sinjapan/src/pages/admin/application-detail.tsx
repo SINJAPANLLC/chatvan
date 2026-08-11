@@ -1,4 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import 'leaflet/dist/leaflet.css';
 import { useRoute, useLocation } from 'wouter';
 import {
   useGetVanApplication,
@@ -16,6 +17,71 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+
+// ─── GPS Map Component ────────────────────────────────────────────────────────
+const GpsMap: React.FC<{ locs: any[] }> = ({ locs }) => {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!mapRef.current || locs.length === 0) return;
+
+    import('leaflet').then(L => {
+      // Fix default icon
+      delete (L.Icon.Default.prototype as any)._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      });
+
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+
+      const latest = locs[0];
+      const center: [number, number] = [Number(latest.latitude), Number(latest.longitude)];
+      const map = L.map(mapRef.current!).setView(center, 15);
+      mapInstanceRef.current = map;
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+      }).addTo(map);
+
+      // ルートポリライン（古い順）
+      const coords: [number, number][] = [...locs].reverse().map(l => [Number(l.latitude), Number(l.longitude)]);
+      L.polyline(coords, { color: '#000', weight: 2, opacity: 0.6 }).addTo(map);
+
+      // 最新位置マーカー
+      L.marker(center)
+        .addTo(map)
+        .bindPopup(
+          `<b>最新位置</b><br>${latest.recorded_at ? new Date(latest.recorded_at).toLocaleString('ja-JP') : '-'}<br>精度: ±${Math.round(Number(latest.accuracy ?? 0))}m`
+        )
+        .openPopup();
+
+      // 古いポイントを小さい円で
+      locs.slice(1).forEach(l => {
+        L.circleMarker([Number(l.latitude), Number(l.longitude)], {
+          radius: 3, color: '#666', fillColor: '#999', fillOpacity: 0.7, weight: 1,
+        }).addTo(map).bindPopup(
+          l.recorded_at ? new Date(l.recorded_at).toLocaleString('ja-JP') : '-'
+        );
+      });
+    });
+
+    return () => {
+      if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
+    };
+  }, [locs]);
+
+  if (locs.length === 0) return (
+    <p className="text-sm text-muted-foreground py-4 text-center">位置情報はまだ送信されていません。</p>
+  );
+
+  return <div ref={mapRef} style={{ height: 420, borderRadius: 8 }} />;
+};
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const yen = (n: number | null | undefined) =>
@@ -1280,58 +1346,50 @@ export default function AdminApplicationDetail() {
         <div className="space-y-4">
           {relatedLoading ? <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-muted-foreground" /></div> : (
             <>
-              {/* ユーザー位置情報 */}
+              {/* ユーザー位置情報マップ */}
               {(() => {
                 const locs: any[] = related?.userLocations ?? [];
                 const latest = locs[0];
                 return (
-                  <Section title={`ユーザー位置情報（${locs.length}件）`}>
-                    {!latest ? (
-                      <p className="text-sm text-muted-foreground">位置情報はまだ送信されていません。GPSに同意済みのユーザーが利用中になると自動で記録されます。</p>
-                    ) : (
-                      <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-                        <DL label="緯度"     value={latest.latitude} />
-                        <DL label="経度"     value={latest.longitude} />
-                        <DL label="精度"     value={latest.accuracy != null ? `±${Math.round(Number(latest.accuracy))}m` : null} />
-                        <DL label="最終更新" value={latest.recorded_at ? format(new Date(latest.recorded_at), 'yyyy/MM/dd HH:mm:ss') : null} />
-                        <DL label="総記録数" value={`${locs.length}件`} />
-                        <div className="col-span-2 sm:col-span-3 flex gap-2 flex-wrap">
-                          <a
-                            href={`https://maps.google.com/?q=${latest.latitude},${latest.longitude}`}
-                            target="_blank" rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-xs hover:bg-muted transition-colors"
-                          >
-                            <MapPinned className="h-3.5 w-3.5" />最新位置をGoogleマップで開く
-                          </a>
-                        </div>
-                        {locs.length > 1 && (
-                          <div className="col-span-2 sm:col-span-3">
-                            <p className="text-xs font-medium text-foreground mb-2">直近の記録</p>
-                            <div className="space-y-1 max-h-48 overflow-y-auto">
-                              {locs.slice(0, 20).map((l: any) => (
-                                <a key={l.id}
-                                  href={`https://maps.google.com/?q=${l.latitude},${l.longitude}`}
-                                  target="_blank" rel="noopener noreferrer"
-                                  className="flex items-center justify-between px-3 py-1.5 rounded-lg hover:bg-muted transition-colors text-xs gap-2"
-                                >
-                                  <span className="text-muted-foreground">{l.recorded_at ? format(new Date(l.recorded_at), 'MM/dd HH:mm:ss') : '-'}</span>
-                                  <span className="font-mono">{Number(l.latitude).toFixed(5)}, {Number(l.longitude).toFixed(5)}</span>
-                                  <MapPinned className="h-3 w-3 text-muted-foreground shrink-0" />
-                                </a>
-                              ))}
+                  <Section title={`位置情報（${locs.length}件）`}>
+                    {/* メタ情報バー */}
+                    {latest && (
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-muted-foreground mb-3 pb-3 border-b border-border">
+                        <span>最終更新: <span className="text-foreground font-medium">{format(new Date(latest.recorded_at), 'yyyy/MM/dd HH:mm:ss')}</span></span>
+                        <span>精度: <span className="text-foreground">±{Math.round(Number(latest.accuracy ?? 0))}m</span></span>
+                        <span>総記録数: <span className="text-foreground">{locs.length}件</span></span>
+                        <a
+                          href={`https://maps.google.com/?q=${latest.latitude},${latest.longitude}`}
+                          target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 border border-border rounded-lg hover:bg-muted ml-auto"
+                        >
+                          <MapPinned className="h-3 w-3" />Googleマップで開く
+                        </a>
+                      </div>
+                    )}
+                    {/* Leaflet マップ */}
+                    <GpsMap locs={locs} />
+                    {/* 直近ログ */}
+                    {locs.length > 0 && (
+                      <div className="mt-3 border-t border-border pt-3">
+                        <p className="text-xs font-medium mb-2">直近の記録</p>
+                        <div className="space-y-0.5 max-h-36 overflow-y-auto">
+                          {locs.slice(0, 30).map((l: any) => (
+                            <div key={l.id} className="flex items-center justify-between px-2 py-1 rounded hover:bg-muted text-xs gap-3">
+                              <span className="text-muted-foreground tabular-nums">{l.recorded_at ? format(new Date(l.recorded_at), 'MM/dd HH:mm:ss') : '-'}</span>
+                              <span className="font-mono text-muted-foreground">{Number(l.latitude).toFixed(5)}, {Number(l.longitude).toFixed(5)}</span>
+                              {l.accuracy != null && <span className="text-muted-foreground">±{Math.round(Number(l.accuracy))}m</span>}
                             </div>
-                          </div>
-                        )}
-                      </dl>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </Section>
                 );
               })()}
 
               {/* 車両搭載GPSデバイス */}
-              {(related?.gps?.length === 0) ? (
-                <div className="bg-card border border-border rounded-xl p-8 text-center text-muted-foreground text-sm">車両搭載GPS機器はありません</div>
-              ) : related?.gps?.map((g: any) => {
+              {related?.gps?.length > 0 && related.gps.map((g: any) => {
                 const loc = g.last_location;
                 return (
                   <Section key={g.id} title={`車両GPS #${g.id} — ${g.maker ?? ''} ${g.model ?? ''} ${g.license_plate ?? ''}`}>
@@ -1349,7 +1407,7 @@ export default function AdminApplicationDetail() {
                             <a
                               href={`https://maps.google.com/?q=${loc.lat ?? loc.latitude},${loc.lng ?? loc.longitude}`}
                               target="_blank" rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-xs hover:bg-muted transition-colors"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-xs hover:bg-muted"
                             >
                               <MapPinned className="h-3.5 w-3.5" />Googleマップで開く
                             </a>
