@@ -100,128 +100,102 @@ function DrillDown({ year, month, label, onClose }: { year: number; month: strin
 function PLTable({ year, setYear }: { year: number; setYear: (y: number) => void }) {
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [openMonth, setOpenMonth] = useState<string | null>(null);
   const currentYear = new Date().getFullYear();
   const years = [currentYear - 1, currentYear, currentYear + 1];
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setRows(await apiFetch(`/api/admin/finance/pl?year=${year}`)); }
+    try { setRows(await apiFetch(`/api/admin/finance/van/pl?year=${year}`)); }
     finally { setLoading(false); }
   }, [year]);
 
-  useEffect(() => { load(); setOpenMonth(null); }, [load]);
+  useEffect(() => { load(); }, [load]);
 
-  // 12ヶ月分のデータを埋める
   const monthMap = Object.fromEntries(rows.map(r => [r.month, r]));
   const grid = Array.from({ length: 12 }, (_, i) => {
     const key = `${year}-${String(i + 1).padStart(2, '0')}`;
-    return monthMap[key] ?? { month: key, revenue: 0, cost: 0, grossProfit: 0, profitRate: 0, cardRevenue: 0, invoiceRevenue: 0, confirmedShipments: 0 };
+    return monthMap[key] ?? { month: key, contractRevenue: 0, cardRevenue: 0, invoiceRevenue: 0, contractCost: 0, grossProfit: 0, profitRate: 0, contractCount: 0 };
   });
 
-  const totals = grid.reduce((acc, r) => ({
-    revenue: acc.revenue + r.revenue,
-    cost: acc.cost + r.cost,
-    grossProfit: acc.grossProfit + r.grossProfit,
-    confirmedShipments: acc.confirmedShipments + r.confirmedShipments,
-    cardRevenue: acc.cardRevenue + r.cardRevenue,
+  const totals = grid.reduce((acc: any, r: any) => ({
+    revenue:        acc.revenue        + r.contractRevenue,
+    cost:           acc.cost           + r.contractCost,
+    grossProfit:    acc.grossProfit    + r.grossProfit,
+    cardRevenue:    acc.cardRevenue    + r.cardRevenue,
     invoiceRevenue: acc.invoiceRevenue + r.invoiceRevenue,
-  }), { revenue: 0, cost: 0, grossProfit: 0, confirmedShipments: 0, cardRevenue: 0, invoiceRevenue: 0 });
+    count:          acc.count          + (r.contractCount ?? 0),
+  }), { revenue: 0, cost: 0, grossProfit: 0, cardRevenue: 0, invoiceRevenue: 0, count: 0 });
 
   return (
     <div className="space-y-4">
-      {/* 年選択 */}
-      <div className="flex items-center gap-2">
-        {years.map(y => (
-          <button key={y} onClick={() => setYear(y)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${year === y ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:text-foreground'}`}>
-            {y}年
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <p className="text-xs text-muted-foreground">
+          契約売上：その月に有効化された契約の月額合計。原価＝レンタル会社支払い、粗利＝SIN JAPAN手数料。
+        </p>
+        <div className="flex items-center gap-1">
+          {years.map(y => (
+            <button key={y} onClick={() => setYear(y)}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${year === y ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:text-foreground'}`}>
+              {y}年
+            </button>
+          ))}
+          <button onClick={load} className="ml-2 text-muted-foreground hover:text-foreground">
+            <RefreshCw className="h-4 w-4" />
           </button>
-        ))}
-        <button onClick={load} className="ml-2 text-muted-foreground hover:text-foreground">
-          <RefreshCw className="h-4 w-4" />
-        </button>
+        </div>
       </div>
 
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : (
-        <div className="space-y-0">
-          <div className="rounded-xl border border-border shadow-sm overflow-x-auto">
-            <table className="w-full text-sm min-w-[700px]">
-              <thead>
-                <tr className="bg-muted/40 border-b border-border">
-                  <th className="px-5 py-3 text-left font-medium text-muted-foreground">月</th>
-                  <th className="px-5 py-3 text-right font-medium text-muted-foreground">売上</th>
-                  <th className="px-5 py-3 text-right font-medium text-muted-foreground text-xs">うちカード</th>
-                  <th className="px-5 py-3 text-right font-medium text-muted-foreground text-xs">うち請求書</th>
-                  <th className="px-5 py-3 text-right font-medium text-muted-foreground">原価</th>
-                  <th className="px-5 py-3 text-right font-medium text-muted-foreground">粗利</th>
-                  <th className="px-5 py-3 text-right font-medium text-muted-foreground">利益率</th>
-                  <th className="px-5 py-3 text-right font-medium text-muted-foreground">確定件数</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border bg-card">
-                {grid.map((r, i) => {
-                  const isEmpty = r.revenue === 0 && r.cost === 0;
-                  const monthKey = String(i + 1).padStart(2, '0');
-                  const isOpen = openMonth === r.month;
-                  return (
-                    <React.Fragment key={r.month}>
-                      <tr
-                        onClick={() => !isEmpty && setOpenMonth(isOpen ? null : r.month)}
-                        className={`transition-colors ${isEmpty ? 'opacity-40' : 'cursor-pointer hover:bg-muted/30'} ${isOpen ? 'bg-muted/20' : ''}`}
-                      >
-                        <td className="px-5 py-3 font-medium">
-                          <span className="flex items-center gap-1.5">
-                            {!isEmpty && (
-                              <span className={`text-xs text-muted-foreground transition-transform ${isOpen ? 'rotate-90' : ''} inline-block`}>▶</span>
-                            )}
-                            {MONTHS[i]}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3 text-right font-semibold">{isEmpty ? '—' : yen(r.revenue)}</td>
-                        <td className="px-5 py-3 text-right text-xs text-muted-foreground">{isEmpty ? '—' : yen(r.cardRevenue)}</td>
-                        <td className="px-5 py-3 text-right text-xs text-muted-foreground">{isEmpty ? '—' : yen(r.invoiceRevenue)}</td>
-                        <td className="px-5 py-3 text-right text-muted-foreground">{isEmpty ? '—' : yen(r.cost)}</td>
-                        <td className={`px-5 py-3 text-right font-semibold ${r.grossProfit < 0 ? 'text-red-600' : ''}`}>
-                          {isEmpty ? '—' : yen(r.grossProfit)}
-                        </td>
-                        <td className="px-5 py-3 text-right text-muted-foreground">{isEmpty ? '—' : pct(r.profitRate)}</td>
-                        <td className="px-5 py-3 text-right text-muted-foreground">{isEmpty ? '—' : `${r.confirmedShipments}件`}</td>
-                      </tr>
-                      {isOpen && (
-                        <tr>
-                          <td colSpan={8} className="px-4 py-0">
-                            <DrillDown
-                              year={year}
-                              month={monthKey}
-                              label={`${year}年${MONTHS[i]}`}
-                              onClose={() => setOpenMonth(null)}
-                            />
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr className="bg-foreground text-background">
-                  <td className="px-5 py-3.5 font-bold">合計</td>
-                  <td className="px-5 py-3.5 text-right font-bold">{yen(totals.revenue)}</td>
-                  <td className="px-5 py-3.5 text-right text-sm opacity-75">{yen(totals.cardRevenue)}</td>
-                  <td className="px-5 py-3.5 text-right text-sm opacity-75">{yen(totals.invoiceRevenue)}</td>
-                  <td className="px-5 py-3.5 text-right opacity-75">{yen(totals.cost)}</td>
-                  <td className="px-5 py-3.5 text-right font-bold">{yen(totals.grossProfit)}</td>
-                  <td className="px-5 py-3.5 text-right opacity-75">
-                    {totals.revenue > 0 ? pct(Math.round(totals.grossProfit / totals.revenue * 1000) / 10) : '—'}
-                  </td>
-                  <td className="px-5 py-3.5 text-right opacity-75">{totals.confirmedShipments}件</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+        <div className="rounded-xl border border-border shadow-sm overflow-x-auto">
+          <table className="w-full text-sm min-w-[700px]">
+            <thead>
+              <tr className="bg-muted/40 border-b border-border">
+                <th className="px-5 py-3 text-left font-medium text-muted-foreground">月</th>
+                <th className="px-5 py-3 text-right font-medium text-muted-foreground">契約売上</th>
+                <th className="px-5 py-3 text-right font-medium text-muted-foreground text-xs">うちカード</th>
+                <th className="px-5 py-3 text-right font-medium text-muted-foreground text-xs">うち請求書</th>
+                <th className="px-5 py-3 text-right font-medium text-muted-foreground">原価</th>
+                <th className="px-5 py-3 text-right font-medium text-muted-foreground">粗利</th>
+                <th className="px-5 py-3 text-right font-medium text-muted-foreground">利益率</th>
+                <th className="px-5 py-3 text-right font-medium text-muted-foreground">契約数</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border bg-card">
+              {grid.map((r: any, i) => {
+                const isEmpty = r.contractRevenue === 0 && r.contractCost === 0;
+                return (
+                  <tr key={r.month} className={isEmpty ? 'opacity-40' : ''}>
+                    <td className="px-5 py-3 font-medium">{MONTHS[i]}</td>
+                    <td className="px-5 py-3 text-right font-semibold">{isEmpty ? '—' : yen(r.contractRevenue)}</td>
+                    <td className="px-5 py-3 text-right text-xs text-muted-foreground">{isEmpty ? '—' : yen(r.cardRevenue)}</td>
+                    <td className="px-5 py-3 text-right text-xs text-muted-foreground">{isEmpty ? '—' : yen(r.invoiceRevenue)}</td>
+                    <td className="px-5 py-3 text-right text-muted-foreground">{isEmpty ? '—' : yen(r.contractCost)}</td>
+                    <td className={`px-5 py-3 text-right font-semibold ${r.grossProfit < 0 ? 'text-red-600' : ''}`}>
+                      {isEmpty ? '—' : yen(r.grossProfit)}
+                    </td>
+                    <td className="px-5 py-3 text-right text-muted-foreground">{isEmpty ? '—' : pct(r.profitRate)}</td>
+                    <td className="px-5 py-3 text-right text-muted-foreground">{isEmpty ? '—' : `${r.contractCount ?? 0}件`}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="bg-foreground text-background">
+                <td className="px-5 py-3.5 font-bold">合計</td>
+                <td className="px-5 py-3.5 text-right font-bold">{yen(totals.revenue)}</td>
+                <td className="px-5 py-3.5 text-right text-sm opacity-75">{yen(totals.cardRevenue)}</td>
+                <td className="px-5 py-3.5 text-right text-sm opacity-75">{yen(totals.invoiceRevenue)}</td>
+                <td className="px-5 py-3.5 text-right opacity-75">{yen(totals.cost)}</td>
+                <td className="px-5 py-3.5 text-right font-bold">{yen(totals.grossProfit)}</td>
+                <td className="px-5 py-3.5 text-right opacity-75">
+                  {totals.revenue > 0 ? pct(Math.round(totals.grossProfit / totals.revenue * 1000) / 10) : '—'}
+                </td>
+                <td className="px-5 py-3.5 text-right opacity-75">{totals.count}件</td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       )}
     </div>

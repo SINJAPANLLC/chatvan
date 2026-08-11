@@ -148,6 +148,90 @@ router.patch("/admin/finance/card-payments/:id/reconcile", requireAdmin, async (
   res.json({ ok: true });
 });
 
+// ── VAN PL ────────────────────────────────────────────────────────────────────
+// GET /admin/finance/van/pl?year=2026
+// 月ごとに「契約が有効だった月」の売上・原価・粗利を集計
+router.get("/admin/finance/van/pl", requireAdmin, async (req, res): Promise<void> => {
+  const year = Number(req.query.year ?? new Date().getFullYear());
+
+  // invoices テーブルからVAN請求書（INV-数字-...形式）の実績を月別集計
+  const invRows = await db.execute(sql`
+    SELECT
+      TO_CHAR(i.created_at, 'YYYY-MM')   AS month,
+      COUNT(*)                            AS invoice_count,
+      SUM(i.total_amount)                 AS inv_revenue,
+      COALESCE(SUM(CASE WHEN i.status = 'paid' THEN i.total_amount ELSE 0 END), 0) AS inv_paid
+    FROM invoices i
+    WHERE EXTRACT(YEAR FROM i.created_at) = ${year}
+      AND i.invoice_number ~ '^INV-[0-9]'
+    GROUP BY TO_CHAR(i.created_at, 'YYYY-MM')
+  `);
+  const invoiceData: any[] = (invRows as any)?.rows ?? invRows;
+
+  // payment_retries から成功したカード課金を月別集計
+  const prRows = await db.execute(sql`
+    SELECT
+      TO_CHAR(pr.attempted_at, 'YYYY-MM') AS month,
+      SUM(pr.amount)                       AS card_revenue,
+      COUNT(*)                             AS card_count
+    FROM payment_retries pr
+    WHERE pr.result = 'success'
+      AND EXTRACT(YEAR FROM pr.attempted_at) = ${year}
+    GROUP BY TO_CHAR(pr.attempted_at, 'YYYY-MM')
+  `);
+  const cardData: any[] = (prRows as any)?.rows ?? prRows;
+
+  // van_contracts から当年に有効な契約の月額（月単位の「契約売上ポテンシャル」）
+  const contractRows = await db.execute(sql`
+    SELECT
+      TO_CHAR(vc.created_at, 'YYYY-MM') AS month,
+      SUM(vc.monthly_price + COALESCE(vc.sin_japan_fee, 0)) AS contract_revenue,
+      SUM(vc.monthly_price)                                  AS contract_cost,
+      SUM(COALESCE(vc.sin_japan_fee, 0))                     AS contract_profit,
+      COUNT(*)                                               AS contract_count
+    FROM van_contracts vc
+    WHERE vc.status::text IN ('active', 'delivery_pending', 'return_pending', 'payment_issue')
+      AND EXTRACT(YEAR FROM vc.created_at) = ${year}
+    GROUP BY TO_CHAR(vc.created_at, 'YYYY-MM')
+  `);
+  const contractData: any[] = (contractRows as any)?.rows ?? contractRows;
+
+  // マージ
+  const merged: Record<string, any> = {};
+  for (let m = 1; m <= 12; m++) {
+    const key = `${year}-${String(m).padStart(2,'0')}`;
+    merged[key] = { month: key, invoiceRevenue: 0, invoicePaid: 0, cardRevenue: 0, contractRevenue: 0, contractCost: 0, contractProfit: 0 };
+  }
+  for (const r of invoiceData) if (r.month && merged[r.month]) { merged[r.month].invoiceRevenue = Number(r.inv_revenue ?? 0); merged[r.month].invoicePaid = Number(r.inv_paid ?? 0); }
+  for (const r of cardData)    if (r.month && merged[r.month]) { merged[r.month].cardRevenue = Number(r.card_revenue ?? 0); }
+  for (const r of contractData) if (r.month && merged[r.month]) {
+    merged[r.month].contractRevenue = Number(r.contract_revenue ?? 0);
+    merged[r.month].contractCost    = Number(r.contract_cost    ?? 0);
+    merged[r.month].contractProfit  = Number(r.contract_profit  ?? 0);
+    merged[r.month].contractCount   = Number(r.contract_count   ?? 0);
+  }
+
+  const result = Object.values(merged).map((r: any) => {
+    // 売上 = 請求書 + カード（実績） ＋ 契約ベース（ポテンシャル）を全部出す
+    const revenue = r.cardRevenue + r.invoiceRevenue + r.contractRevenue;
+    const cost    = r.contractCost;
+    return {
+      month:           r.month,
+      revenue,          // 全合計
+      cardRevenue:     r.cardRevenue,
+      invoiceRevenue:  r.invoiceRevenue,
+      invoicePaid:     r.invoicePaid,
+      contractRevenue: r.contractRevenue, // 月額契約ベース
+      cost:            r.contractCost,
+      grossProfit:     r.contractProfit,
+      profitRate:      r.contractRevenue > 0
+        ? Math.round(r.contractProfit / r.contractRevenue * 1000) / 10 : 0,
+      contractCount:   r.contractCount ?? 0,
+    };
+  });
+  res.json(result);
+});
+
 // ── VAN レンタル会社支払い ────────────────────────────────────────────────────
 
 // GET /admin/finance/van/rental-payments?year=2026&month=08
@@ -184,7 +268,7 @@ router.get("/admin/finance/van/rental-payments", requireAdmin, async (req, res):
     JOIN rental_companies rc ON vc.rental_company_id = rc.id
     LEFT JOIN vehicles v     ON vc.vehicle_id = v.id
     LEFT JOIN users u        ON vc.user_id = u.id
-    WHERE vc.status IN ('active', 'delivery_pending', 'return_pending', 'payment_issue')
+    WHERE vc.status::text IN ('active', 'delivery_pending', 'return_pending', 'payment_issue')
       AND vc.rental_company_id IS NOT NULL
     ORDER BY rc.name, vc.id
   `);
@@ -254,7 +338,7 @@ router.get("/admin/finance/van/rental-payment-statement", requireAdmin, async (r
     LEFT JOIN vehicles v     ON vc.vehicle_id = v.id
     LEFT JOIN users u        ON vc.user_id = u.id
     WHERE vc.rental_company_id = ${rcId}
-      AND vc.status IN ('active', 'delivery_pending', 'return_pending', 'payment_issue')
+      AND vc.status::text IN ('active', 'delivery_pending', 'return_pending', 'payment_issue')
     ORDER BY vc.id
   `);
   const contracts: any[] = (rows as any)?.rows ?? rows;
