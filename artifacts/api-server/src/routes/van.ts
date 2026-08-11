@@ -1620,6 +1620,79 @@ router.post("/van/payment-retries/:id/retry", requireAuth, requireAdmin, async (
   }
 });
 
+// POST /van/contracts/:id/additional-charge  追加決済（カード or 請求書）
+router.post("/van/contracts/:id/additional-charge", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const contractId = parseInt(String(req.params.id));
+    const { amount, description, method, dueDate } = req.body as {
+      amount: number; description: string; method: 'card' | 'invoice'; dueDate?: string;
+    };
+    if (!amount || amount <= 0) return res.status(400).json({ error: "金額を正しく入力してください" });
+    if (!description) return res.status(400).json({ error: "摘要を入力してください" });
+
+    const [contract] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.id, contractId));
+    if (!contract) return res.status(404).json({ error: "Contract not found" });
+
+    if (method === 'card') {
+      // カード on file で課金
+      const userRow = await db.execute(sql`SELECT square_customer_id, square_card_id FROM users WHERE id = ${contract.userId} LIMIT 1`);
+      const user: any = ((userRow as any)?.rows ?? userRow)[0];
+      if (!user?.square_card_id || !user?.square_customer_id) {
+        return res.status(400).json({ error: "登録済みカードがありません。請求書払いを選択してください。" });
+      }
+      const chargeAmount = Math.round(amount);
+      const squareRes = await squareFetch("/v2/payments", "POST", {
+        source_id: user.square_card_id,
+        customer_id: user.square_customer_id,
+        idempotency_key: randomUUID(),
+        amount_money: { amount: chargeAmount, currency: "JPY" },
+        autocomplete: true,
+        note: `Chat VAN 追加決済 契約#${contractId} ${description}`,
+      });
+      const data = await squareRes.json() as any;
+      if (!squareRes.ok) {
+        const code = data.errors?.[0]?.code ?? "";
+        const msgs: Record<string, string> = {
+          CARD_EXPIRED: "カードの有効期限が切れています",
+          INSUFFICIENT_FUNDS: "残高が不足しています",
+          GENERIC_DECLINE: "カードが拒否されました",
+        };
+        return res.status(502).json({ error: msgs[code] ?? "カード決済に失敗しました" });
+      }
+      // payment_retries に成功記録
+      await db.execute(sql`
+        INSERT INTO payment_retries (contract_id, user_id, amount, period_month, result, square_payment_id, failure_reason, attempted_at)
+        VALUES (${contractId}, ${contract.userId}, ${chargeAmount}, ${description}, 'success', ${data.payment?.id ?? null}, NULL, NOW())
+      `);
+      if (contract.userId) {
+        await db.insert(notificationsTable).values({
+          userId: contract.userId,
+          title: "Chat VAN - 追加決済が完了しました",
+          message: `${description}（¥${chargeAmount.toLocaleString()}）の決済が完了しました。`,
+        });
+      }
+      return res.json({ ok: true, method: 'card' });
+
+    } else {
+      // 請求書作成
+      const now = new Date();
+      const invoiceNumber = `INV-${contractId}-ADD-${now.getTime()}`;
+      const subtotal = Math.round(amount);
+      const tax = Math.floor(subtotal * 0.1);
+      const totalAmount = subtotal + tax;
+      const due = dueDate ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2,'0')}-${String(new Date(now.getFullYear(), now.getMonth()+1, 0).getDate()).padStart(2,'0')}`;
+      await db.execute(sql`
+        INSERT INTO invoices (user_id, invoice_number, period_start, period_end, subtotal, tax, total_amount, status, due_date, created_at)
+        VALUES (${contract.userId}, ${invoiceNumber}, NOW(), NOW(), ${subtotal}, ${tax}, ${totalAmount}, 'pending', ${due}, NOW())
+      `);
+      return res.json({ ok: true, method: 'invoice', invoiceNumber, totalAmount });
+    }
+  } catch (err) {
+    console.error("additional-charge error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
 // ── PATCH /van/contracts/:id/options  支払い前にオプションを変更 ───────────
 router.patch("/van/contracts/:id/options", requireAuth, async (req: Request, res: Response) => {
   try {

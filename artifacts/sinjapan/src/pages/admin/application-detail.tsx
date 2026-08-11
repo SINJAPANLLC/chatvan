@@ -334,6 +334,43 @@ export default function AdminApplicationDetail() {
     } finally { setPaymentConfirming(null); }
   };
 
+  // 追加決済
+  const [showAddPayment, setShowAddPayment] = useState(false);
+  const [addPaymentForm, setAddPaymentForm] = useState({ amount: '', description: '', method: 'invoice', dueDate: '' });
+  const [addPaymentLoading, setAddPaymentLoading] = useState(false);
+  const handleAddPayment = async () => {
+    if (!addPaymentForm.amount || Number(addPaymentForm.amount) <= 0) {
+      toast({ variant: 'destructive', title: '金額を正しく入力してください' }); return;
+    }
+    if (!addPaymentForm.description) {
+      toast({ variant: 'destructive', title: '摘要を入力してください' }); return;
+    }
+    const contractId = related?.contracts?.[0]?.id;
+    if (!contractId) { toast({ variant: 'destructive', title: '契約が見つかりません' }); return; }
+    setAddPaymentLoading(true);
+    try {
+      const token = localStorage.getItem('sinjapan_auth_token');
+      const r = await fetch(`${import.meta.env.BASE_URL}api/van/contracts/${contractId}/additional-charge`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: Number(addPaymentForm.amount),
+          description: addPaymentForm.description,
+          method: addPaymentForm.method,
+          dueDate: addPaymentForm.dueDate || undefined,
+        }),
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? '');
+      toast({ title: json.method === 'card' ? 'カード決済が完了しました' : `請求書（${json.invoiceNumber}）を作成しました` });
+      setShowAddPayment(false);
+      setAddPaymentForm({ amount: '', description: '', method: 'invoice', dueDate: '' });
+      setRelated(null); loadRelated();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: e.message || '追加決済に失敗しました' });
+    } finally { setAddPaymentLoading(false); }
+  };
+
   // 請求書ステータス変更
   const [invoiceUpdating, setInvoiceUpdating] = useState<number | null>(null);
   const updateInvoiceStatus = async (invoiceId: number, status: string) => {
@@ -1221,6 +1258,79 @@ export default function AdminApplicationDetail() {
          ═══════════════════════════════════════════════════════════════════════ */}
       {tab === 'payment' && (
         <div className="space-y-4">
+          {/* 追加決済ボタン */}
+          <div className="flex justify-end">
+            <button
+              onClick={() => setShowAddPayment(true)}
+              className="flex items-center gap-1.5 px-4 py-2 bg-foreground text-background text-sm font-medium rounded-lg hover:opacity-90 transition"
+            >
+              <Plus className="h-4 w-4" />追加決済
+            </button>
+          </div>
+
+          {/* 追加決済モーダル */}
+          {showAddPayment && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowAddPayment(false)}>
+              <div className="bg-card border border-border rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-base font-semibold">追加決済</h2>
+                  <button onClick={() => setShowAddPayment(false)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+                </div>
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">金額（税抜）</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">¥</span>
+                      <input type="number" min="1" placeholder="例: 10000"
+                        value={addPaymentForm.amount}
+                        onChange={e => setAddPaymentForm(f => ({ ...f, amount: e.target.value }))}
+                        className="w-full pl-7 pr-3 py-2 border rounded-lg text-sm outline-none focus:border-foreground/50" />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">摘要</label>
+                    <input type="text" placeholder="例: 修理費・超過走行料金"
+                      value={addPaymentForm.description}
+                      onChange={e => setAddPaymentForm(f => ({ ...f, description: e.target.value }))}
+                      className="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:border-foreground/50" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">支払方法</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {([['invoice', '請求書払い'], ['card', 'カード決済']] as const).map(([val, label]) => (
+                        <button key={val} type="button"
+                          onClick={() => setAddPaymentForm(f => ({ ...f, method: val }))}
+                          className={`py-2 text-sm rounded-lg border transition ${addPaymentForm.method === val ? 'bg-foreground text-background border-foreground' : 'border-border hover:bg-muted'}`}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    {addPaymentForm.method === 'card' && !related?.userCard?.hasCardOnFile && (
+                      <p className="text-xs text-amber-600">⚠ 登録済みカードがないためカード決済は利用できません</p>
+                    )}
+                  </div>
+                  {addPaymentForm.method === 'invoice' && (
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">支払期限 <span className="text-muted-foreground font-normal">（任意）</span></label>
+                      <input type="date"
+                        value={addPaymentForm.dueDate}
+                        onChange={e => setAddPaymentForm(f => ({ ...f, dueDate: e.target.value }))}
+                        className="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:border-foreground/50" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button onClick={() => setShowAddPayment(false)} className="flex-1 py-2 text-sm border rounded-lg hover:bg-muted">キャンセル</button>
+                  <button onClick={handleAddPayment} disabled={addPaymentLoading}
+                    className="flex-1 py-2 text-sm bg-foreground text-background rounded-lg hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1.5">
+                    {addPaymentLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
+                    決済する
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {relatedLoading ? <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-muted-foreground" /></div> : (
             <>
             {/* カード決済履歴 */}
