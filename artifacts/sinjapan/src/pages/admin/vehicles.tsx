@@ -151,8 +151,8 @@ export default function AdminVehicles() {
       maker: '', model: '', grade: '', year: new Date().getFullYear(),
       color: '', vin: '', licensePlate: '', transmission: 'AT', fuelType: 'ガソリン',
       engineDisplacement: '', mileage: '', inspectionExpiry: '', compulsoryInsuranceExpiry: '',
-      prefecture: '', locationDetail: '', monthlyPrice: 30000, sinJapanFee: 5000, insuranceFee: 0,
-      minPeriodMonths: 1, maxPeriodMonths: '', mileageLimit: '', excessMileageFee: '',
+      prefecture: '', locationDetail: '', monthlyPrice: 30000, sinJapanFee: 5000,
+      minPeriodMonths: 1,
       availableFrom: '', smokingPolicy: 'no_smoking',
       hasEtc: false, hasDashcam: false, hasBackupCam: false,
       inspectionCertificateOwner: '', inspectionCertificateUser: '',
@@ -182,13 +182,9 @@ export default function AdminVehicles() {
         photos,
         year: formData.year ? Number(formData.year) : null,
         mileage: formData.mileage ? Number(formData.mileage) : null,
-        monthlyPrice: Number(formData.monthlyPrice),
-        sinJapanFee: Number(formData.sinJapanFee) || 0,
-        insuranceFee: Number(formData.insuranceFee) || 0,
+        monthlyPrice: Math.round(Number(formData.monthlyPrice)),
+        sinJapanFee: Math.round(Number(formData.sinJapanFee)) || 0,
         minPeriodMonths: Number(formData.minPeriodMonths) || 1,
-        maxPeriodMonths: formData.maxPeriodMonths ? Number(formData.maxPeriodMonths) : null,
-        mileageLimit: formData.mileageLimit ? Number(formData.mileageLimit) : null,
-        excessMileageFee: formData.excessMileageFee ? Number(formData.excessMileageFee) : null,
         rentalCompanyId: formData.rentalCompanyId ? Number(formData.rentalCompanyId) : null,
       };
       if (editingId) {
@@ -423,28 +419,16 @@ export default function AdminVehicles() {
               <input className={inp} value={formData.locationDetail ?? ''} onChange={e => set('locationDetail', e.target.value)} placeholder="例: 横浜市港北区" />
             </Field>
             <Field label="月額料金（原価）">
-              <input type="number" className={inp} value={formData.monthlyPrice ?? ''} onChange={e => set('monthlyPrice', e.target.value)} />
+              <input type="number" className={inp} value={formData.monthlyPrice != null ? Math.round(Number(formData.monthlyPrice)) : ''} onChange={e => set('monthlyPrice', e.target.value)} />
             </Field>
             <Field label="SIN JAPAN 手数料">
-              <input type="number" className={inp} value={formData.sinJapanFee ?? ''} onChange={e => set('sinJapanFee', e.target.value)} />
-            </Field>
-            <Field label="保険料（月額）">
-              <input type="number" className={inp} value={formData.insuranceFee ?? ''} onChange={e => set('insuranceFee', e.target.value)} />
+              <input type="number" className={inp} value={formData.sinJapanFee != null ? Math.round(Number(formData.sinJapanFee)) : ''} onChange={e => set('sinJapanFee', e.target.value)} />
             </Field>
             <Field label="貸出開始日">
               <input type="date" className={inp} value={formData.availableFrom ?? ''} onChange={e => set('availableFrom', e.target.value)} />
             </Field>
             <Field label="最低利用期間（月）">
               <input type="number" className={inp} value={formData.minPeriodMonths ?? ''} onChange={e => set('minPeriodMonths', e.target.value)} />
-            </Field>
-            <Field label="最長利用期間（月）">
-              <input type="number" className={inp} value={formData.maxPeriodMonths ?? ''} onChange={e => set('maxPeriodMonths', e.target.value)} placeholder="未設定" />
-            </Field>
-            <Field label="走行距離制限（km/月）">
-              <input type="number" className={inp} value={formData.mileageLimit ?? ''} onChange={e => set('mileageLimit', e.target.value)} placeholder="未設定" />
-            </Field>
-            <Field label="超過走行料金（円/km）">
-              <input type="number" className={inp} value={formData.excessMileageFee ?? ''} onChange={e => set('excessMileageFee', e.target.value)} placeholder="未設定" />
             </Field>
 
             {/* ── 装備 ── */}
