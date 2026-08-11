@@ -12,7 +12,7 @@ import {
   Loader2, ChevronLeft, Save, Send, Check, Printer, Bell,
   User, Car, MessageSquare, FileText, CreditCard, ClipboardList,
   Phone, Mail, MapPin, Calendar, Banknote, Shield, BadgeCheck,
-  Truck, Wrench, Camera, Package,
+  Truck, Wrench, Camera, Package, Plus, X,
   ScrollText, Wallet, MapPinned, AlertTriangle, ClipboardCheck,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';

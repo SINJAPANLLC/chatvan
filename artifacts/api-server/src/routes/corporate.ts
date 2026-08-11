@@ -128,6 +128,19 @@ router.patch("/admin/corporate/:userId/suspend", requireAdmin, async (req, res):
   res.json({ message: "停止しました" });
 });
 
+// PATCH /admin/corporate/:userId/info — 会社情報編集
+router.patch("/admin/corporate/:userId/info", requireAdmin, async (req, res): Promise<void> => {
+  const userId = parseInt(req.params.userId, 10);
+  const { companyName, email, corporateNumber, paymentTerms } = req.body;
+  await db.update(usersTable).set({
+    ...(companyName    !== undefined && { companyName }),
+    ...(email          !== undefined && { email }),
+    ...(corporateNumber!== undefined && { corporateNumber }),
+    ...(paymentTerms   !== undefined && { paymentTerms }),
+  }).where(eq(usersTable.id, userId));
+  res.json({ message: "更新しました" });
+});
+
 // PATCH /admin/corporate/:userId/credit-limit — 与信枠変更
 router.patch("/admin/corporate/:userId/credit-limit", requireAdmin, async (req, res): Promise<void> => {
   const userId = parseInt(req.params.userId, 10);
