@@ -286,16 +286,18 @@ router.get("/admin/finance/van/rental-payments", requireAdmin, async (req, res):
       });
     }
     const co = companyMap.get(rcId)!;
-    const price = Number(r.monthly_price ?? 0);
+    const priceExTax = Number(r.monthly_price ?? 0);
+    const priceInTax = Math.round(priceExTax * 1.1);
     co.contracts.push({
-      contractId:   Number(r.contract_id),
-      vehicleName:  r.vehicle_name ?? '—',
+      contractId:    Number(r.contract_id),
+      vehicleName:   r.vehicle_name ?? '—',
       vehicleNumber: r.vehicle_number ?? '—',
-      vehicleMaker: r.vehicle_maker ?? '',
-      monthlyPrice: price,
-      userName:     r.user_company || r.user_name || '—',
+      vehicleMaker:  r.vehicle_maker ?? '',
+      monthlyPrice:  priceInTax,
+      monthlyPriceExTax: priceExTax,
+      userName:      r.user_company || r.user_name || '—',
     });
-    co.totalAmount += price;
+    co.totalAmount += priceInTax;
   }
 
   res.json({
@@ -338,17 +340,24 @@ router.get("/admin/finance/van/rental-payment-statement", requireAdmin, async (r
   `);
   const contracts: any[] = (rows as any)?.rows ?? rows;
 
-  const total = contracts.reduce((s, r) => s + Number(r.monthly_price ?? 0), 0);
   const fmt = (n: number) => new Intl.NumberFormat('ja-JP').format(Math.round(n));
   const rcName = contracts[0]?.rc_name ?? '—';
+  const totalExTax = contracts.reduce((s, r) => s + Number(r.monthly_price ?? 0), 0);
+  const totalTax   = Math.round(totalExTax * 0.1);
+  const total      = totalExTax + totalTax;
 
-  const tableRows = contracts.map(r => `
+  const tableRows = contracts.map(r => {
+    const exTax = Number(r.monthly_price ?? 0);
+    const inTax = Math.round(exTax * 1.1);
+    return `
     <tr>
       <td>${r.vehicle_name ?? '—'}</td>
       <td>${r.vehicle_number ?? '—'}</td>
       <td>${r.user_company || r.user_name || '—'}</td>
-      <td class="num">¥${fmt(Number(r.monthly_price ?? 0))}</td>
-    </tr>`).join('');
+      <td class="num">¥${fmt(exTax)}</td>
+      <td class="num">¥${fmt(inTax)}</td>
+    </tr>`;
+  }).join('');
 
   const html = `<!DOCTYPE html>
 <html lang="ja">
@@ -403,6 +412,7 @@ router.get("/admin/finance/van/rental-payment-statement", requireAdmin, async (r
         <th>車両名</th>
         <th>ナンバー</th>
         <th>利用者</th>
+        <th class="num">月額（税抜）</th>
         <th class="num">月額（税込）</th>
       </tr>
     </thead>
@@ -411,7 +421,18 @@ router.get("/admin/finance/van/rental-payment-statement", requireAdmin, async (r
     </tbody>
     <tfoot>
       <tr class="total-row">
-        <td colspan="3">合計</td>
+        <td colspan="3">小計（税抜）</td>
+        <td class="num">¥${fmt(totalExTax)}</td>
+        <td></td>
+      </tr>
+      <tr class="total-row">
+        <td colspan="3">消費税（10%）</td>
+        <td class="num">¥${fmt(totalTax)}</td>
+        <td></td>
+      </tr>
+      <tr class="total-row">
+        <td colspan="3">合計（税込）</td>
+        <td></td>
         <td class="num">¥${fmt(total)}</td>
       </tr>
     </tfoot>
