@@ -31,7 +31,6 @@ const NAV_SECTIONS: Section[] = [
     title: '財務',
     items: [
       { href: '/admin/corporate', label: '法人口座審査',   icon: Building2 },
-      { href: '/admin/invoices',  label: '請求書払い管理', icon: Receipt },
       { href: '/admin/finance',  label: 'PL・BS・CF',    icon: TrendingUp },
     ],
   },
