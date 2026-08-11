@@ -894,8 +894,8 @@ router.get("/van/dashboard", requireAuth, requireAdmin, async (req: Request, res
       // カード売上 (Square決済成功)
       db.execute(sql`SELECT COALESCE(SUM(amount),0) AS total FROM payment_retries WHERE result = 'success'`)
         .then((r: any) => { cardRevenue = Number((r?.rows ?? r)?.[0]?.total ?? 0); }),
-      // 請求書売上 (settlements完了)
-      db.execute(sql`SELECT COALESCE(SUM(user_payment_amount),0) AS total FROM settlements WHERE status = 'completed'`)
+      // 請求書売上 (invoices 支払済)
+      db.execute(sql`SELECT COALESCE(SUM(total_amount),0) AS total FROM invoices WHERE status = 'paid'`)
         .then((r: any) => { invoiceRevenue = Number((r?.rows ?? r)?.[0]?.total ?? 0); }),
       // 黒ナンバー売上・件数
       db.execute(sql`
@@ -2559,14 +2559,28 @@ cron.schedule("0 0 * * *", async () => {
             });
           }
         } else {
-          // 請求書払い → 管理者に通知
+          // 請求書払い → invoices テーブルにレコード作成 + 管理者通知
           console.log(`[月額決済] 請求書払い contract=${contract.id} ¥${amount}`);
+          const now = new Date();
+          const periodStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+          const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+          const periodEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${lastDay}`;
+          const dueDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+          const invoiceNumber = `INV-${contract.id}-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+          const subtotal = amount;
+          const tax = Math.floor(subtotal * 0.1);
+          const totalAmount = subtotal + tax;
+          await db.execute(sql`
+            INSERT INTO invoices (user_id, invoice_number, period_start, period_end, subtotal, tax, total_amount, status, due_date, created_at)
+            VALUES (${contract.userId}, ${invoiceNumber}, ${periodStart}, ${periodEnd}, ${subtotal}, ${tax}, ${totalAmount}, 'pending', ${dueDate}, NOW())
+            ON CONFLICT DO NOTHING
+          `);
           const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
           for (const admin of admins) {
             await db.insert(notificationsTable).values({
               userId: admin.id,
               title: "Chat VAN - 月額請求書を発行してください",
-              message: `契約ID: ${contract.id} / ユーザーID: ${contract.userId} への月額請求書（¥${amount.toLocaleString()}）を発行してください。`,
+              message: `契約ID: ${contract.id} / ユーザーID: ${contract.userId} への月額請求書（${invoiceNumber} / ¥${totalAmount.toLocaleString()}）を発行してください。`,
             });
           }
         }
