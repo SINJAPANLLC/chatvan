@@ -118,7 +118,7 @@ const STATUS_LABEL: Record<string, string> = {
 const ALL_STATUSES = Object.keys(STATUS_STYLES);
 
 type Tab = 'overview' | 'customer' | 'vehicle' | 'chat' | 'instruction' | 'master'
-         | 'contract' | 'payment' | 'gps' | 'incident' | 'screening';
+         | 'contract' | 'payment' | 'gps' | 'incident';
 
 const TABS: { id: Tab; label: string; icon: React.ComponentType<any> }[] = [
   { id: 'overview',    label: '概要',           icon: ClipboardList },
@@ -129,7 +129,7 @@ const TABS: { id: Tab; label: string; icon: React.ComponentType<any> }[] = [
  
   { id: 'gps',         label: 'GPS',            icon: MapPinned },
   { id: 'incident',    label: '事故・故障',     icon: AlertTriangle },
-  { id: 'screening',   label: '審査',           icon: ClipboardCheck },
+ 
   { id: 'instruction', label: '指示書',         icon: FileText },
   { id: 'master',      label: 'マスターカード', icon: CreditCard },
 ];
@@ -360,7 +360,7 @@ export default function AdminApplicationDetail() {
   // 追加タブ用関連データ
   const [related, setRelated] = useState<any>(null);
   const [relatedLoading, setRelatedLoading] = useState(false);
-  const RELATED_TABS: Tab[] = ['contract', 'payment', 'gps', 'incident', 'screening'];
+  const RELATED_TABS: Tab[] = ['contract', 'payment', 'gps', 'incident'];
 
   const loadRelated = async () => {
     if (related || relatedLoading) return;
@@ -1446,83 +1446,6 @@ export default function AdminApplicationDetail() {
               </Section>
             ))
           )}
-        </div>
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════════════════
-          TAB: 審査
-         ═══════════════════════════════════════════════════════════════════════ */}
-      {tab === 'screening' && (
-        <div className="space-y-4">
-          {relatedLoading ? <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-muted-foreground" /></div> : (<>
-            {/* 本人確認 */}
-            <Section title="本人確認（eKYC）">
-              {!related?.identityVerification ? (
-                <p className="text-sm text-muted-foreground py-2 text-center">本人確認書類は未提出です</p>
-              ) : (() => {
-                const iv = related.identityVerification;
-                const statusLabel: Record<string, string> = { verified: '確認済み', approved: '承認済み', rejected: '却下', pending: '審査中' };
-                const statusStyle: Record<string, string> = { verified: 'bg-muted text-foreground border border-border', approved: 'bg-muted text-foreground border border-border', rejected: 'bg-muted text-muted-foreground border border-border', pending: 'bg-muted text-muted-foreground border border-border' };
-                return (
-                  <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-                    <DL label="ステータス" value={
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusStyle[iv.status] ?? 'bg-muted text-muted-foreground border border-border'}`}>
-                        {statusLabel[iv.status] ?? iv.status}
-                      </span>
-                    } />
-                    <DL label="提出日" value={iv.created_at ? format(new Date(iv.created_at), 'yyyy/MM/dd') : null} />
-                    <DL label="氏名" value={iv.full_name} />
-                    <DL label="生年月日" value={iv.birth_date} />
-                    <DL label="住所" value={iv.address} span2 />
-                    <DL label="免許証種別" value={iv.license_type} />
-                    <DL label="免許証番号" value={iv.license_number} />
-                    <DL label="有効期限" value={iv.license_expiry} />
-                    {iv.emergency_contact_name && <>
-                      <DL label="緊急連絡先" value={iv.emergency_contact_name} />
-                      <DL label="関係" value={iv.emergency_contact_relation} />
-                      <DL label="緊急連絡先電話" value={iv.emergency_contact_phone} />
-                    </>}
-                    {/* 免許証画像（license_front / license_back / selfie_photo） */}
-                    {(iv.license_front || iv.selfie_photo) && (
-                      <div className="col-span-2 sm:col-span-3 flex gap-3 flex-wrap">
-                        {[['免許証（表面）', iv.license_front], ['免許証（裏面）', iv.license_back], ['自撮り写真', iv.selfie_photo]].filter(([, p]) => p).map(([label, path]) => (
-                          <div key={label as string}>
-                            <p className="text-xs text-muted-foreground mb-1">{label}</p>
-                            <img src={`${import.meta.env.BASE_URL}api/storage${path}`} alt={label as string} className="h-28 w-auto rounded-lg border border-border object-cover" />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {iv.rejection_reason && (
-                      <DL label="却下理由" value={iv.rejection_reason} span2 />
-                    )}
-                  </dl>
-                );
-              })()}
-            </Section>
-
-            {/* 審査結果 */}
-            <Section title={`審査結果（${related?.screening?.length ?? 0}件）`}>
-              {!related?.screening?.length ? (
-                <p className="text-sm text-muted-foreground py-2 text-center">審査記録はありません</p>
-              ) : related.screening.map((s: any) => (
-                <div key={s.id} className="border border-border rounded-xl p-4 mb-3 last:mb-0">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      s.result === 'approved' ? 'bg-green-100 text-green-700' :
-                      s.result === 'rejected' ? 'bg-red-100 text-red-700' :
-                      s.result === 'conditional' ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-muted text-muted-foreground'
-                    }`}>{s.result === 'approved' ? '承認' : s.result === 'rejected' ? '否決' : s.result === 'conditional' ? '条件付き承認' : '審査中'}</span>
-                    <span className="text-xs text-muted-foreground">{s.created_at ? format(new Date(s.created_at), 'yyyy/MM/dd HH:mm') : ''}</span>
-                  </div>
-                  {s.reason && <p className="text-sm mb-2"><span className="text-xs text-muted-foreground block mb-0.5">審査理由</span>{s.reason}</p>}
-                  {s.conditions && <p className="text-sm mb-2"><span className="text-xs text-muted-foreground block mb-0.5">承認条件</span>{s.conditions}</p>}
-                  {s.risk_notes && <p className="text-sm bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-900 text-xs">{s.risk_notes}</p>}
-                </div>
-              ))}
-            </Section>
-          </>)}
         </div>
       )}
 
