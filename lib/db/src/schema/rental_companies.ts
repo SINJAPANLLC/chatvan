@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -36,6 +36,7 @@ export const rentalCompaniesTable = pgTable("rental_companies", {
   recoveryContact: text("recovery_contact"),
   insuranceConditions: text("insurance_conditions"),
   contractStartDate: text("contract_start_date"),
+  fleetSize: integer("fleet_size"),
   status: rentalCompanyStatusEnum("status").notNull().default("prospect"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

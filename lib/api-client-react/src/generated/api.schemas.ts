@@ -72,6 +72,8 @@ export interface RentalCompany {
   notes?: string | null;
   /** @nullable */
   vehicleCount?: number | null;
+  /** @nullable */
+  fleetSize?: number | null;
   createdAt: string;
 }
 

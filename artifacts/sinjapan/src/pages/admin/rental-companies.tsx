@@ -223,6 +223,17 @@ export default function AdminRentalCompanies() {
                 className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:border-foreground/50"
               />
             </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">保有台数 <span className="text-muted-foreground font-normal">（台）</span></label>
+              <input
+                type="number"
+                min={0}
+                value={(formData as any).fleetSize ?? ''}
+                onChange={e => setFormData({...formData, fleetSize: e.target.value ? Number(e.target.value) : null} as any)}
+                placeholder="例: 10"
+                className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:border-foreground/50"
+              />
+            </div>
             {!editingId && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">ログインパスワード <span className="text-muted-foreground font-normal">（任意）</span></label>

@@ -219,6 +219,7 @@ export default function AdminCustomers() {
                     <SelectContent>
                       <SelectItem value="user">一般</SelectItem>
                       <SelectItem value="admin">管理者</SelectItem>
+                      <SelectItem value="rental_company">協力会社</SelectItem>
                     </SelectContent>
                   </Select>
                 </Field>

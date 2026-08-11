@@ -147,6 +147,7 @@ async function runMigrations() {
     "ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS insurance_expiry TEXT",
     "ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()",
     // rental_companies
+    "ALTER TABLE rental_companies ADD COLUMN IF NOT EXISTS fleet_size INTEGER",
     "ALTER TABLE rental_companies ADD COLUMN IF NOT EXISTS corporate_name TEXT",
     "ALTER TABLE rental_companies ADD COLUMN IF NOT EXISTS service_areas TEXT",
     "ALTER TABLE rental_companies ADD COLUMN IF NOT EXISTS payment_terms TEXT",
