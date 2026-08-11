@@ -62,14 +62,19 @@ export default function AdminApplications() {
   });
 
   // stats
+  const now = new Date();
   const stats = {
     total: applications.length,
-    active: applications.filter(a => ['new','hearing','proposed','application_received','screening'].includes(a.status)).length,
-    contract: applications.filter(a => ['contracting','active'].includes(a.status)).length,
+    active: applications.filter(a => [
+      'new', 'hearing', 'proposed', 'application_received', 'screening',
+      'approved', 'contracting', 'payment_pending', 'delivery_pending',
+    ].includes(a.status)).length,
+    contract: applications.filter(a => a.status === 'active').length,
     today: applications.filter(a => {
       const d = new Date(a.createdAt);
-      const now = new Date();
-      return d.getDate() === now.getDate() && d.getMonth() === now.getMonth();
+      return d.getFullYear() === now.getFullYear()
+          && d.getMonth()    === now.getMonth()
+          && d.getDate()     === now.getDate();
     }).length,
   };
 
