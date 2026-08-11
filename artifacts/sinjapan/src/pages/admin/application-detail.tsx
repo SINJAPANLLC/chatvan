@@ -52,7 +52,7 @@ const STATUS_LABEL: Record<string, string> = {
 const ALL_STATUSES = Object.keys(STATUS_STYLES);
 
 type Tab = 'overview' | 'customer' | 'vehicle' | 'chat' | 'instruction' | 'master'
-         | 'contract' | 'payment' | 'insurance' | 'gps' | 'incident' | 'screening';
+         | 'contract' | 'payment' | 'gps' | 'incident' | 'screening';
 
 const TABS: { id: Tab; label: string; icon: React.ComponentType<any> }[] = [
   { id: 'overview',    label: '概要',           icon: ClipboardList },
@@ -60,7 +60,7 @@ const TABS: { id: Tab; label: string; icon: React.ComponentType<any> }[] = [
   { id: 'vehicle',     label: '車両情報',       icon: Car },
   { id: 'contract',    label: '契約',           icon: ScrollText },
   { id: 'payment',     label: '決済',           icon: Wallet },
-  { id: 'insurance',   label: '保険',           icon: Shield },
+ 
   { id: 'gps',         label: 'GPS',            icon: MapPinned },
   { id: 'incident',    label: '事故・故障',     icon: AlertTriangle },
   { id: 'screening',   label: '審査',           icon: ClipboardCheck },
@@ -294,7 +294,7 @@ export default function AdminApplicationDetail() {
   // 追加タブ用関連データ
   const [related, setRelated] = useState<any>(null);
   const [relatedLoading, setRelatedLoading] = useState(false);
-  const RELATED_TABS: Tab[] = ['contract', 'payment', 'insurance', 'gps', 'incident', 'screening'];
+  const RELATED_TABS: Tab[] = ['contract', 'payment', 'gps', 'incident', 'screening'];
 
   const loadRelated = async () => {
     if (related || relatedLoading) return;
@@ -1269,32 +1269,6 @@ export default function AdminApplicationDetail() {
               )}
             </Section>
             </>
-          )}
-        </div>
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════════════════
-          TAB: 保険
-         ═══════════════════════════════════════════════════════════════════════ */}
-      {tab === 'insurance' && (
-        <div className="space-y-4">
-          {relatedLoading ? <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-muted-foreground" /></div> : (
-            related?.insurance?.length === 0 ? (
-              <div className="bg-card border border-border rounded-xl p-12 text-center text-muted-foreground text-sm">保険情報はありません</div>
-            ) : related?.insurance?.map((ins: any) => (
-              <Section key={ins.id} title={`保険 #${ins.id} — ${ins.maker ?? ''} ${ins.model ?? ''}`}>
-                <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-                  <DL label="保険会社" value={ins.insurer} />
-                  <DL label="証券番号" value={ins.policy_number} />
-                  <DL label="種類" value={ins.insurance_type} />
-                  <DL label="満了日" value={ins.expiry_date} />
-                  <DL label="ステータス" value={<span className={`px-2 py-0.5 rounded-full text-xs ${ins.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>{ins.status}</span>} />
-                  <DL label="商用利用可" value={ins.covers_commercial_use ? '対応' : '非対応'} />
-                  <DL label="月額保険料" value={ins.monthly_premium ? `¥${Number(ins.monthly_premium).toLocaleString()}` : null} />
-                  <DL label="ナンバー" value={ins.license_plate} />
-                </dl>
-              </Section>
-            ))
           )}
         </div>
       )}
