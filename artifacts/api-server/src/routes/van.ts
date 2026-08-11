@@ -671,6 +671,48 @@ router.get("/van/applications", requireAuth, requireAdmin, async (req: Request, 
   }
 });
 
+// ── GET /van/applications/stats ────────────────────────────────────────────
+router.get("/van/applications/stats", requireAuth, requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const rows = await db.execute(sql`
+      SELECT
+        COUNT(*)                                                                      AS total,
+        COUNT(*) FILTER (WHERE status IN (
+          'new','hearing','proposed','application_received','screening',
+          'approved','contracting','payment_pending','delivery_pending'
+        ))                                                                            AS active,
+        COUNT(*) FILTER (WHERE status = 'active')                                    AS contract,
+        COUNT(*) FILTER (WHERE status = 'return_pending')                            AS return_pending,
+        COUNT(*) FILTER (WHERE status IN ('completed','cancelled','rejected'))        AS closed,
+        COUNT(*) FILTER (
+          WHERE (created_at AT TIME ZONE 'Asia/Tokyo')::date
+              = (NOW() AT TIME ZONE 'Asia/Tokyo')::date
+        )                                                                             AS today,
+        COUNT(*) FILTER (WHERE status = 'new')                                       AS new_count,
+        COUNT(*) FILTER (WHERE status = 'hearing')                                   AS hearing,
+        COUNT(*) FILTER (WHERE status = 'proposed')                                  AS proposed,
+        COUNT(*) FILTER (WHERE status = 'rejected')                                  AS rejected
+      FROM van_applications
+    `) as any;
+    const r = (rows?.rows ?? rows)?.[0] ?? {};
+    return res.json({
+      total:         Number(r.total ?? 0),
+      active:        Number(r.active ?? 0),
+      contract:      Number(r.contract ?? 0),
+      returnPending: Number(r.return_pending ?? 0),
+      closed:        Number(r.closed ?? 0),
+      today:         Number(r.today ?? 0),
+      newCount:      Number(r.new_count ?? 0),
+      hearing:       Number(r.hearing ?? 0),
+      proposed:      Number(r.proposed ?? 0),
+      rejected:      Number(r.rejected ?? 0),
+    });
+  } catch (err) {
+    console.error("application stats error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
 // ── GET /van/applications/:id ──────────────────────────────────────────────
 router.get("/van/applications/:id", requireAuth, async (req: Request, res: Response) => {
   try {

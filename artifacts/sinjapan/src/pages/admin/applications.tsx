@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useListVanApplications } from '@workspace/api-client-react';
 import { useLocation } from 'wouter';
 import { Loader2, Filter, Phone, Mail, User, TrendingUp } from 'lucide-react';
+
+const API = (p: string) => `${import.meta.env.BASE_URL}api${p}`;
+const authH = () => ({ Authorization: `Bearer ${localStorage.getItem('sinjapan_auth_token') ?? ''}` });
 import { format } from 'date-fns';
 
 const STATUS_STYLES: Record<string, string> = {
@@ -18,6 +21,7 @@ const STATUS_STYLES: Record<string, string> = {
   return_pending:       'bg-amber-50 text-amber-700 border-amber-200',
   completed:            'bg-gray-50 text-gray-500 border-gray-200',
   cancelled:            'bg-red-50 text-red-400 border-red-200',
+  rejected:             'bg-red-100 text-red-600 border-red-300',
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -34,6 +38,7 @@ const STATUS_LABEL: Record<string, string> = {
   return_pending:       '返却予定',
   completed:            '契約終了',
   cancelled:            'キャンセル',
+  rejected:             '否決',
 };
 
 const ALL_STATUSES = Object.keys(STATUS_STYLES);
@@ -43,6 +48,14 @@ export default function AdminApplications() {
   const [search, setSearch] = useState('');
   const { data, isLoading } = useListVanApplications();
   const [, setLocation] = useLocation();
+  const [stats, setStats] = useState({ total: 0, active: 0, contract: 0, today: 0 });
+
+  useEffect(() => {
+    fetch(API('/van/applications/stats'), { headers: authH() })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setStats({ total: d.total, active: d.active, contract: d.contract, today: d.today }); })
+      .catch(() => {});
+  }, []);
 
   const applications = data?.applications || [];
 
@@ -60,23 +73,6 @@ export default function AdminApplications() {
     }
     return true;
   });
-
-  // stats
-  const now = new Date();
-  const stats = {
-    total: applications.length,
-    active: applications.filter(a => [
-      'new', 'hearing', 'proposed', 'application_received', 'screening',
-      'approved', 'contracting', 'payment_pending', 'delivery_pending',
-    ].includes(a.status)).length,
-    contract: applications.filter(a => a.status === 'active').length,
-    today: applications.filter(a => {
-      const d = new Date(a.createdAt);
-      return d.getFullYear() === now.getFullYear()
-          && d.getMonth()    === now.getMonth()
-          && d.getDate()     === now.getDate();
-    }).length,
-  };
 
   return (
     <div className="space-y-6">
