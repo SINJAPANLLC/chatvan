@@ -26,6 +26,7 @@ export default function AdminRentalCompanies() {
     name: '', contactPerson: '', phone: '', email: '',
     address: '', serviceArea: '', notes: ''
   });
+  const [newPassword, setNewPassword] = useState('');
 
   // 招待
   const [inviteCompany, setInviteCompany] = useState<RentalCompany | null>(null);
@@ -63,6 +64,7 @@ export default function AdminRentalCompanies() {
   const handleOpenCreate = () => {
     setEditingId(null);
     setFormData({ name: '', contactPerson: '', phone: '', email: '', address: '', serviceArea: '', notes: '' });
+    setNewPassword('');
     setIsModalOpen(true);
   };
 
@@ -78,10 +80,26 @@ export default function AdminRentalCompanies() {
         await updateMut.mutateAsync({ id: editingId, data: formData as any });
         toast({ title: '更新しました' });
       } else {
-        await createMut.mutateAsync({ data: formData as any });
-        toast({ title: '登録しました' });
+        const created = await createMut.mutateAsync({ data: formData as any });
+        // パスワードが入力されている場合はアカウントも同時発行
+        if (newPassword && (created as any)?.id) {
+          const r = await fetch(API(`/van/rental-companies/${(created as any).id}/invite`), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+            body: JSON.stringify({ email: formData.email, password: newPassword }),
+          });
+          const j = await r.json();
+          if (r.ok) {
+            toast({ title: '会社を登録し、アカウントを発行しました' });
+          } else {
+            toast({ title: '会社を登録しました（アカウント発行失敗: ' + j.error + '）' });
+          }
+        } else {
+          toast({ title: '登録しました' });
+        }
       }
       setIsModalOpen(false);
+      setNewPassword('');
       refetch();
     } catch {
       toast({ variant: 'destructive', title: 'エラー', description: '保存に失敗しました' });
@@ -205,6 +223,18 @@ export default function AdminRentalCompanies() {
                 className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:border-foreground/50"
               />
             </div>
+            {!editingId && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">ログインパスワード <span className="text-muted-foreground font-normal">（任意）</span></label>
+                <input 
+                  type="password" 
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  placeholder="入力するとアカウントも同時に発行します"
+                  className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:border-foreground/50"
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <label className="text-sm font-medium">住所</label>
               <input 

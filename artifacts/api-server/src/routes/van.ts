@@ -2625,7 +2625,8 @@ router.post("/van/rental-companies/:id/invite", requireAuth, requireAdmin, async
     // 新規ユーザー作成
     const bcrypt = await import("bcryptjs");
     const chars = "abcdefghijkmnpqrstuvwxyz23456789";
-    const tempPassword = Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+    const tempPassword = req.body.password ||
+      Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
     const passwordHash = await bcrypt.hash(tempPassword, 10);
 
     const raw = await db.execute(sql`
