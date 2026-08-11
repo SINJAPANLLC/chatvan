@@ -2680,6 +2680,50 @@ router.post("/users", requireAuth, requireAdmin, async (req: Request, res: Respo
   }
 });
 
+// POST /van/vehicles/parse-shaken  車検証 OCR → 車両情報を抽出
+router.post("/van/vehicles/parse-shaken", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { imageBase64, mimeType = "image/jpeg" } = req.body;
+    if (!imageBase64) return res.status(400).json({ error: "imageBase64 is required" });
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{
+        role: "user",
+        content: [
+          { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBase64}`, detail: "high" } },
+          { type: "text", text: `この画像は日本の自動車検査証（車検証）です。以下のキーのJSONを返してください。読み取れない値はnullにしてください。
+{
+  "licensePlate": "登録番号（例: 横浜300あ1234）",
+  "maker": "メーカー名（車名）",
+  "model": "車種・型式（例: エブリイ）",
+  "grade": "グレード",
+  "vin": "車台番号",
+  "year": "初度登録年（西暦の整数）",
+  "engineDisplacement": "排気量（例: 660cc）",
+  "fuelType": "燃料種類（例: ガソリン）",
+  "transmission": "変速機（例: AT、MT）",
+  "color": "車体色",
+  "inspectionExpiry": "車検満了日（YYYY-MM-DD形式）",
+  "inspectionCertificateOwner": "所有者の氏名または名称",
+  "inspectionCertificateUser": "使用者の氏名または名称（所有者と同じ場合はnull）"
+}
+JSONのみ返してください。` }
+        ]
+      }],
+      max_tokens: 600,
+    });
+
+    const text = completion.choices[0]?.message?.content ?? "";
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return res.status(422).json({ error: "OCR結果を解析できませんでした" });
+    return res.json(JSON.parse(match[0]));
+  } catch (err) {
+    console.error("parse-shaken error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
 // ── Rental Companies ───────────────────────────────────────────────────────
 router.get("/van/rental-companies", requireAuth, async (req: Request, res: Response) => {
   try {

@@ -134,6 +134,10 @@ async function runMigrations() {
     "ALTER TABLE van_applications ADD COLUMN IF NOT EXISTS ai_summary TEXT",
     "ALTER TABLE van_applications ADD COLUMN IF NOT EXISTS current_vehicle TEXT",
     // vehicles
+    "ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS color TEXT",
+    "ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS engine_displacement TEXT",
+    "ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS fuel_type TEXT",
+    "ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS transmission TEXT",
     "ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS grade TEXT",
     "ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS vin TEXT",
     "ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS license_plate TEXT",
