@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useListUsers } from '@workspace/api-client-react';
-import { Loader2, Send, Users, User, History, ChevronDown, ChevronUp, Mail, CheckCheck, Settings } from 'lucide-react';
+import {
+  Loader2, Send, Users, User, History, ChevronDown, ChevronUp,
+  Mail, CheckCheck, Settings, Wrench, Calendar, Clock, AlertTriangle, Info
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,14 +19,14 @@ function apiFetch(path: string, opts?: RequestInit) {
   }).then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); });
 }
 
-// テンプレート
+// ── テンプレート ───────────────────────────────────────────────────────────────
 const TEMPLATES = [
-  { label: 'カスタム',   subject: '',                                    body: '' },
+  { label: 'カスタム',   subject: '',                                          body: '' },
   { label: '提案送信',   subject: '【Chat VAN】軽バンのご提案をお送りしました', body: 'お世話になっております。\nご相談いただいた条件に合わせた軽バンのご提案をお送りしました。\n\nマイページよりご確認いただけます。\nご不明な点がございましたらお気軽にお問い合わせください。' },
-  { label: '申込確認',   subject: '【Chat VAN】お申込みを受け付けました',       body: 'お世話になっております。\nお申込みありがとうございます。\n\n内容を確認のうえ、担当者よりご連絡いたします。\n引き続きよろしくお願いいたします。' },
-  { label: '利用開始',   subject: '【Chat VAN】ご利用開始のご案内',             body: 'お世話になっております。\n本日より軽バンのご利用を開始いただけます。\n\n車両の受け渡しについては担当者よりご連絡いたします。\nご不明な点がございましたらお気軽にお問い合わせください。' },
-  { label: '請求書発行', subject: '【Chat VAN】請求書を発行しました',           body: 'お世話になっております。\n今月の請求書を発行いたしました。マイページよりご確認ください。\n\nご不明な点がございましたらお気軽にお問い合わせください。' },
-  { label: 'お知らせ',   subject: '【Chat VAN】重要なお知らせ',                 body: 'お世話になっております。\n以下の通りお知らせいたします。\n\n' },
+  { label: '申込確認',   subject: '【Chat VAN】お申込みを受け付けました',         body: 'お世話になっております。\nお申込みありがとうございます。\n\n内容を確認のうえ、担当者よりご連絡いたします。\n引き続きよろしくお願いいたします。' },
+  { label: '利用開始',   subject: '【Chat VAN】ご利用開始のご案内',               body: 'お世話になっております。\n本日より軽バンのご利用を開始いただけます。\n\n車両の受け渡しについては担当者よりご連絡いたします。\nご不明な点がございましたらお気軽にお問い合わせください。' },
+  { label: '請求書発行', subject: '【Chat VAN】請求書を発行しました',             body: 'お世話になっております。\n今月の請求書を発行いたしました。マイページよりご確認ください。\n\nご不明な点がございましたらお気軽にお問い合わせください。' },
+  { label: 'お知らせ',   subject: '【Chat VAN】重要なお知らせ',                   body: 'お世話になっております。\n以下の通りお知らせいたします。\n\n' },
 ];
 
 type SendTarget = 'all' | 'select';
@@ -67,15 +70,12 @@ function SendForm({ onSent }: { onSent: () => void }) {
 
   const handleSend = async () => {
     if (!subject.trim() || !body.trim()) {
-      toast({ variant: 'destructive', title: '件名と本文を入力してください' });
-      return;
+      toast({ variant: 'destructive', title: '件名と本文を入力してください' }); return;
     }
     if (target === 'select' && selectedIds.size === 0) {
-      toast({ variant: 'destructive', title: '送信先を選択してください' });
-      return;
+      toast({ variant: 'destructive', title: '送信先を選択してください' }); return;
     }
-    setSending(true);
-    setResult(null);
+    setSending(true); setResult(null);
     try {
       const payload = target === 'all'
         ? { sendAll: true, subject, body }
@@ -86,28 +86,20 @@ function SendForm({ onSent }: { onSent: () => void }) {
       onSent();
     } catch (e: any) {
       toast({ variant: 'destructive', title: '送信に失敗しました', description: e.message });
-    } finally {
-      setSending(false);
-    }
+    } finally { setSending(false); }
   };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-      {/* 左：設定 */}
       <div className="lg:col-span-2 space-y-5">
-
-        {/* 送信先 */}
         <div className="bg-card border border-border rounded-xl p-5 space-y-4">
           <p className="font-semibold text-sm">送信先</p>
           <div className="grid grid-cols-2 gap-2">
             {(['all', 'select'] as SendTarget[]).map(t => (
-              <button
-                key={t}
-                onClick={() => setTarget(t)}
+              <button key={t} onClick={() => setTarget(t)}
                 className={`flex items-center justify-center gap-2 py-3 rounded-lg border text-sm font-medium transition-colors ${
                   target === t ? 'bg-foreground text-background border-foreground' : 'border-border text-muted-foreground hover:text-foreground'
-                }`}
-              >
+                }`}>
                 {t === 'all' ? <><Users className="h-4 w-4" />全ユーザー</> : <><User className="h-4 w-4" />個別選択</>}
               </button>
             ))}
@@ -115,17 +107,11 @@ function SendForm({ onSent }: { onSent: () => void }) {
 
           {target === 'select' && (
             <div className="space-y-2">
-              <Input
-                placeholder="名前・メール・会社名で絞り込み..."
-                value={userSearch}
-                onChange={e => setUserSearch(e.target.value)}
-                className="text-sm"
-              />
+              <Input placeholder="名前・メール・会社名で絞り込み..." value={userSearch}
+                onChange={e => setUserSearch(e.target.value)} className="text-sm" />
               <div className="border border-border rounded-lg overflow-hidden">
-                <button
-                  className="w-full flex items-center justify-between px-3 py-2.5 text-xs text-muted-foreground hover:bg-muted/30"
-                  onClick={() => setUserListOpen(v => !v)}
-                >
+                <button className="w-full flex items-center justify-between px-3 py-2.5 text-xs text-muted-foreground hover:bg-muted/30"
+                  onClick={() => setUserListOpen(v => !v)}>
                   <span>{selectedIds.size > 0 ? `${selectedIds.size}名選択中` : 'ユーザーを選択'}</span>
                   {userListOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                 </button>
@@ -133,12 +119,7 @@ function SendForm({ onSent }: { onSent: () => void }) {
                   <div className="max-h-52 overflow-y-auto divide-y divide-border border-t border-border">
                     {filteredUsers.filter(u => u.role === 'user').map(u => (
                       <label key={u.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/30 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(u.id)}
-                          onChange={() => toggleUser(u.id)}
-                          className="accent-foreground"
-                        />
+                        <input type="checkbox" checked={selectedIds.has(u.id)} onChange={() => toggleUser(u.id)} className="accent-foreground" />
                         <div className="min-w-0">
                           <div className="text-sm font-medium truncate">{u.name}</div>
                           <div className="text-xs text-muted-foreground truncate">{u.companyName || u.email}</div>
@@ -162,18 +143,14 @@ function SendForm({ onSent }: { onSent: () => void }) {
           )}
         </div>
 
-        {/* テンプレート */}
         <div className="bg-card border border-border rounded-xl p-5 space-y-3">
           <p className="font-semibold text-sm">テンプレート</p>
           <div className="flex flex-wrap gap-2">
             {TEMPLATES.map((t, i) => (
-              <button
-                key={i}
-                onClick={() => applyTemplate(i)}
+              <button key={i} onClick={() => applyTemplate(i)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                   templateIdx === i ? 'bg-foreground text-background border-foreground' : 'border-border text-muted-foreground hover:text-foreground'
-                }`}
-              >
+                }`}>
                 {t.label}
               </button>
             ))}
@@ -181,45 +158,28 @@ function SendForm({ onSent }: { onSent: () => void }) {
         </div>
       </div>
 
-      {/* 右：本文 */}
       <div className="lg:col-span-3 bg-card border border-border rounded-xl p-5 space-y-4 flex flex-col">
         <p className="font-semibold text-sm">メール内容</p>
-
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground">件名 *</Label>
-          <Input
-            value={subject}
-            onChange={e => { setSubject(e.target.value); setTemplateIdx(0); }}
-            placeholder="【Chat VAN】件名を入力..."
-          />
+          <Input value={subject} onChange={e => { setSubject(e.target.value); setTemplateIdx(0); }}
+            placeholder="【Chat VAN】件名を入力..." />
         </div>
-
         <div className="space-y-1.5 flex-1 flex flex-col">
           <Label className="text-xs text-muted-foreground">本文 *</Label>
-          <Textarea
-            value={body}
-            onChange={e => { setBody(e.target.value); setTemplateIdx(0); }}
-            placeholder="本文を入力してください..."
-            className="flex-1 min-h-[240px] resize-none font-mono text-sm leading-relaxed"
-          />
+          <Textarea value={body} onChange={e => { setBody(e.target.value); setTemplateIdx(0); }}
+            placeholder="本文を入力してください..." className="flex-1 min-h-[240px] resize-none font-mono text-sm leading-relaxed" />
         </div>
-
-        {/* プレビュー */}
         <div className="bg-muted/30 border border-border rounded-lg p-4 text-xs text-muted-foreground space-y-1">
           <p className="font-medium text-foreground">送信イメージ</p>
           <p>宛先：{target === 'all' ? '全ユーザー' : `${selectedIds.size}名`}</p>
           <p>件名：{subject || '（未入力）'}</p>
         </div>
-
-        <Button
-          className="w-full gap-2"
-          onClick={handleSend}
-          disabled={sending || !subject.trim() || !body.trim() || recipientCount === 0}
-        >
+        <Button className="w-full gap-2" onClick={handleSend}
+          disabled={sending || !subject.trim() || !body.trim() || recipientCount === 0}>
           {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           {sending ? '送信中...' : `${recipientCount}名に送信する`}
         </Button>
-
         {result && (
           <div className="rounded-lg bg-muted/30 border border-border p-3 text-sm">
             <p className="font-medium text-green-700">{result.message}</p>
@@ -243,16 +203,11 @@ function SendHistory() {
   useEffect(() => {
     const token = localStorage.getItem('sinjapan_auth_token');
     setLoading(true);
-    fetch('/api/admin/notifications', {
-      headers: { Authorization: `Bearer ${token}` }
-    }).then(async r => {
-      if (!r.ok) return;
-      const text = await r.text();
-      if (text) setLogs(JSON.parse(text));
-    }).finally(() => setLoading(false));
+    fetch('/api/admin/notifications', { headers: { Authorization: `Bearer ${token}` } })
+      .then(async r => { if (!r.ok) return; const text = await r.text(); if (text) setLogs(JSON.parse(text)); })
+      .finally(() => setLoading(false));
   }, []);
 
-  // 件名でグループ化して表示
   const grouped = logs.reduce((acc: Record<string, any[]>, item) => {
     const key = `${item.title}__${item.createdAt?.slice(0, 10)}`;
     (acc[key] = acc[key] ?? []).push(item);
@@ -285,15 +240,9 @@ function SendHistory() {
                 const recipients = items.map((i: any) => i.companyName || i.userName).filter(Boolean).join('、');
                 return (
                   <tr key={key} className="hover:bg-muted/20 transition-colors align-top">
-                    <td className="px-5 py-3.5 font-medium max-w-[200px]">
-                      <div className="truncate">{first.title}</div>
-                    </td>
-                    <td className="px-5 py-3.5 text-xs text-muted-foreground max-w-[160px]">
-                      <div className="line-clamp-2">{recipients || '—'}</div>
-                    </td>
-                    <td className="px-5 py-3.5 text-xs text-muted-foreground max-w-[240px]">
-                      <div className="line-clamp-2 whitespace-pre-wrap">{first.message}</div>
-                    </td>
+                    <td className="px-5 py-3.5 font-medium max-w-[200px]"><div className="truncate">{first.title}</div></td>
+                    <td className="px-5 py-3.5 text-xs text-muted-foreground max-w-[160px]"><div className="line-clamp-2">{recipients || '—'}</div></td>
+                    <td className="px-5 py-3.5 text-xs text-muted-foreground max-w-[240px]"><div className="line-clamp-2 whitespace-pre-wrap">{first.message}</div></td>
                     <td className="px-5 py-3.5 text-right font-medium">{items.length}名</td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-1.5">
@@ -317,21 +266,20 @@ function SendHistory() {
 
 // ── 自動通知設定 ───────────────────────────────────────────────────────────────
 const AUTO_RULES = [
-  { category: '会員',     status: '会員登録',         trigger: 'ユーザーが新規登録した時',                         mail: true  },
-  { category: '会員',     status: 'パスワードリセット', trigger: 'パスワードリセットをリクエストした時',             mail: true  },
-  { category: '相談',     status: '提案送信',          trigger: '管理者が車両提案を送信した時',                     mail: true  },
-  { category: '相談',     status: '申込受付',          trigger: 'ユーザーが申込みを確定した時',                     mail: true  },
-  { category: '契約',     status: '利用開始',          trigger: '管理者がステータスを「利用開始」に変更した時',      mail: true  },
-  { category: '契約',     status: '返却予定',          trigger: '返却予定日7日前',                                  mail: true  },
-  { category: '契約',     status: '契約終了',          trigger: '契約が終了した時',                                 mail: true  },
-  { category: '相談',     status: 'キャンセル',        trigger: 'キャンセルが承認された時',                         mail: true  },
-  { category: '決済',     status: '決済完了',          trigger: '月次決済が完了した時',                             mail: true  },
-  { category: 'お問合せ', status: '受付確認',          trigger: 'お問い合わせフォームが送信された時（ユーザーへ）',  mail: true  },
-  { category: 'お問合せ', status: '返信通知',          trigger: '管理者がお問い合わせに返信した時（ユーザーへ）',    mail: true  },
+  { category: '会員',     status: '会員登録',         trigger: 'ユーザーが新規登録した時',                         mail: true },
+  { category: '会員',     status: 'パスワードリセット', trigger: 'パスワードリセットをリクエストした時',             mail: true },
+  { category: '相談',     status: '提案送信',          trigger: '管理者が車両提案を送信した時',                     mail: true },
+  { category: '相談',     status: '申込受付',          trigger: 'ユーザーが申込みを確定した時',                     mail: true },
+  { category: '契約',     status: '利用開始',          trigger: '管理者がステータスを「利用開始」に変更した時',      mail: true },
+  { category: '契約',     status: '返却予定',          trigger: '返却予定日7日前',                                  mail: true },
+  { category: '契約',     status: '契約終了',          trigger: '契約が終了した時',                                 mail: true },
+  { category: '相談',     status: 'キャンセル',        trigger: 'キャンセルが承認された時',                         mail: true },
+  { category: '決済',     status: '決済完了',          trigger: '月次決済が完了した時',                             mail: true },
+  { category: 'お問合せ', status: '受付確認',          trigger: 'お問い合わせフォームが送信された時（ユーザーへ）',  mail: true },
+  { category: 'お問合せ', status: '返信通知',          trigger: '管理者がお問い合わせに返信した時（ユーザーへ）',    mail: true },
 ];
 
-// プレビューデータ
-const PREVIEW_DATA: Record<string, { badge?: string; name: string; subject: string; body: string; cta: string }> = {
+const PREVIEW_DATA: Record<string, { badge?: string; name: string; subject: string; body: string; cta: string; accentColor?: string }> = {
   '会員登録': {
     name: '山田 太郎',
     subject: '【Chat VAN】ご登録ありがとうございます',
@@ -407,16 +355,66 @@ const PREVIEW_DATA: Record<string, { badge?: string; name: string; subject: stri
   },
 };
 
+function EmailPreview() {
+  const keys = Object.keys(PREVIEW_DATA);
+  const [selected, setSelected] = React.useState(keys[0]);
+  const p = PREVIEW_DATA[selected];
+  const year = new Date().getFullYear();
+
+  return (
+    <div className="rounded-xl border border-border overflow-hidden shadow-sm">
+      <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-3 flex-wrap">
+        <p className="text-sm font-semibold shrink-0">メールプレビュー</p>
+        <div className="flex flex-wrap gap-1.5">
+          {keys.map(k => (
+            <button key={k} onClick={() => setSelected(k)}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                selected === k ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:text-foreground'
+              }`}>
+              {k}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="p-5 bg-muted/10">
+        <div style={{ fontFamily: "'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif", maxWidth: 560 }}>
+          <div style={{ background: '#000', padding: '20px 28px', borderRadius: '10px 10px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ color: '#fff', fontWeight: 800, fontSize: 16, letterSpacing: 1 }}>Chat VAN</span>
+            {p.badge && (
+              <span style={{ background: '#fff', color: '#000', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20 }}>{p.badge}</span>
+            )}
+          </div>
+          <div style={{ background: '#fff', padding: '32px 32px 24px', border: '1px solid #e5e5e5', borderTop: 'none' }}>
+            <p style={{ margin: '0 0 20px', fontSize: 15, color: '#333', fontWeight: 500 }}>{p.name} 様</p>
+            <div style={{ fontSize: 14, color: '#333', lineHeight: 1.9, marginBottom: 28, whiteSpace: 'pre-wrap' }}>{p.body}</div>
+            <table cellPadding={0} cellSpacing={0} style={{ marginBottom: 28 }}>
+              <tbody><tr><td style={{ background: '#000', borderRadius: 8 }}>
+                <span style={{ display: 'inline-block', padding: '12px 28px', color: '#fff', fontSize: 13, fontWeight: 700 }}>{p.cta}</span>
+              </td></tr></tbody>
+            </table>
+            <hr style={{ border: 'none', borderTop: '1px solid #ebebeb', margin: '0 0 20px' }} />
+            <p style={{ margin: 0, fontSize: 11, color: '#aaa', lineHeight: 1.7 }}>
+              このメールは <strong>Chat VAN</strong> から自動送信されています。<br />
+              心当たりのない場合や、ご不明な点は担当者までお問い合わせください。
+            </p>
+          </div>
+          <div style={{ background: '#f7f7f7', padding: '14px 28px', borderRadius: '0 0 10px 10px', border: '1px solid #e5e5e5', borderTop: 'none', display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 11, color: '#bbb' }}>© {year} Chat VAN</span>
+            <span style={{ fontSize: 11, color: '#bbb' }}>合同会社SIN JAPAN</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AutoSettings() {
   return (
     <div className="space-y-5">
-      {/* 説明 */}
       <div className="rounded-xl border border-border bg-muted/30 px-5 py-4 text-sm text-muted-foreground leading-relaxed">
         案件のステータスが変更されると、対象ユーザーへ自動的に通知メールが送信されます。<br />
         以下のルールは常時有効です。SMTP設定を行うことで実際のメール送信が有効になります。
       </div>
-
-      {/* ルール一覧 */}
       <div className="rounded-xl border border-border overflow-hidden shadow-sm">
         <table className="w-full text-sm">
           <thead>
@@ -433,98 +431,263 @@ function AutoSettings() {
               <tr key={r.category + r.status} className="hover:bg-muted/20 transition-colors">
                 <td className="px-5 py-3.5 text-xs text-muted-foreground whitespace-nowrap">{r.category}</td>
                 <td className="px-5 py-3.5 whitespace-nowrap">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-foreground text-background text-xs font-semibold">
-                    {r.status}
-                  </span>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-foreground text-background text-xs font-semibold">{r.status}</span>
                 </td>
                 <td className="px-5 py-3.5 text-muted-foreground">{r.trigger}</td>
-                <td className="px-5 py-3.5 text-center">
-                  <span className="inline-block w-2 h-2 rounded-full bg-green-500" title="有効" />
-                </td>
-                <td className="px-5 py-3.5 text-center">
-                  <span className="inline-block w-2 h-2 rounded-full bg-green-500" title="有効" />
-                </td>
+                <td className="px-5 py-3.5 text-center"><span className="inline-block w-2 h-2 rounded-full bg-green-500" /></td>
+                <td className="px-5 py-3.5 text-center"><span className="inline-block w-2 h-2 rounded-full bg-green-500" /></td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-
-      {/* メールプレビュー */}
       <EmailPreview />
     </div>
   );
 }
 
-function EmailPreview() {
-  const keys = Object.keys(PREVIEW_DATA);
-  const [selected, setSelected] = React.useState(keys[0]);
-  const p = PREVIEW_DATA[selected];
+// ── メンテナンス通知 ───────────────────────────────────────────────────────────
+type MaintenanceLevel = 'info' | 'warning' | 'critical';
+
+const LEVEL_CONFIG: Record<MaintenanceLevel, { label: string; color: string; bgColor: string; borderColor: string; icon: React.ElementType }> = {
+  info:     { label: '通常メンテナンス', color: '#1d4ed8', bgColor: '#eff6ff', borderColor: '#bfdbfe', icon: Info },
+  warning:  { label: '重要メンテナンス', color: '#92400e', bgColor: '#fffbeb', borderColor: '#fde68a', icon: AlertTriangle },
+  critical: { label: '緊急メンテナンス', color: '#991b1b', bgColor: '#fef2f2', borderColor: '#fecaca', icon: AlertTriangle },
+};
+
+const MAINTENANCE_TEMPLATES = [
+  {
+    label: '定期メンテナンス',
+    level: 'info' as MaintenanceLevel,
+    scope: '一部機能',
+    detail: '定期メンテナンスを実施いたします。\n該当時間帯はサービスが一時的にご利用いただけない場合がございます。\n\nご不便をおかけして申し訳ありません。\n完了次第、通常通りご利用いただけます。',
+  },
+  {
+    label: '緊急メンテナンス',
+    level: 'critical' as MaintenanceLevel,
+    scope: '全サービス',
+    detail: '緊急メンテナンスを実施いたします。\n全サービスが一時的にご利用いただけなくなります。\n\n復旧次第、改めてご連絡いたします。\nご迷惑をおかけして誠に申し訳ございません。',
+  },
+  {
+    label: '機能リリース',
+    level: 'info' as MaintenanceLevel,
+    scope: '一部機能',
+    detail: 'システムアップデートを実施いたします。\n新機能のリリースに伴い、一部機能が一時的にご利用いただけない場合がございます。\n\nアップデート後はより便利な機能をご利用いただけます。',
+  },
+];
+
+function MaintenanceForm({ onSent }: { onSent: () => void }) {
+  const { toast } = useToast();
+  const { data: users } = useListUsers();
+
+  // フォーム状態
+  const todayStr = new Date().toISOString().slice(0, 16);
+  const [level, setLevel] = useState<MaintenanceLevel>('info');
+  const [startDatetime, setStartDatetime] = useState('');
+  const [endDatetime, setEndDatetime] = useState('');
+  const [scope, setScope] = useState('一部機能');
+  const [detail, setDetail] = useState('');
+  const [sending, setSending] = useState(false);
+  const [tplIdx, setTplIdx] = useState(-1);
+
+  const applyTemplate = (i: number) => {
+    const t = MAINTENANCE_TEMPLATES[i];
+    setTplIdx(i);
+    setLevel(t.level);
+    setScope(t.scope);
+    setDetail(t.detail);
+  };
+
+  // 件名・本文を自動生成
+  const levelLabel = LEVEL_CONFIG[level].label;
+  const startFmt = startDatetime ? format(new Date(startDatetime), 'yyyy年MM月dd日 HH:mm') : '○月○日 ○○:○○';
+  const endFmt   = endDatetime   ? format(new Date(endDatetime),   'yyyy年MM月dd日 HH:mm') : '○月○日 ○○:○○';
+
+  const autoSubject = `【Chat VAN】${levelLabel}のお知らせ（${startFmt}〜）`;
+  const autoBody = [
+    'いつもChat VANをご利用いただきありがとうございます。',
+    '',
+    `以下の通り、${levelLabel}を実施いたします。`,
+    '',
+    `▼ メンテナンス概要`,
+    `日時：${startFmt} 〜 ${endFmt}`,
+    `影響範囲：${scope}`,
+    '',
+    detail,
+    '',
+    'ご不便をおかけして申し訳ございません。\n引き続きChat VANをよろしくお願いいたします。',
+  ].join('\n');
+
+  const recipientCount = users?.filter(u => u.role === 'user').length ?? 0;
+
+  const handleSend = async () => {
+    if (!startDatetime) { toast({ variant: 'destructive', title: 'メンテナンス開始日時を入力してください' }); return; }
+    if (!endDatetime)   { toast({ variant: 'destructive', title: 'メンテナンス終了日時を入力してください' }); return; }
+    if (!detail.trim()) { toast({ variant: 'destructive', title: '詳細説明を入力してください' }); return; }
+    setSending(true);
+    try {
+      const res = await apiFetch('/api/admin/notifications/send', {
+        method: 'POST',
+        body: JSON.stringify({ sendAll: true, subject: autoSubject, body: autoBody }),
+      });
+      toast({ title: res.message });
+      onSent();
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: '送信に失敗しました', description: e.message });
+    } finally { setSending(false); }
+  };
+
+  const cfg = LEVEL_CONFIG[level];
   const year = new Date().getFullYear();
 
   return (
-    <div className="rounded-xl border border-border overflow-hidden shadow-sm">
-      <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-3 flex-wrap">
-        <p className="text-sm font-semibold shrink-0">メールプレビュー</p>
-        <div className="flex flex-wrap gap-1.5">
-          {keys.map(k => (
-            <button
-              key={k}
-              onClick={() => setSelected(k)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                selected === k
-                  ? 'bg-foreground text-background'
-                  : 'bg-muted text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {k}
-            </button>
-          ))}
+    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      {/* 左：設定 */}
+      <div className="lg:col-span-2 space-y-5">
+
+        {/* テンプレート */}
+        <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+          <p className="font-semibold text-sm">テンプレート</p>
+          <div className="flex flex-col gap-2">
+            {MAINTENANCE_TEMPLATES.map((t, i) => {
+              const Icon = LEVEL_CONFIG[t.level].icon;
+              return (
+                <button key={i} onClick={() => applyTemplate(i)}
+                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border text-sm text-left transition-colors ${
+                    tplIdx === i ? 'bg-foreground text-background border-foreground' : 'border-border hover:bg-muted/30'
+                  }`}>
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 重要度 */}
+        <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+          <p className="font-semibold text-sm">重要度</p>
+          <div className="flex flex-col gap-2">
+            {(Object.entries(LEVEL_CONFIG) as [MaintenanceLevel, typeof LEVEL_CONFIG[MaintenanceLevel]][]).map(([k, v]) => {
+              const Icon = v.icon;
+              return (
+                <button key={k} onClick={() => setLevel(k)}
+                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border text-sm text-left transition-colors ${
+                    level === k ? 'bg-foreground text-background border-foreground' : 'border-border hover:bg-muted/30'
+                  }`}>
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  {v.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 送信先 */}
+        <div className="bg-card border border-border rounded-xl p-5 space-y-2">
+          <p className="font-semibold text-sm">送信先</p>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
+            <Users className="h-4 w-4" />
+            <span>全ユーザー <strong className="text-foreground">{recipientCount}名</strong> に一斉送信</span>
+          </div>
         </div>
       </div>
-      <div className="p-5 bg-muted/10">
-        <div style={{ fontFamily: "'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif", maxWidth: 560 }}>
-          {/* ヘッダー */}
-          <div style={{ background: '#000', padding: '20px 28px', borderRadius: '10px 10px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <span style={{ color: '#fff', fontWeight: 800, fontSize: 16, letterSpacing: 1 }}>Chat VAN</span>
+
+      {/* 右：フォーム + プレビュー */}
+      <div className="lg:col-span-3 space-y-5">
+        <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+          <p className="font-semibold text-sm">メンテナンス情報</p>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1"><Calendar className="h-3 w-3" />開始日時 *</Label>
+              <input type="datetime-local" value={startDatetime} onChange={e => setStartDatetime(e.target.value)}
+                className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-foreground/20" />
             </div>
-            {p.badge && (
-              <span style={{ background: '#fff', color: '#000', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20 }}>{p.badge}</span>
-            )}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" />終了日時 *</Label>
+              <input type="datetime-local" value={endDatetime} onChange={e => setEndDatetime(e.target.value)}
+                className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-foreground/20" />
+            </div>
           </div>
-          {/* ボディ */}
-          <div style={{ background: '#fff', padding: '32px 32px 24px', border: '1px solid #e5e5e5', borderTop: 'none' }}>
-            <p style={{ margin: '0 0 20px', fontSize: 15, color: '#333', fontWeight: 500 }}>{p.name} 様</p>
-            <div style={{ fontSize: 14, color: '#333', lineHeight: 1.9, marginBottom: 28, whiteSpace: 'pre-wrap' }}>{p.body}</div>
-            <table cellPadding={0} cellSpacing={0} style={{ marginBottom: 28 }}>
-              <tbody><tr><td style={{ background: '#000', borderRadius: 8 }}>
-                <span style={{ display: 'inline-block', padding: '12px 28px', color: '#fff', fontSize: 13, fontWeight: 700 }}>{p.cta}</span>
-              </td></tr></tbody>
-            </table>
-            <hr style={{ border: 'none', borderTop: '1px solid #ebebeb', margin: '0 0 20px' }} />
-            <p style={{ margin: 0, fontSize: 11, color: '#aaa', lineHeight: 1.7 }}>
-              このメールは <strong>Chat VAN</strong> から自動送信されています。<br />
-              心当たりのない場合や、ご不明な点は担当者までお問い合わせください。
-            </p>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">影響範囲</Label>
+            <div className="flex gap-2 flex-wrap">
+              {['全サービス', '一部機能', 'チャット機能', '決済機能', '管理画面'].map(s => (
+                <button key={s} onClick={() => setScope(s)}
+                  className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                    scope === s ? 'bg-foreground text-background border-foreground' : 'border-border text-muted-foreground hover:text-foreground'
+                  }`}>
+                  {s}
+                </button>
+              ))}
+              <Input value={!['全サービス', '一部機能', 'チャット機能', '決済機能', '管理画面'].includes(scope) ? scope : ''}
+                onChange={e => setScope(e.target.value)} placeholder="カスタム入力" className="h-7 text-xs w-28" />
+            </div>
           </div>
-          {/* フッター */}
-          <div style={{ background: '#f7f7f7', padding: '14px 28px', borderRadius: '0 0 10px 10px', border: '1px solid #e5e5e5', borderTop: 'none', display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 11, color: '#bbb' }}>© {year} Chat VAN</span>
-            <span style={{ fontSize: 11, color: '#bbb' }}>合同会社SIN JAPAN</span>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">詳細説明 *</Label>
+            <Textarea value={detail} onChange={e => setDetail(e.target.value)}
+              placeholder="メンテナンスの内容・理由・影響について記述してください..." className="min-h-[120px] resize-none text-sm" />
           </div>
         </div>
+
+        {/* メールプレビュー */}
+        <div className="rounded-xl border border-border overflow-hidden shadow-sm">
+          <div className="px-5 py-3 border-b border-border bg-muted/20">
+            <p className="text-sm font-semibold">送信メールプレビュー</p>
+          </div>
+          <div className="p-4 bg-muted/10">
+            <div style={{ fontFamily: "'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif", maxWidth: 540 }}>
+              {/* ヘッダー */}
+              <div style={{ background: '#000', padding: '18px 24px', borderRadius: '10px 10px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ color: '#fff', fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>Chat VAN</span>
+                <span style={{ background: level === 'critical' ? '#ef4444' : level === 'warning' ? '#f59e0b' : '#3b82f6', color: '#fff', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20 }}>
+                  {levelLabel}
+                </span>
+              </div>
+              {/* アラートバナー */}
+              <div style={{ background: cfg.bgColor, borderLeft: `4px solid ${cfg.color}`, padding: '12px 20px', border: `1px solid ${cfg.borderColor}`, borderTop: 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 16 }}>{level === 'critical' ? '🚨' : level === 'warning' ? '⚠️' : 'ℹ️'}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: cfg.color }}>{levelLabel}</span>
+                </div>
+                <div style={{ marginTop: 6, fontSize: 12, color: cfg.color, lineHeight: 1.5 }}>
+                  <span>日時: {startFmt} 〜 {endFmt}</span><br />
+                  <span>影響範囲: {scope}</span>
+                </div>
+              </div>
+              {/* ボディ */}
+              <div style={{ background: '#fff', padding: '24px 24px 20px', border: '1px solid #e5e5e5', borderTop: 'none', fontSize: 13, color: '#333', lineHeight: 1.9, whiteSpace: 'pre-wrap' }}>
+                {detail || '詳細説明を入力してください'}
+              </div>
+              {/* フッター */}
+              <div style={{ background: '#f7f7f7', padding: '12px 24px', borderRadius: '0 0 10px 10px', border: '1px solid #e5e5e5', borderTop: 'none', display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 10, color: '#bbb' }}>© {year} Chat VAN</span>
+                <span style={{ fontSize: 10, color: '#bbb' }}>合同会社SIN JAPAN</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Button className="w-full gap-2 bg-black text-white hover:bg-black/90" onClick={handleSend}
+          disabled={sending || !startDatetime || !endDatetime || !detail.trim() || recipientCount === 0}>
+          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          {sending ? '送信中...' : `全ユーザー ${recipientCount}名 にメンテナンス通知を送信`}
+        </Button>
       </div>
     </div>
   );
 }
 
 // ── メインページ ───────────────────────────────────────────────────────────────
-
 const TABS = [
-  { key: 'send',    label: 'メール送信',   icon: Send },
-  { key: 'history', label: '送信履歴',     icon: History },
-  { key: 'auto',    label: '自動通知設定', icon: Settings },
+  { key: 'send',        label: 'メール送信',       icon: Send },
+  { key: 'maintenance', label: 'メンテナンス通知',  icon: Wrench },
+  { key: 'history',     label: '送信履歴',          icon: History },
+  { key: 'auto',        label: '自動通知設定',       icon: Settings },
 ];
 
 export default function AdminNotifications() {
@@ -533,26 +696,26 @@ export default function AdminNotifications() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">通知管理</h1>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">通知管理</h1>
+        <p className="text-muted-foreground mt-1 text-sm">ユーザーへの通知メール送信・自動通知ルールの確認を行います。</p>
+      </div>
 
       <div className="flex gap-1 border-b border-border">
         {TABS.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
+          <button key={t.key} onClick={() => setTab(t.key)}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors ${
               tab === t.key ? 'text-foreground border-b-2 border-foreground -mb-px' : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <t.icon className="h-4 w-4" />
-            {t.label}
+            }`}>
+            <t.icon className="h-4 w-4" />{t.label}
           </button>
         ))}
       </div>
 
-      {tab === 'send'    && <SendForm onSent={() => { setHistoryKey(k => k + 1); }} />}
-      {tab === 'history' && <SendHistory key={historyKey} />}
-      {tab === 'auto'    && <AutoSettings />}
+      {tab === 'send'        && <SendForm onSent={() => setHistoryKey(k => k + 1)} />}
+      {tab === 'maintenance' && <MaintenanceForm onSent={() => setHistoryKey(k => k + 1)} />}
+      {tab === 'history'     && <SendHistory key={historyKey} />}
+      {tab === 'auto'        && <AutoSettings />}
     </div>
   );
 }

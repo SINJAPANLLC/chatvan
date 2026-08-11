@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, prospectsTable } from "@workspace/db";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, and, sql as drizzleSql } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/auth";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { sendEmail, buildSalesEmailHtml } from "../lib/email";
@@ -9,8 +9,11 @@ import { runAutoProspect, lastRunLog } from "../lib/autoProspect";
 const router: IRouter = Router();
 
 // ── リスト取得 ────────────────────────────────────────────────────────────────
-router.get("/admin/prospects", requireAdmin, async (_req, res): Promise<void> => {
-  const rows = await db.select().from(prospectsTable).orderBy(prospectsTable.createdAt);
+router.get("/admin/prospects", requireAdmin, async (req, res): Promise<void> => {
+  const type = (req.query.type as string) || "user";
+  const rows = await db.select().from(prospectsTable)
+    .where(eq(drizzleSql`${prospectsTable}.prospect_type`, type))
+    .orderBy(prospectsTable.createdAt);
   res.json(rows.map(r => ({
     ...r,
     createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
@@ -20,28 +23,41 @@ router.get("/admin/prospects", requireAdmin, async (_req, res): Promise<void> =>
 
 // ── 1件追加 ───────────────────────────────────────────────────────────────────
 router.post("/admin/prospects", requireAdmin, async (req, res): Promise<void> => {
-  const { companyName, contactName, email, phone, industry, prefecture, notes } = req.body;
+  const { companyName, contactName, email, phone, industry, prefecture, notes, prospectType } = req.body;
   if (!companyName || !email) { res.status(400).json({ error: "会社名とメールアドレスは必須です" }); return; }
-  const [row] = await db.insert(prospectsTable).values({ companyName, contactName, email, phone, industry, prefecture, notes }).returning();
-  res.json(row);
+  const [row] = await db.execute(drizzleSql`
+    INSERT INTO prospects (company_name, contact_name, email, phone, industry, prefecture, notes, prospect_type)
+    VALUES (${companyName}, ${contactName ?? null}, ${email}, ${phone ?? null}, ${industry ?? null}, ${prefecture ?? null}, ${notes ?? null}, ${prospectType ?? 'user'})
+    RETURNING *
+  `);
+  res.json((row as any));
 });
 
 // ── CSV一括追加 ───────────────────────────────────────────────────────────────
 router.post("/admin/prospects/import", requireAdmin, async (req, res): Promise<void> => {
-  const { rows } = req.body as { rows: any[] };
+  const { rows, prospectType } = req.body as { rows: any[]; prospectType?: string };
   if (!Array.isArray(rows) || rows.length === 0) { res.status(400).json({ error: "データがありません" }); return; }
   const valid = rows.filter(r => r.companyName && r.email);
   if (valid.length === 0) { res.status(400).json({ error: "有効なデータがありません（会社名・メールアドレス必須）" }); return; }
-  const inserted = await db.insert(prospectsTable).values(valid).returning();
-  res.json({ inserted: inserted.length });
+  const type = prospectType ?? "user";
+  let inserted = 0;
+  for (const r of valid) {
+    await db.execute(drizzleSql`
+      INSERT INTO prospects (company_name, contact_name, email, phone, industry, prefecture, notes, prospect_type)
+      VALUES (${r.companyName}, ${r.contactName ?? null}, ${r.email}, ${r.phone ?? null}, ${r.industry ?? null}, ${r.prefecture ?? null}, ${r.notes ?? null}, ${type})
+    `);
+    inserted++;
+  }
+  res.json({ inserted });
 });
 
 // ── AI自動生成 ────────────────────────────────────────────────────────────────
 router.post("/admin/prospects/generate", requireAdmin, async (req, res): Promise<void> => {
-  const { industry, prefecture, count = 10 } = req.body as { industry: string; prefecture: string; count?: number };
+  const { industry, prefecture, count = 10, prospectType } = req.body as { industry: string; prefecture: string; count?: number; prospectType?: string };
   if (!industry || !prefecture) { res.status(400).json({ error: "業種と都道府県を指定してください" }); return; }
 
   const n = Math.min(Math.max(Number(count), 5), 30);
+  const type = prospectType ?? "user";
 
   const prompt = [
     "あなたは日本の法人リストを生成するアシスタントです。",
@@ -79,22 +95,20 @@ router.post("/admin/prospects/generate", requireAdmin, async (req, res): Promise
   const valid = generated.filter((r: any) => r.companyName && r.email);
   if (valid.length === 0) { res.status(500).json({ error: "生成に失敗しました" }); return; }
 
-  const inserted = await db.insert(prospectsTable).values(valid.map((r: any) => ({
-    companyName: r.companyName,
-    contactName: r.contactName ?? null,
-    email:       r.email,
-    phone:       r.phone ?? null,
-    industry:    r.industry ?? industry,
-    prefecture:  r.prefecture ?? prefecture,
-    notes:       null,
-  }))).returning();
+  let inserted = 0;
+  for (const r of valid) {
+    await db.execute(drizzleSql`
+      INSERT INTO prospects (company_name, contact_name, email, phone, industry, prefecture, notes, prospect_type)
+      VALUES (${r.companyName}, ${r.contactName ?? null}, ${r.email}, ${r.phone ?? null}, ${r.industry ?? industry}, ${r.prefecture ?? prefecture}, ${null}, ${type})
+    `);
+    inserted++;
+  }
 
-  res.json({ inserted: inserted.length, rows: inserted });
+  res.json({ inserted });
 });
 
 // ── 自動クロール（手動トリガー） ───────────────────────────────────────────────
 router.post("/admin/prospects/auto-crawl", requireAdmin, async (_req, res): Promise<void> => {
-  // バックグラウンド実行（レスポンスはすぐ返す）
   res.json({ message: "自動クロールを開始しました。数分後にリストを確認してください。" });
   runAutoProspect().catch(e => console.error("[AutoCrawl]", e.message));
 });

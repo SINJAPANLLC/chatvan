@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, blogPostsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, sql as drizzleSql } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/auth";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { getStatus, setEnabled, generateAndPublish } from "../lib/blogAutoGen";
@@ -17,14 +17,17 @@ function fmt(p: any) {
 }
 
 // ── 公開 API ──────────────────────────────────────────────────────────────────
-// 公開記事一覧
+// 公開記事一覧（ユーザー向けのみ公開）
 router.get("/blog", async (_req, res): Promise<void> => {
   const posts = await db.select({
     id: blogPostsTable.id, slug: blogPostsTable.slug, title: blogPostsTable.title,
     excerpt: blogPostsTable.excerpt, category: blogPostsTable.category, tags: blogPostsTable.tags,
     publishedAt: blogPostsTable.publishedAt, createdAt: blogPostsTable.createdAt,
   }).from(blogPostsTable)
-    .where(eq(blogPostsTable.published, true))
+    .where(and(
+      eq(blogPostsTable.published, true),
+      drizzleSql`${blogPostsTable}.target_type = 'user'`
+    ))
     .orderBy(desc(blogPostsTable.publishedAt));
   res.json(posts.map(fmt));
 });
@@ -39,24 +42,33 @@ router.get("/blog/:slug", async (req, res): Promise<void> => {
 });
 
 // ── 管理 API ──────────────────────────────────────────────────────────────────
-// 全記事（管理者）
-router.get("/admin/blog", requireAdmin, async (_req, res): Promise<void> => {
-  const posts = await db.select().from(blogPostsTable).orderBy(desc(blogPostsTable.createdAt));
+// 全記事（管理者）?type=user|rental_company
+router.get("/admin/blog", requireAdmin, async (req, res): Promise<void> => {
+  const type = (req.query.type as string) || "user";
+  const posts = await db.select().from(blogPostsTable)
+    .where(drizzleSql`${blogPostsTable}.target_type = ${type}`)
+    .orderBy(desc(blogPostsTable.createdAt));
   res.json(posts.map(fmt));
 });
 
 // 作成
 router.post("/admin/blog", requireAdmin, async (req, res): Promise<void> => {
-  const { slug, title, excerpt, content, category, tags, metaTitle, metaDescription, published } = req.body;
+  const { slug, title, excerpt, content, category, tags, metaTitle, metaDescription, published, targetType } = req.body;
   if (!slug || !title || !content) { res.status(400).json({ error: "slug・title・contentは必須です" }); return; }
-  const [post] = await db.insert(blogPostsTable).values({
-    slug, title, excerpt: excerpt ?? "", content, category: category ?? "物流コラム",
-    tags: tags ? JSON.stringify(tags) : null,
-    metaTitle: metaTitle ?? null, metaDescription: metaDescription ?? null,
-    published: !!published,
-    publishedAt: published ? new Date() : null,
-  }).returning();
-  res.json(fmt(post));
+  const type = targetType ?? "user";
+  const [post] = await db.execute(drizzleSql`
+    INSERT INTO blog_posts (slug, title, excerpt, content, category, tags, meta_title, meta_description, published, published_at, target_type)
+    VALUES (
+      ${slug}, ${title}, ${excerpt ?? ""}, ${content},
+      ${category ?? "Chat VANコラム"},
+      ${tags ? JSON.stringify(tags) : null},
+      ${metaTitle ?? null}, ${metaDescription ?? null},
+      ${!!published}, ${published ? new Date() : null},
+      ${type}
+    )
+    RETURNING *
+  `);
+  res.json(fmt(post as any));
 });
 
 // 更新
@@ -90,13 +102,26 @@ router.delete("/admin/blog/:id", requireAdmin, async (req, res): Promise<void> =
 
 // ── AI記事生成 ────────────────────────────────────────────────────────────────
 router.post("/admin/blog/generate", requireAdmin, async (req, res): Promise<void> => {
-  const { keyword, painPoint } = req.body as { keyword: string; painPoint?: string };
+  const { keyword, painPoint, targetType } = req.body as { keyword: string; painPoint?: string; targetType?: string };
   if (!keyword) { res.status(400).json({ error: "キーワードを入力してください" }); return; }
 
-  const systemPrompt = [
-    "あなたは物流業界に特化したSEOコンテンツライターです。",
-    "日本語の物流担当者・経営者に向けた、検索意図に沿った実用的なブログ記事を作成します。",
-  ].join("\n");
+  const isRental = targetType === "rental_company";
+
+  const systemPrompt = isRental
+    ? "あなたはレンタカー・カーリース業界に特化したSEOコンテンツライターです。日本語のレンタル会社経営者・管理職に向けた、稼働率改善や収益向上に関する実用的なブログ記事を作成します。"
+    : "あなたは軽バンレンタル業界に特化したSEOコンテンツライターです。日本語の法人担当者・個人事業主に向けた、検索意図に沿った実用的なブログ記事を作成します。";
+
+  const readerDesc = isRental
+    ? "レンタカー会社・リース会社の経営者・管理職"
+    : "軽バンを利用したい法人担当者・個人事業主・配送業者";
+
+  const ctaDesc = isRental
+    ? "Chat VANへの車両提供・パートナー登録のCTA（「まずは無料でご相談ください」）"
+    : "Chat VANで軽バンを探すCTA（「まずは無料でご相談ください」）";
+
+  const categoryList = isRental
+    ? "稼働率改善/収益アップ/コスト管理/運営効率化/パートナー活用"
+    : "軽バン活用術/節約・コスト/レンタル基礎知識/個人事業主向け/法人向け/Chat VANコラム";
 
   const userPrompt = [
     `以下の条件でSEO記事を作成してください。`,
@@ -106,11 +131,11 @@ router.post("/admin/blog/generate", requireAdmin, async (req, res): Promise<void
     ``,
     `要件:`,
     `- 文字数: 1000〜1500文字`,
-    `- 読者: 物流担当者・中小企業の経営者`,
-    `- 構成: ペインを強調→原因分析→解決策提示→Chat LOGIのCTA`,
+    `- 読者: ${readerDesc}`,
+    `- 構成: ペインを強調→原因分析→解決策提示→Chat VANのCTA`,
     `- H2/H3を使った見出し構造（Markdownで記述）`,
     `- 読みやすく実践的な内容`,
-    `- 末尾にChat LOGIへの誘導CTA（「まずは無料でご相談ください」）`,
+    `- 末尾に${ctaDesc}`,
     ``,
     `出力形式はJSONのみ（マークダウン不要）:`,
     `{`,
@@ -119,7 +144,7 @@ router.post("/admin/blog/generate", requireAdmin, async (req, res): Promise<void
     `  "excerpt": "記事の要約（120文字以内）",`,
     `  "metaTitle": "メタタイトル（60文字以内）",`,
     `  "metaDescription": "メタディスクリプション（120文字以内）",`,
-    `  "category": "カテゴリ（コスト削減/物流DX/運送会社選び/物流戦略/物流運営 のいずれか）",`,
+    `  "category": "カテゴリ（${categoryList} のいずれか）",`,
     `  "tags": ["タグ1", "タグ2", "タグ3"],`,
     `  "content": "Markdown形式の本文（## で見出し）"`,
     `}`,
@@ -147,22 +172,22 @@ router.post("/admin/blog/generate", requireAdmin, async (req, res): Promise<void
 });
 
 // ── 自動生成スケジューラー設定 ──────────────────────────────────────────────────
-// GET /admin/blog/auto-gen — ステータス取得
-router.get("/admin/blog/auto-gen", requireAdmin, async (_req, res): Promise<void> => {
-  res.json(await getStatus());
+router.get("/admin/blog/auto-gen", requireAdmin, async (req, res): Promise<void> => {
+  const type = (req.query.type as string) || "user";
+  res.json(await getStatus(type));
 });
 
-// POST /admin/blog/auto-gen — 有効/無効切替
 router.post("/admin/blog/auto-gen", requireAdmin, async (req, res): Promise<void> => {
-  const { enabled } = req.body as { enabled: boolean };
-  await setEnabled(!!enabled);
-  res.json(await getStatus());
+  const { enabled, targetType } = req.body as { enabled: boolean; targetType?: string };
+  const type = targetType ?? "user";
+  await setEnabled(!!enabled, type);
+  res.json(await getStatus(type));
 });
 
-// POST /admin/blog/auto-gen/run — 手動で今すぐ1記事生成
-router.post("/admin/blog/auto-gen/run", requireAdmin, async (_req, res): Promise<void> => {
+router.post("/admin/blog/auto-gen/run", requireAdmin, async (req, res): Promise<void> => {
+  const { targetType } = req.body as { targetType?: string };
   try {
-    const result = await generateAndPublish();
+    const result = await generateAndPublish(targetType ?? "user");
     res.json({ ok: true, ...result });
   } catch (e: any) {
     res.status(500).json({ error: e.message });

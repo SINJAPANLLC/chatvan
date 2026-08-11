@@ -1,21 +1,22 @@
 /**
  * 自動リスト収集 & 営業メール送信
- * - DuckDuckGo HTML から荷主候補を収集
+ * - Brave Search から軽バンレンタル会社候補を収集
  * - AI で品質スコアリング & 個別メール文生成
  * - 毎日5件取得 → 5件未送信に送信
  */
 import cron from "node-cron";
-import { db, prospectsTable } from "@workspace/db";
+import { db, prospectsTable, settingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { sendEmail, buildSalesEmailHtml } from "./email";
 import { logger } from "./logger";
+import { PROMPT_DEFAULTS } from "../routes/ai-settings";
 
 // ── ローテーション候補 ──────────────────────────────────────────────────────────
 const INDUSTRIES = [
-  "食品メーカー", "製造業", "化学品メーカー", "医薬品", "電子部品メーカー",
-  "アパレル", "家具メーカー", "建材メーカー", "農産物", "EC通販事業者",
-  "小売業", "卸売業", "自動車部品メーカー", "印刷業", "化粧品メーカー",
+  "レンタカー会社", "カーリース会社", "自動車販売会社", "中古車販売", "軽バン保有会社",
+  "運送会社", "引越し会社", "福祉車両レンタル", "建設機械レンタル", "農業機械レンタル",
+  "軽貨物配送会社", "宅配事業者", "フードデリバリー", "EC配送業者", "輸送会社",
 ];
 const PREFECTURES = [
   "東京都", "神奈川県", "大阪府", "愛知県", "埼玉県",
@@ -24,8 +25,8 @@ const PREFECTURES = [
 ];
 const SEARCH_QUERIES_TMPL = (industry: string, pref: string) => [
   `${industry} ${pref} 問い合わせ メール site:co.jp`,
-  `${industry} 荷主 配送 発送 問い合わせ ${pref}`,
-  `${pref} ${industry} メーカー 物流 お問い合わせ`,
+  `${industry} 軽バン 保有 ${pref} お問い合わせ`,
+  `${pref} ${industry} レンタル 問い合わせ`,
 ];
 
 const EMAIL_RE = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
@@ -41,6 +42,16 @@ export interface AutoProspectLog {
   errors: string[];
 }
 export let lastRunLog: AutoProspectLog | null = null;
+
+// ── DBからプロンプトを取得（なければデフォルト） ──────────────────────────────
+async function getPrompt(key: "ai_prospect_score_prompt" | "ai_prospect_email_prompt"): Promise<string> {
+  try {
+    const [row] = await db.select().from(settingsTable).where(eq(settingsTable.key, key)).limit(1);
+    return row?.value ?? PROMPT_DEFAULTS[key];
+  } catch {
+    return PROMPT_DEFAULTS[key];
+  }
+}
 
 // ── HTTP fetch ────────────────────────────────────────────────────────────────
 async function fetchHtml(url: string, timeout = 10_000): Promise<string> {
@@ -58,7 +69,7 @@ async function fetchHtml(url: string, timeout = 10_000): Promise<string> {
   return res.text();
 }
 
-// ── Brave Search API（VPS IPのDDG CAPTCHAブロックを回避） ────────────────────
+// ── Brave Search API ───────────────────────────────────────────────────────────
 async function searchBrave(query: string): Promise<string[]> {
   const apiKey = process.env.BRAVE_SEARCH_API_KEY;
   if (!apiKey) throw new Error("BRAVE_SEARCH_API_KEY が未設定です");
@@ -84,12 +95,7 @@ async function searchBrave(query: string): Promise<string[]> {
 }
 
 async function searchWeb(query: string): Promise<string[]> {
-  try {
-    return await searchBrave(query);
-  } catch (e: any) {
-    // Brave APIキー未設定やエラー時は空配列（ログはメイン処理で記録）
-    throw e;
-  }
+  return await searchBrave(query);
 }
 
 // ── サイトからメールを抽出 ───────────────────────────────────────────────────
@@ -122,7 +128,6 @@ async function findEmailOnSite(
     const emails = extractEmails(html);
     if (emails.length) return { email: emails[0], title };
 
-    // サブページも確認
     const origin = new URL(siteUrl).origin;
     for (const path of ["/contact", "/inquiry", "/company", "/about"]) {
       try {
@@ -137,28 +142,17 @@ async function findEmailOnSite(
   }
 }
 
-// ── AI: 荷主適合度評価 ────────────────────────────────────────────────────────
+// ── AI: 企業スコアリング ──────────────────────────────────────────────────────
 async function aiScore(
   candidates: { idx: number; url: string; title: string }[],
   industry: string,
 ): Promise<{ idx: number; companyName: string; industry: string }[]> {
   if (candidates.length === 0) return [];
 
-  const prompt = `あなたは物流SaaS「Chat LOGI」のBtoB営業AIです。
-以下の企業リストの中から「荷主企業」として有望なものを最大5社選び、JSONのみで返してください。
-
-Chat LOGIのサービス: チャットで配送依頼するだけでプロが即日手配する物流SaaS。
-理想の顧客: 定期的な発送ニーズがある法人（製造、食品、EC、小売、卸売など）。
-
-企業リスト:
-${JSON.stringify(candidates.map(c => ({ idx: c.idx, url: c.url, title: c.title })))}
-
-除外条件:
-- 個人ブログ・メディア・求人・官公庁・金融・不動産は除外
-- 明らかに荷主でないもの（SaaS、IT、コンサル等）は低スコア
-
-出力（JSONのみ、他の文字は不要）:
-[{"idx":0,"companyName":"株式会社○○","industry":"${industry}"}]`;
+  const template = await getPrompt("ai_prospect_score_prompt");
+  const prompt = template
+    .replace("{CANDIDATES}", JSON.stringify(candidates.map(c => ({ idx: c.idx, url: c.url, title: c.title }))))
+    .replace(/\{INDUSTRY\}/g, industry);
 
   try {
     const res = await openai.chat.completions.create({
@@ -180,26 +174,14 @@ async function aiGenerateEmail(
   industry: string,
 ): Promise<{ subject: string; body: string }> {
   try {
+    const template = await getPrompt("ai_prospect_email_prompt");
+    const prompt = template
+      .replace("{COMPANY_NAME}", companyName)
+      .replace(/\{INDUSTRY\}/g, industry);
+
     const res = await openai.chat.completions.create({
       model: "gpt-4.1-mini",
-      messages: [
-        {
-          role: "user",
-          content: `Chat LOGI（物流SaaS）の営業メールを1通生成してください。
-
-宛先企業: ${companyName}（業種: ${industry}）
-サービス概要: チャットで配送依頼するだけで、物流のプロが最短即日手配。運送会社との交渉・見積依頼が不要になる。
-
-条件:
-- 件名: 30文字以内、【Chat LOGI】で始める
-- 本文: 180〜280文字。丁寧で簡潔、押しつけがましくない
-- {会社名} プレースホルダーを冒頭宛名として使う
-- 配送コスト・手間削減の具体的ベネフィットに1行触れる
-
-出力（JSONのみ）:
-{"subject":"件名","body":"本文"}`,
-        },
-      ],
+      messages: [{ role: "user", content: prompt }],
       max_completion_tokens: 400,
     });
     const raw = (res.choices[0]?.message?.content ?? "{}")
@@ -207,9 +189,8 @@ async function aiGenerateEmail(
     return JSON.parse(raw);
   } catch {
     return {
-      subject: "【Chat LOGI】物流業務を自動化するご提案",
-      body:
-        "{会社名} ご担当者様\n\nはじめまして。物流SaaS「Chat LOGI」と申します。\n\nチャットで配送依頼するだけで物流のプロが即日手配いたします。\n運送会社との見積・交渉が不要になり、物流業務のコストと手間を大幅に削減できます。\n\nまずは無料でお試しいただけます。ぜひご検討ください。",
+      subject: "【Chat VAN】車両提供のご相談",
+      body: "{会社名} ご担当者様\n\nはじめまして。軽バンレンタルサービス「Chat VAN」と申します。\n\n遊休車両を活用し、安定した月額収益を得られる仕組みをご提案させてください。\n顧客対応はChat VAN側が担当するため、御社の手間を最小化できます。\n\nまずは無料でご相談ください。",
     };
   }
 }
@@ -219,14 +200,15 @@ export async function runAutoProspect(): Promise<AutoProspectLog> {
   const ranAt = new Date().toISOString();
   const errors: string[] = [];
 
-  // 日付ベースでローテーション
-  const dayIdx = Math.floor(Date.now() / 86_400_000);
-  const industry = INDUSTRIES[dayIdx % INDUSTRIES.length];
-  const prefecture = PREFECTURES[dayIdx % PREFECTURES.length];
+  const dayOfYear = Math.floor((Date.now() - Date.UTC(new Date().getUTCFullYear(), 0, 0)) / 86400000);
+  const industry = INDUSTRIES[dayOfYear % INDUSTRIES.length];
+  const prefecture = PREFECTURES[dayOfYear % PREFECTURES.length];
 
   logger.info({ industry, prefecture }, "[AutoProspect] 開始");
 
-  // ── 1. DDG クロール ────────────────────────────────────────────────────────
+  let found = 0;
+
+  // ── Step 1: 検索 → メール収集 ──────────────────────────────────────────────
   const queries = SEARCH_QUERIES_TMPL(industry, prefecture);
   const allUrls: string[] = [];
 
@@ -234,130 +216,104 @@ export async function runAutoProspect(): Promise<AutoProspectLog> {
     try {
       const urls = await searchWeb(q);
       allUrls.push(...urls);
-      await new Promise(r => setTimeout(r, 1_000)); // rate limit
     } catch (e: any) {
-      errors.push(`検索エラー: ${e.message}`);
+      errors.push(`検索失敗: ${e.message}`);
     }
   }
 
   const uniqueUrls = [...new Set(allUrls)].slice(0, 20);
-  logger.info({ count: uniqueUrls.length }, "[AutoProspect] URL収集完了");
-
-  // ── 2. 各サイトからメール抽出 ──────────────────────────────────────────────
-  const candidates: { idx: number; url: string; title: string; email: string }[] = [];
+  const rawCandidates: { idx: number; url: string; title: string; email: string }[] = [];
 
   for (let i = 0; i < uniqueUrls.length; i++) {
     const url = uniqueUrls[i];
     try {
       const { email, title } = await findEmailOnSite(url);
-      if (email && title) {
-        candidates.push({ idx: candidates.length, url, title, email });
-      }
-      await new Promise(r => setTimeout(r, 500));
-    } catch { /* skip */ }
+      if (email) rawCandidates.push({ idx: i, url, title, email });
+    } catch (e: any) {
+      errors.push(`サイト取得失敗 ${url}: ${e.message}`);
+    }
   }
 
-  logger.info({ count: candidates.length }, "[AutoProspect] メール抽出完了");
+  // ── Step 2: AIスコアリング ──────────────────────────────────────────────────
+  const scored = await aiScore(rawCandidates, industry);
 
-  if (candidates.length === 0) {
-    errors.push("候補サイトからメールアドレスを取得できませんでした");
-    // クロール失敗でも既存の未送信リストへの送信は続行する
-  }
+  // ── Step 3: DBに登録 ───────────────────────────────────────────────────────
+  for (const s of scored) {
+    const raw = rawCandidates.find(c => c.idx === s.idx);
+    if (!raw) continue;
 
-  // ── 3. AI でスコアリング ──────────────────────────────────────────────────
-  const scored = await aiScore(
-    candidates.map(c => ({ idx: c.idx, url: c.url, title: c.title })),
-    industry,
-  );
-
-  // ── 4. DB 登録（重複スキップ、最大5件） ───────────────────────────────────
-  let found = 0;
-  const insertedEmails = new Set<string>();
-
-  for (const s of scored.slice(0, 5)) {
-    const c = candidates[s.idx];
-    if (!c) continue;
-    if (insertedEmails.has(c.email)) continue;
-
-    // 既存チェック
-    const existing = await db
-      .select()
+    // 重複チェック
+    const existing = await db.select({ id: prospectsTable.id })
       .from(prospectsTable)
-      .where(eq(prospectsTable.email, c.email))
+      .where(eq(prospectsTable.email, raw.email))
       .limit(1);
     if (existing.length > 0) continue;
 
     try {
       await db.insert(prospectsTable).values({
-        companyName: s.companyName || c.title,
-        email: c.email,
+        companyName: s.companyName || raw.title || raw.url,
+        email: raw.email,
         industry: s.industry || industry,
         prefecture,
-        notes: `[自動取得] ${c.url}`,
+        notes: `[自動取得] ${raw.url}`,
         status: "unsent",
       });
-      insertedEmails.add(c.email);
       found++;
     } catch (e: any) {
-      errors.push(`DB挿入エラー: ${e.message}`);
+      errors.push(`DB登録失敗 ${raw.email}: ${e.message}`);
     }
   }
 
-  logger.info({ found }, "[AutoProspect] DB登録完了");
-
-  // ── 5. 未送信 5件にメール送信 ─────────────────────────────────────────────
-  const unsent = await db
-    .select()
+  // ── Step 4: 未送信5件にAI個別メールを送信 ─────────────────────────────────
+  let sent = 0;
+  const targets = await db.select()
     .from(prospectsTable)
     .where(eq(prospectsTable.status, "unsent"))
     .limit(5);
 
-  let sent = 0;
-  for (const prospect of unsent) {
+  for (const t of targets) {
     try {
-      const { subject, body } = await aiGenerateEmail(
-        prospect.companyName,
-        prospect.industry ?? industry,
-      );
+      const { subject, body } = await aiGenerateEmail(t.companyName, t.industry ?? industry);
       const html = buildSalesEmailHtml({
         subject,
         bodyText: body,
-        companyName: prospect.companyName,
-        contactName: prospect.contactName ?? undefined,
-        ctaText: "Chat LOGIを無料で試す →",
-        ctaUrl: "https://chatlogi.jp",
+        companyName: t.companyName,
+        contactName: t.contactName ?? undefined,
+        ctaText: "Chat VANの詳細を見る →",
       });
-      const result = await sendEmail(prospect.email, subject, html);
+      const result = await sendEmail(t.email, subject, html);
       if (result.sent) {
-        await db
-          .update(prospectsTable)
+        await db.update(prospectsTable)
           .set({ status: "sent", sentAt: new Date() })
-          .where(eq(prospectsTable.id, prospect.id));
+          .where(eq(prospectsTable.id, t.id));
         sent++;
       } else {
-        errors.push(`送信失敗 ${prospect.email}: ${result.reason}`);
+        errors.push(`送信失敗 ${t.email}: ${result.reason}`);
       }
     } catch (e: any) {
-      errors.push(`メール処理エラー: ${e.message}`);
+      errors.push(`メール生成失敗 ${t.companyName}: ${e.message}`);
     }
   }
 
-  logger.info({ sent }, "[AutoProspect] 送信完了");
-
   lastRunLog = { ranAt, industry, prefecture, found, sent, errors };
+  logger.info({ found, sent, errors: errors.length }, "[AutoProspect] 完了");
   return lastRunLog;
 }
 
-// ── スケジューラー起動 ────────────────────────────────────────────────────────
-export function startAutoProspect() {
-  // 毎朝 09:00 JST = UTC 00:00
-  cron.schedule("0 0 * * *", async () => {
-    logger.info("[AutoProspect] 定期実行開始");
-    try {
-      await runAutoProspect();
-    } catch (e: any) {
-      logger.error({ err: e.message }, "[AutoProspect] 予期せぬエラー");
-    }
-  });
+// ── スケジューラー ────────────────────────────────────────────────────────────
+let scheduled = false;
+let task: ReturnType<typeof cron.schedule> | null = null;
+
+export function startScheduler(): void {
+  if (scheduled) return;
+  scheduled = true;
+  task = cron.schedule("0 0 * * *", async () => {
+    try { await runAutoProspect(); }
+    catch (e: any) { logger.error({ err: e.message }, "[AutoProspect] エラー"); }
+  }, { timezone: "Asia/Tokyo" });
   logger.info("[AutoProspect] スケジューラー起動（毎日 UTC 00:00 / JST 09:00）");
+}
+
+export function stopScheduler(): void {
+  task?.stop(); task = null; scheduled = false;
 }

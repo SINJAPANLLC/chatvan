@@ -30,13 +30,13 @@ router.post("/contact", async (req, res): Promise<void> => {
   // 管理者への通知メール（非同期・失敗しても送信完了扱い）
   {
     const html = buildEmailHtml({
-      subject: `【Chat LOGI】新規お問い合わせ：${subject}`,
+      subject: `【Chat VAN】新規お問い合わせ：${subject}`,
       body: `新しいお問い合わせが届きました。\n\n氏名：${name}\nメール：${email}\n件名：${subject}\n\n内容：\n${message}`,
       ctaText: "管理画面で確認する →",
     });
     sendEmail(
       ADMIN_NOTIFY_EMAIL,
-      `【Chat LOGI】新規お問い合わせ：${subject}`,
+      `【Chat VAN】新規お問い合わせ：${subject}`,
       html,
     ).catch(() => {});
   }
@@ -72,7 +72,7 @@ router.post("/admin/contacts/:id/reply", requireAdmin, async (req, res): Promise
     subject: `Re: ${contact.subject}`,
     body: `${contact.name} 様\n\nお問い合わせいただきありがとうございます。\n\n${body}`,
     recipientName: contact.name,
-    ctaText: "Chat LOGIを確認する →",
+    ctaText: "Chat VANを確認する →",
   });
   await sendEmail(contact.email, `Re: ${contact.subject}`, html);
 

@@ -114,6 +114,11 @@ export default function IdentityVerificationPage() {
   const [backImage, setBackImage] = useState<UploadedImage | null>(null);
   const [selfieImage, setSelfieImage] = useState<UploadedImage | null>(null);
 
+  // 緊急連絡先
+  const [emergencyName, setEmergencyName] = useState('');
+  const [emergencyPhone, setEmergencyPhone] = useState('');
+  const [emergencyRelation, setEmergencyRelation] = useState('');
+
   useEffect(() => {
     if (!userLoading && !user) { setLocation('/login'); return; }
     if (!user) return;
@@ -141,6 +146,9 @@ export default function IdentityVerificationPage() {
             if (iv.licenseType) setLicenseType(iv.licenseType);
             if (iv.licenseNumber) setLicenseNumber(iv.licenseNumber);
             if (iv.licenseExpiry) setLicenseExpiry(iv.licenseExpiry);
+            if (iv.emergencyContactName) setEmergencyName(iv.emergencyContactName);
+            if (iv.emergencyContactPhone) setEmergencyPhone(iv.emergencyContactPhone);
+            if (iv.emergencyContactRelation) setEmergencyRelation(iv.emergencyContactRelation);
           }
           if (iv?.applicationId) setApplicationId(iv.applicationId);
         }
@@ -178,6 +186,9 @@ export default function IdentityVerificationPage() {
           license_front: frontImage.path,
           license_back: backImage.path,
           selfie_photo: selfieImage.path,
+          emergency_contact_name: emergencyName,
+          emergency_contact_phone: emergencyPhone,
+          emergency_contact_relation: emergencyRelation,
         }),
       });
       if (!res.ok) throw new Error('送信失敗');
@@ -317,6 +328,43 @@ export default function IdentityVerificationPage() {
                   required type="date" value={licenseExpiry} onChange={e => setLicenseExpiry(e.target.value)}
                   className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-foreground"
                 />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 緊急連絡先 */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">緊急連絡先</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="text-sm font-medium block mb-1.5">氏名 <span className="text-red-500">*</span></label>
+                <input
+                  required value={emergencyName} onChange={e => setEmergencyName(e.target.value)}
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-foreground"
+                  placeholder="山田 花子"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-1.5">電話番号 <span className="text-red-500">*</span></label>
+                <input
+                  required value={emergencyPhone} onChange={e => setEmergencyPhone(e.target.value)}
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-foreground"
+                  placeholder="090-0000-0000"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-1.5">続柄 <span className="text-red-500">*</span></label>
+                <select
+                  required value={emergencyRelation} onChange={e => setEmergencyRelation(e.target.value)}
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-foreground"
+                >
+                  <option value="">選択してください</option>
+                  {['配偶者', '父', '母', '子', '兄弟', '姉妹', '祖父', '祖母', '友人', 'その他'].map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
               </div>
             </div>
           </CardContent>

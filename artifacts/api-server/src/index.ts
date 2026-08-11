@@ -2,7 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { seedRequiredAccounts } from "./lib/seed";
 import { startScheduler } from "./lib/blogAutoGen";
-import { startAutoProspect } from "./lib/autoProspect";
+import { startScheduler as startAutoProspect } from "./lib/autoProspect";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 
@@ -424,6 +424,22 @@ async function runMigrations() {
   }
 
   logger.info("migration: all Chat VAN tables ready");
+
+  // prospects prospect_type カラム
+  try {
+    await db.execute(sql`ALTER TABLE prospects ADD COLUMN IF NOT EXISTS prospect_type TEXT NOT NULL DEFAULT 'user'`);
+    logger.info("migration: prospects prospect_type column ready");
+  } catch (e: any) {
+    logger.warn({ err: e.message }, "migration warning (non-fatal)");
+  }
+
+  // blog_posts target_type カラム
+  try {
+    await db.execute(sql`ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS target_type TEXT NOT NULL DEFAULT 'user'`);
+    logger.info("migration: blog_posts target_type column ready");
+  } catch (e: any) {
+    logger.warn({ err: e.message }, "migration warning (non-fatal)");
+  }
 }
 
 const port = Number(process.env.PORT ?? 8080);

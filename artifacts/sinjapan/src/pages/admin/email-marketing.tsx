@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Mail, Send, Users, Plus, Trash2, Loader2, Upload,
-  List, History, ChevronDown, Check, Eye, X, Bot, RefreshCw, Clock, AlertCircle
+  List, History, ChevronDown, Check, Eye, X, Bot, RefreshCw, Clock, AlertCircle,
+  Building2, Truck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +11,8 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
-// ── API helper ───────────────────────────────────────────────────────────────
+type ProspectType = 'user' | 'rental_company';
+
 function apiFetch(path: string, opts?: RequestInit) {
   const token = localStorage.getItem('sinjapan_auth_token');
   return fetch(path, {
@@ -19,14 +21,28 @@ function apiFetch(path: string, opts?: RequestInit) {
   }).then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); });
 }
 
-// ── HTML preview builder (ブラウザ側プレビュー用) ─────────────────────────────
-function buildPreviewHtml(subject: string, bodyText: string, ctaText: string) {
+// ── HTML preview ──────────────────────────────────────────────────────────────
+function buildPreviewHtml(subject: string, bodyText: string, ctaText: string, mode: ProspectType) {
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
-  // 冒頭の宛名行（{会社名} {担当者名}）は挨拶と重複するので除去
   const stripped = bodyText.replace(/^[\s\S]*?\n\n/, '');
-  const body = esc(stripped).replace(/\{会社名\}/g, '<span style="background:#fffbe6;padding:0 2px">○○株式会社</span>').replace(/\{担当者名\}/g, '<span style="background:#fffbe6;padding:0 2px">田中様</span>');
+  const body = esc(stripped)
+    .replace(/\{会社名\}/g, '<span style="background:#fffbe6;padding:0 2px">○○株式会社</span>')
+    .replace(/\{担当者名\}/g, '<span style="background:#fffbe6;padding:0 2px">田中様</span>');
   const headline = esc(subject.replace(/【Chat VAN】\s*/g, ''));
   const year = new Date().getFullYear();
+
+  const featureRow = mode === 'rental_company'
+    ? `<tr>
+        <td width="33%" style="padding-right:8px;vertical-align:top"><p style="margin:0 0 3px;font-size:12px;font-weight:700;color:#111">安定した収益</p><p style="margin:0;font-size:11px;color:#666">月額固定での契約。</p></td>
+        <td width="33%" style="padding:0 4px;vertical-align:top"><p style="margin:0 0 3px;font-size:12px;font-weight:700;color:#111">手間なし運営</p><p style="margin:0;font-size:11px;color:#666">Chat VANが顧客対応。</p></td>
+        <td width="33%" style="padding-left:8px;vertical-align:top"><p style="margin:0 0 3px;font-size:12px;font-weight:700;color:#111">稼働率アップ</p><p style="margin:0;font-size:11px;color:#666">遊休車両を有効活用。</p></td>
+      </tr>`
+    : `<tr>
+        <td width="33%" style="padding-right:8px;vertical-align:top"><p style="margin:0 0 3px;font-size:12px;font-weight:700;color:#111">チャットで相談</p><p style="margin:0;font-size:11px;color:#666">条件を入力するだけ。</p></td>
+        <td width="33%" style="padding:0 4px;vertical-align:top"><p style="margin:0 0 3px;font-size:12px;font-weight:700;color:#111">最適な軽バンを提案</p><p style="margin:0;font-size:11px;color:#666">Chat VANが厳選します。</p></td>
+        <td width="33%" style="padding-left:8px;vertical-align:top"><p style="margin:0 0 3px;font-size:12px;font-weight:700;color:#111">そのまま契約</p><p style="margin:0;font-size:11px;color:#666">最短で翌日から利用可能。</p></td>
+      </tr>`;
+
   return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#f0f0f0;font-family:'Helvetica Neue',Arial,'Hiragino Kaku Gothic ProN',Meiryo,sans-serif}@media(max-width:600px){.wrap{padding:16px 8px!important}.inner{width:100%!important}.cell{padding:20px 18px!important}.feat td{display:block!important;width:100%!important;padding:0 0 12px!important}}</style></head><body>
 <table width="100%" cellpadding="0" cellspacing="0" class="wrap" style="background:#f0f0f0;padding:24px 12px"><tr><td align="center">
 <table class="inner" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%">
@@ -42,13 +58,7 @@ function buildPreviewHtml(subject: string, bodyText: string, ctaText: string) {
 </td></tr>
 <tr><td class="cell" style="background:#f7f7f7;padding:16px 24px;border-top:1px solid #eee;border-bottom:1px solid #eee">
   <p style="margin:0 0 12px;font-size:10px;font-weight:700;color:#999;letter-spacing:1px">Chat VAN の特長</p>
-  <table class="feat" width="100%" cellpadding="0" cellspacing="0">
-    <tr>
-      <td width="33%" style="padding-right:8px;vertical-align:top"><p style="margin:0 0 3px;font-size:12px;font-weight:700;color:#111">チャットで相談</p><p style="margin:0;font-size:11px;color:#666">条件を入力するだけ。</p></td>
-      <td width="33%" style="padding:0 4px;vertical-align:top"><p style="margin:0 0 3px;font-size:12px;font-weight:700;color:#111">最適な軽バンを提案</p><p style="margin:0;font-size:11px;color:#666">Chat VANが厳選します。</p></td>
-      <td width="33%" style="padding-left:8px;vertical-align:top"><p style="margin:0 0 3px;font-size:12px;font-weight:700;color:#111">そのまま契約</p><p style="margin:0;font-size:11px;color:#666">最短で翌日から利用可能。</p></td>
-    </tr>
-  </table>
+  <table class="feat" width="100%" cellpadding="0" cellspacing="0">${featureRow}</table>
 </td></tr>
 <tr><td class="cell" style="background:#fff;padding:22px 24px;text-align:center">
   <div style="display:inline-block;background:#000;border-radius:8px;padding:13px 32px">
@@ -64,7 +74,7 @@ function buildPreviewHtml(subject: string, bodyText: string, ctaText: string) {
 }
 
 // ── テンプレート ──────────────────────────────────────────────────────────────
-const TEMPLATES = [
+const USER_TEMPLATES = [
   {
     label: '新規ご挨拶',
     subject: '【Chat VAN】はじめまして',
@@ -83,26 +93,39 @@ const TEMPLATES = [
   { label: 'カスタム', subject: '', body: '' },
 ];
 
+const RENTAL_TEMPLATES = [
+  {
+    label: '新規ご挨拶',
+    subject: '【Chat VAN】車両提供のご相談',
+    body: 'はじめまして。軽バンのサブスク・レンタルサービス「Chat VAN」と申します。\n\n現在、車両を提供いただけるレンタル会社・リース会社様を探しております。\n\n【Chat VANとは】\nChat VANは、軽バンを法人・個人事業主様にサブスクリプション形式でご提供するサービスです。\n\n【車両提供のメリット】\n・遊休車両の有効活用・稼働率アップ\n・Chat VANが顧客の獲得・対応を担当\n・月額固定でのお支払い（安定収益）\n・車両管理の手間を最小化\n\nご興味をお持ちいただけましたら、ぜひ一度詳細をご説明させてください。\n\nよろしくお願いいたします。',
+  },
+  {
+    label: 'パートナー案内',
+    subject: '【Chat VAN】協力会社様募集のご案内',
+    body: 'お世話になっております。Chat VANでございます。\n\n弊サービスでは、軽バンを保有・管理されているレンタル会社様と協力体制を構築し、車両の共同活用を推進しております。\n\n【ご提案内容】\n・保有車両をChat VANに提供いただき、定額で買い取り\n・顧客対応・保険手続きはChat VAN側が担当\n・月末締め翌月末払いで安定した入金\n\nまずはオンラインでのご説明の機会をいただけますと幸いです。',
+  },
+  {
+    label: 'フォローアップ',
+    subject: '【Chat VAN】先日のご連絡の件',
+    body: 'いつもお世話になっております。Chat VANでございます。\n\n先日は車両提供のご相談をお送りしましたが、いかがでしょうか。\n\nご質問やご不明な点がございましたら、どうぞお気軽にご返信ください。\n\n引き続きよろしくお願いいたします。',
+  },
+  { label: 'カスタム', subject: '', body: '' },
+];
+
 type Prospect = {
   id: number; companyName: string; contactName?: string; email: string;
   phone?: string; industry?: string; prefecture?: string; status: string;
-  sentAt?: string; createdAt: string;
+  sentAt?: string; createdAt: string; prospectType?: string;
 };
 
-// ── 自動クロール ステータス表示 ───────────────────────────────────────────────
+// ── 自動クロールパネル ─────────────────────────────────────────────────────────
 function AutoCrawlPanel({ onRefresh }: { onRefresh: () => void }) {
   const { toast } = useToast();
   const [running, setRunning] = useState(false);
-  const [status, setStatus] = useState<{
-    ranAt: string; industry: string; prefecture: string;
-    found: number; sent: number; errors: string[];
-  } | null>(null);
+  const [status, setStatus] = useState<{ ranAt: string; industry: string; prefecture: string; found: number; sent: number; errors: string[] } | null>(null);
 
   const loadStatus = async () => {
-    try {
-      const s = await apiFetch('/api/admin/prospects/auto-crawl/status');
-      setStatus(s);
-    } catch { /* ignore */ }
+    try { setStatus(await apiFetch('/api/admin/prospects/auto-crawl/status')); } catch { }
   };
   useEffect(() => { loadStatus(); }, []);
 
@@ -111,12 +134,8 @@ function AutoCrawlPanel({ onRefresh }: { onRefresh: () => void }) {
     try {
       await apiFetch('/api/admin/prospects/auto-crawl', { method: 'POST' });
       toast({ title: '自動クロールを開始しました。数分後にリロードしてください。' });
-      // 30秒後にステータスと一覧を更新
       setTimeout(() => { loadStatus(); onRefresh(); setRunning(false); }, 30_000);
-    } catch (e: any) {
-      toast({ title: e.message, variant: 'destructive' });
-      setRunning(false);
-    }
+    } catch (e: any) { toast({ title: e.message, variant: 'destructive' }); setRunning(false); }
   };
 
   return (
@@ -127,45 +146,28 @@ function AutoCrawlPanel({ onRefresh }: { onRefresh: () => void }) {
           <span className="text-sm font-semibold">毎日自動クロール</span>
           <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">毎朝9:00 JST</span>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={handleRun}
-          disabled={running}
-          className="gap-1.5 text-xs"
-        >
-          {running
-            ? <><Loader2 className="h-3 w-3 animate-spin" />実行中…</>
-            : <><RefreshCw className="h-3 w-3" />今すぐ実行</>}
+        <Button size="sm" variant="outline" onClick={handleRun} disabled={running} className="gap-1.5 text-xs">
+          {running ? <><Loader2 className="h-3 w-3 animate-spin" />実行中…</> : <><RefreshCw className="h-3 w-3" />今すぐ実行</>}
         </Button>
       </div>
-
       <p className="text-xs text-muted-foreground leading-relaxed">
         DuckDuckGo で荷主企業を検索 → AI が品質評価 → 5件を自動登録 → 未送信5件にAI個別メールを自動送信
       </p>
-
       {status ? (
         <div className="bg-card rounded-lg border border-border p-3 space-y-2">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Clock className="h-3 w-3" />
-            前回: {new Date(status.ranAt).toLocaleString('ja-JP')}
-            　対象: {status.industry} / {status.prefecture}
+            前回: {new Date(status.ranAt).toLocaleString('ja-JP')}　対象: {status.industry} / {status.prefecture}
           </div>
           <div className="flex gap-4 text-xs">
             <span className="text-green-700 font-semibold">登録 {status.found}件</span>
             <span className="text-blue-700 font-semibold">送信 {status.sent}件</span>
-            {status.errors.length > 0 && (
-              <span className="text-amber-600 font-semibold">エラー {status.errors.length}件</span>
-            )}
+            {status.errors.length > 0 && <span className="text-amber-600 font-semibold">エラー {status.errors.length}件</span>}
           </div>
           {status.errors.length > 0 && (
             <details className="text-xs text-muted-foreground">
-              <summary className="flex items-center gap-1 cursor-pointer">
-                <AlertCircle className="h-3 w-3 text-amber-500" />エラー詳細
-              </summary>
-              <ul className="mt-1 space-y-0.5 pl-4">
-                {status.errors.slice(0, 5).map((e, i) => <li key={i}>・{e}</li>)}
-              </ul>
+              <summary className="flex items-center gap-1 cursor-pointer"><AlertCircle className="h-3 w-3 text-amber-500" />エラー詳細</summary>
+              <ul className="mt-1 space-y-0.5 pl-4">{status.errors.slice(0, 5).map((e, i) => <li key={i}>・{e}</li>)}</ul>
             </details>
           )}
         </div>
@@ -177,41 +179,32 @@ function AutoCrawlPanel({ onRefresh }: { onRefresh: () => void }) {
 }
 
 // ── リスト管理タブ ─────────────────────────────────────────────────────────────
-function ProspectList({ onSelectForSend }: { onSelectForSend: (ids: number[]) => void }) {
+function ProspectList({ mode, onSelectForSend }: { mode: ProspectType; onSelectForSend: (ids: number[]) => void }) {
   const { toast } = useToast();
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<number[]>([]);
-
-  // 手動追加ダイアログ
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addForm, setAddForm] = useState({ companyName: '', contactName: '', email: '', phone: '', industry: '', prefecture: '' });
   const [adding, setAdding] = useState(false);
-
-  // CSV
   const csvRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
     setLoading(true);
-    try {
-      const rows = await apiFetch('/api/admin/prospects');
-      setProspects(rows);
-    } catch { toast({ title: 'リストの取得に失敗しました', variant: 'destructive' }); }
+    try { setProspects(await apiFetch(`/api/admin/prospects?type=${mode}`)); }
+    catch { toast({ title: 'リストの取得に失敗しました', variant: 'destructive' }); }
     finally { setLoading(false); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); setSelected([]); }, [mode]);
 
-  const toggleAll = () => {
-    setSelected(selected.length === prospects.length ? [] : prospects.map(p => p.id));
-  };
+  const toggleAll = () => setSelected(selected.length === prospects.length ? [] : prospects.map(p => p.id));
   const toggle = (id: number) => setSelected(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
-
 
   const handleAdd = async () => {
     if (!addForm.companyName || !addForm.email) { toast({ title: '会社名とメールアドレスは必須です', variant: 'destructive' }); return; }
     setAdding(true);
     try {
-      await apiFetch('/api/admin/prospects', { method: 'POST', body: JSON.stringify(addForm) });
+      await apiFetch('/api/admin/prospects', { method: 'POST', body: JSON.stringify({ ...addForm, prospectType: mode }) });
       toast({ title: '追加しました' });
       setShowAddDialog(false); setAddForm({ companyName: '', contactName: '', email: '', phone: '', industry: '', prefecture: '' });
       load();
@@ -234,7 +227,7 @@ function ProspectList({ onSelectForSend }: { onSelectForSend: (ids: number[]) =>
       }).filter(r => r.companyName && r.email);
       if (rows.length === 0) { toast({ title: 'CSVに有効なデータがありません', variant: 'destructive' }); return; }
       try {
-        const r = await apiFetch('/api/admin/prospects/import', { method: 'POST', body: JSON.stringify({ rows }) });
+        const r = await apiFetch('/api/admin/prospects/import', { method: 'POST', body: JSON.stringify({ rows, prospectType: mode }) });
         toast({ title: `${r.inserted}件インポートしました` }); load();
       } catch (e: any) { toast({ title: e.message, variant: 'destructive' }); }
     };
@@ -250,15 +243,12 @@ function ProspectList({ onSelectForSend }: { onSelectForSend: (ids: number[]) =>
     } catch (e: any) { toast({ title: e.message, variant: 'destructive' }); }
   };
 
-  const unsentSelected = selected.filter(id => prospects.find(p => p.id === id)?.status === 'unsent');
   const total = prospects.length, unsent = prospects.filter(p => p.status === 'unsent').length, sent = prospects.filter(p => p.status === 'sent').length;
 
   return (
     <div className="space-y-4">
-      {/* 自動クロールパネル */}
-      <AutoCrawlPanel onRefresh={load} />
+      {mode === 'user' && <AutoCrawlPanel onRefresh={load} />}
 
-      {/* 統計 */}
       <div className="grid grid-cols-3 gap-3">
         {[['総数', total, ''], ['未送信', unsent, 'text-amber-600'], ['送信済', sent, 'text-green-600']].map(([label, val, cls]) => (
           <div key={label as string} className="rounded-xl border border-border bg-card px-4 py-3 text-center">
@@ -268,7 +258,6 @@ function ProspectList({ onSelectForSend }: { onSelectForSend: (ids: number[]) =>
         ))}
       </div>
 
-      {/* ツールバー */}
       <div className="flex flex-wrap gap-2 items-center">
         <Button onClick={() => setShowAddDialog(true)} className="bg-black text-white hover:bg-black/90 gap-1.5">
           <Plus className="h-4 w-4" />手動追加
@@ -281,7 +270,7 @@ function ProspectList({ onSelectForSend }: { onSelectForSend: (ids: number[]) =>
           <>
             <div className="flex-1" />
             <Button variant="outline" className="gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50"
-              onClick={() => { onSelectForSend(selected); }}>
+              onClick={() => onSelectForSend(selected)}>
               <Send className="h-4 w-4" />{selected.length}件に送信
             </Button>
             <Button variant="outline" className="gap-1.5 text-red-500 border-red-200 hover:bg-red-50" onClick={handleDeleteSelected}>
@@ -291,7 +280,6 @@ function ProspectList({ onSelectForSend }: { onSelectForSend: (ids: number[]) =>
         )}
       </div>
 
-      {/* テーブル */}
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : prospects.length === 0 ? (
@@ -309,7 +297,7 @@ function ProspectList({ onSelectForSend }: { onSelectForSend: (ids: number[]) =>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">会社名</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">担当者</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">メールアドレス</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">業種</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">{mode === 'user' ? '業種' : 'エリア'}</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">都道府県</th>
                 <th className="px-4 py-3 text-center font-medium text-muted-foreground">ステータス</th>
               </tr>
@@ -347,7 +335,6 @@ function ProspectList({ onSelectForSend }: { onSelectForSend: (ids: number[]) =>
         </div>
       )}
 
-      {/* 手動追加ダイアログ */}
       {showAddDialog && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
@@ -360,7 +347,7 @@ function ProspectList({ onSelectForSend }: { onSelectForSend: (ids: number[]) =>
               <div className="space-y-1"><Label>担当者名</Label><Input value={addForm.contactName} onChange={e => setAddForm(f => ({...f, contactName: e.target.value}))} /></div>
               <div className="space-y-1"><Label>電話番号</Label><Input value={addForm.phone} onChange={e => setAddForm(f => ({...f, phone: e.target.value}))} /></div>
               <div className="col-span-2 space-y-1"><Label>メールアドレス *</Label><Input value={addForm.email} onChange={e => setAddForm(f => ({...f, email: e.target.value}))} /></div>
-              <div className="space-y-1"><Label>業種</Label><Input value={addForm.industry} onChange={e => setAddForm(f => ({...f, industry: e.target.value}))} /></div>
+              <div className="space-y-1"><Label>{mode === 'user' ? '業種' : 'エリア・特徴'}</Label><Input value={addForm.industry} onChange={e => setAddForm(f => ({...f, industry: e.target.value}))} /></div>
               <div className="space-y-1"><Label>都道府県</Label><Input value={addForm.prefecture} onChange={e => setAddForm(f => ({...f, prefecture: e.target.value}))} /></div>
             </div>
             <div className="flex gap-2 justify-end pt-1">
@@ -376,26 +363,24 @@ function ProspectList({ onSelectForSend }: { onSelectForSend: (ids: number[]) =>
   );
 }
 
-// ── 営業メール送信タブ ─────────────────────────────────────────────────────────
-function SendTab({ preselectedIds, prospects, onSent }: {
-  preselectedIds: number[];
-  prospects: Prospect[];
-  onSent: () => void;
+// ── 送信タブ ──────────────────────────────────────────────────────────────────
+function SendTab({ mode, preselectedIds, prospects, onSent }: {
+  mode: ProspectType; preselectedIds: number[]; prospects: Prospect[]; onSent: () => void;
 }) {
   const { toast } = useToast();
+  const templates = mode === 'user' ? USER_TEMPLATES : RENTAL_TEMPLATES;
+  const defaultCta = mode === 'user' ? 'Chat VANを無料で試す →' : 'Chat VAN 車両提供の詳細を見る →';
   const [tplIdx, setTplIdx] = useState(0);
-  const [subject, setSubject] = useState(TEMPLATES[0].subject);
-  const [body, setBody] = useState(TEMPLATES[0].body);
-  const [ctaText, setCtaText] = useState('Chat VANを無料で試す →');
+  const [subject, setSubject] = useState(templates[0].subject);
+  const [body, setBody] = useState(templates[0].body);
+  const [ctaText, setCtaText] = useState(defaultCta);
   const [targetMode, setTargetMode] = useState<'selected' | 'unsent'>('selected');
   const [sending, setSending] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
 
-  const applyTemplate = (idx: number) => {
-    setTplIdx(idx);
-    setSubject(TEMPLATES[idx].subject);
-    setBody(TEMPLATES[idx].body);
-  };
+  const applyTemplate = (idx: number) => { setTplIdx(idx); setSubject(templates[idx].subject); setBody(templates[idx].body); };
+
+  // modeが変わったらテンプレートをリセット
+  useEffect(() => { setTplIdx(0); setSubject(templates[0].subject); setBody(templates[0].body); setCtaText(defaultCta); }, [mode]);
 
   const targetIds = targetMode === 'selected'
     ? preselectedIds
@@ -406,25 +391,20 @@ function SendTab({ preselectedIds, prospects, onSent }: {
     if (targetIds.length === 0) { toast({ title: '送信先がありません', variant: 'destructive' }); return; }
     setSending(true);
     try {
-      const r = await apiFetch('/api/admin/prospects/send', {
-        method: 'POST',
-        body: JSON.stringify({ ids: targetIds, subject, bodyText: body, ctaText }),
-      });
-      toast({ title: r.message });
-      onSent();
+      const r = await apiFetch('/api/admin/prospects/send', { method: 'POST', body: JSON.stringify({ ids: targetIds, subject, bodyText: body, ctaText }) });
+      toast({ title: r.message }); onSent();
     } catch (e: any) { toast({ title: e.message, variant: 'destructive' }); }
     finally { setSending(false); }
   };
 
-  const previewHtml = buildPreviewHtml(subject || '件名を入力してください', body || '本文を入力してください', ctaText);
+  const previewHtml = buildPreviewHtml(subject || '件名を入力してください', body || '本文を入力してください', ctaText, mode);
 
   return (
     <div className="space-y-6">
-      {/* テンプレート選択 */}
       <div className="space-y-2">
         <Label className="text-sm font-semibold">テンプレート</Label>
         <div className="flex flex-wrap gap-2">
-          {TEMPLATES.map((t, i) => (
+          {templates.map((t, i) => (
             <button key={i} onClick={() => applyTemplate(i)}
               className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${tplIdx === i ? 'bg-foreground text-background border-foreground' : 'border-border hover:bg-muted'}`}>
               {t.label}
@@ -433,7 +413,6 @@ function SendTab({ preselectedIds, prospects, onSent }: {
         </div>
       </div>
 
-      {/* 送信先 */}
       <div className="space-y-2">
         <Label className="text-sm font-semibold">送信対象</Label>
         <div className="flex gap-2">
@@ -449,7 +428,6 @@ function SendTab({ preselectedIds, prospects, onSent }: {
         <p className="text-xs text-muted-foreground">送信対象: {targetIds.length}件</p>
       </div>
 
-      {/* 件名・本文・CTA */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-4">
           <div className="space-y-1.5">
@@ -462,11 +440,9 @@ function SendTab({ preselectedIds, prospects, onSent }: {
           </div>
           <div className="space-y-1.5">
             <Label>CTAボタンテキスト</Label>
-            <Input value={ctaText} onChange={e => setCtaText(e.target.value)} placeholder="Chat VANを無料で試す →" />
+            <Input value={ctaText} onChange={e => setCtaText(e.target.value)} placeholder={defaultCta} />
           </div>
         </div>
-
-        {/* プレビュー */}
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Eye className="h-4 w-4 text-muted-foreground" />
@@ -536,23 +512,26 @@ const TABS = [
   { key: 'history', label: '送信履歴',  icon: History },
 ];
 
+const MODES: { key: ProspectType; label: string; icon: React.ElementType; desc: string }[] = [
+  { key: 'user',           label: 'ユーザー営業',       icon: Building2, desc: '軽バンを利用したい法人・個人事業主向け' },
+  { key: 'rental_company', label: 'レンタル会社営業',   icon: Truck,     desc: '車両を提供いただけるレンタル会社向け' },
+];
+
 export default function EmailMarketing() {
+  const [mode, setMode] = useState<ProspectType>('user');
   const [tab, setTab] = useState('list');
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [sendTargetIds, setSendTargetIds] = useState<number[]>([]);
 
   const loadProspects = async () => {
     const token = localStorage.getItem('sinjapan_auth_token');
-    const rows = await fetch('/api/admin/prospects', { headers: { Authorization: `Bearer ${token}` } })
-      .then(async r => r.ok ? (await r.text() ? r.json() : []) : []).catch(() => []);
+    const rows = await fetch(`/api/admin/prospects?type=${mode}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(async r => r.ok ? r.json() : []).catch(() => []);
     setProspects(rows);
   };
-  useEffect(() => { loadProspects(); }, []);
+  useEffect(() => { loadProspects(); setSendTargetIds([]); }, [mode]);
 
-  const handleSelectForSend = (ids: number[]) => {
-    setSendTargetIds(ids);
-    setTab('send');
-  };
+  const handleSelectForSend = (ids: number[]) => { setSendTargetIds(ids); setTab('send'); };
 
   return (
     <div className="space-y-6">
@@ -561,6 +540,27 @@ export default function EmailMarketing() {
         <p className="text-muted-foreground mt-1 text-sm">AIで見込みリストを自動生成し、HTMLメールで一括送信します。</p>
       </div>
 
+      {/* モード切替 */}
+      <div className="flex gap-3">
+        {MODES.map(m => {
+          const Icon = m.icon;
+          const active = mode === m.key;
+          return (
+            <button key={m.key} onClick={() => { setMode(m.key); setTab('list'); }}
+              className={`flex-1 flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all ${
+                active ? 'border-foreground bg-foreground text-background' : 'border-border bg-card hover:border-foreground/30'
+              }`}>
+              <Icon className={`h-5 w-5 mt-0.5 shrink-0 ${active ? 'text-background' : 'text-muted-foreground'}`} />
+              <div>
+                <p className={`text-sm font-semibold ${active ? 'text-background' : 'text-foreground'}`}>{m.label}</p>
+                <p className={`text-xs mt-0.5 ${active ? 'text-background/70' : 'text-muted-foreground'}`}>{m.desc}</p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* タブ */}
       <div className="flex gap-1 border-b border-border">
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
@@ -572,8 +572,8 @@ export default function EmailMarketing() {
         ))}
       </div>
 
-      {tab === 'list'    && <ProspectList onSelectForSend={handleSelectForSend} />}
-      {tab === 'send'    && <SendTab preselectedIds={sendTargetIds} prospects={prospects} onSent={() => { loadProspects(); setTab('history'); }} />}
+      {tab === 'list'    && <ProspectList mode={mode} onSelectForSend={handleSelectForSend} />}
+      {tab === 'send'    && <SendTab mode={mode} preselectedIds={sendTargetIds} prospects={prospects} onSent={() => { loadProspects(); setTab('history'); }} />}
       {tab === 'history' && <HistoryTab prospects={prospects} />}
     </div>
   );

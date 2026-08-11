@@ -808,6 +808,13 @@ export default function AdminApplicationDetail() {
                   <DL label="免許証種別" value={iv.license_type} />
                   <DL label="免許証番号" value={iv.license_number} />
                   <DL label="有効期限" value={iv.license_expiry} />
+                  {(iv.emergencyContactName || iv.emergency_contact_name) && (
+                    <>
+                      <DL label="緊急連絡先（氏名）" value={iv.emergencyContactName ?? iv.emergency_contact_name} />
+                      <DL label="緊急連絡先（電話）" value={iv.emergencyContactPhone ?? iv.emergency_contact_phone} />
+                      <DL label="続柄" value={iv.emergencyContactRelation ?? iv.emergency_contact_relation} />
+                    </>
+                  )}
                   {(iv.license_front || iv.selfie_photo) && (
                     <div className="col-span-2 sm:col-span-3 flex gap-3 flex-wrap">
                       {[['免許証（表面）', iv.license_front], ['免許証（裏面）', iv.license_back], ['自撮り写真', iv.selfie_photo]].filter(([, p]) => p).map(([label, path]) => (

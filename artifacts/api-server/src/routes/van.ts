@@ -2186,9 +2186,11 @@ router.post("/van/applications/:id/identity-verification", requireAuth, async (r
         fullName: b.full_name, birthDate: b.birth_date, address: b.address, phone: b.phone,
         email: b.email, licenseFront: b.license_front, licenseBack: b.license_back,
         licenseExpiry: b.license_expiry, licenseType: b.license_type, licenseNumber: b.license_number,
+        emergencyContactName: b.emergency_contact_name ?? null,
+        emergencyContactPhone: b.emergency_contact_phone ?? null,
+        emergencyContactRelation: b.emergency_contact_relation ?? null,
         status: 'submitted' as any, rejectionReason: null, updatedAt: new Date(),
       }).where(eq(identityVerificationsTable.id, existing[0].id)).returning();
-      // selfie_photo は別カラムとして保存（マイグレーション済みの場合）
       if (b.selfie_photo) {
         await db.execute(sql`UPDATE identity_verifications SET selfie_photo = ${b.selfie_photo} WHERE id = ${existing[0].id}`);
       }
@@ -2199,6 +2201,9 @@ router.post("/van/applications/:id/identity-verification", requireAuth, async (r
         fullName: b.full_name, birthDate: b.birth_date, address: b.address, phone: b.phone,
         email: b.email, licenseFront: b.license_front, licenseBack: b.license_back,
         licenseExpiry: b.license_expiry, licenseType: b.license_type, licenseNumber: b.license_number,
+        emergencyContactName: b.emergency_contact_name ?? null,
+        emergencyContactPhone: b.emergency_contact_phone ?? null,
+        emergencyContactRelation: b.emergency_contact_relation ?? null,
         status: 'submitted',
       }).returning();
       if (b.selfie_photo) {

@@ -4,62 +4,88 @@
  */
 import cron from "node-cron";
 import { db, blogPostsTable, settingsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql as drizzleSql } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { logger } from "./logger";
+import { PROMPT_DEFAULTS } from "../routes/ai-settings";
 
-// 30日分のキーワードローテーション（日付のmod30で選択）
-const TOPICS = [
-  { keyword: "運送会社の選び方", painPoint: "どの運送会社が自社に合うか分からない" },
-  { keyword: "物流コスト削減", painPoint: "配送費が年々上がって利益を圧迫している" },
-  { keyword: "ラストマイル配送", painPoint: "宅配の遅延・不在でクレームが増えている" },
-  { keyword: "物流DXとは", painPoint: "いまだにFAXや電話で運送手配していて非効率" },
-  { keyword: "チャーター便と路線便の違い", painPoint: "どちらを使えばいいか判断できない" },
-  { keyword: "3PL物流代行", painPoint: "自社で物流管理する余裕がない" },
-  { keyword: "フレート管理", painPoint: "輸送コストの見える化ができていない" },
-  { keyword: "混載便の活用法", painPoint: "小ロット輸送のコストが高すぎる" },
-  { keyword: "緊急配送の手配方法", painPoint: "急な配送依頼に対応できる業者が見つからない" },
-  { keyword: "物流アウトソーシング", painPoint: "物流業務に人手と時間が取られすぎている" },
-  { keyword: "配送状況のリアルタイム把握", painPoint: "荷物がどこにあるか分からないと顧客から苦情が来る" },
-  { keyword: "運賃交渉のコツ", painPoint: "運送会社との価格交渉で損をしている気がする" },
-  { keyword: "物流における温度管理", painPoint: "食品・医薬品の温度管理輸送が難しい" },
-  { keyword: "返品物流（リバースロジスティクス）", painPoint: "返品対応が煩雑でコストがかさんでいる" },
-  { keyword: "物流業界の2024年問題", painPoint: "ドライバー不足で配送が遅れるようになった" },
-  { keyword: "倉庫保管と配送の連携", painPoint: "倉庫と配送会社の連携がうまくいかない" },
-  { keyword: "BtoB配送の効率化", painPoint: "法人向け配送の管理が煩雑すぎる" },
-  { keyword: "物流における書類管理", painPoint: "納品書・送り状の管理がアナログで大変" },
-  { keyword: "ドライバー不足への対応策", painPoint: "配送を頼めるドライバーが見つからない" },
-  { keyword: "物流コンサルティング活用法", painPoint: "物流改善の方向性が分からない" },
-  { keyword: "中小企業の物流戦略", painPoint: "大手と違い物流に予算をかけられない" },
-  { keyword: "EC物流の課題と解決策", painPoint: "ネット販売拡大に伴い配送が追いつかない" },
-  { keyword: "季節変動に強い物流体制", painPoint: "繁忙期に配送能力が足りなくなる" },
-  { keyword: "物流における環境対応", painPoint: "CO2削減など環境への取り組みが求められている" },
-  { keyword: "建設資材の輸送手配", painPoint: "大型資材の輸送手配が難しい" },
-  { keyword: "製造業の物流改善", painPoint: "工場出荷から納品までの流れが非効率" },
-  { keyword: "食品物流の注意点", painPoint: "食品の鮮度を保ちながら配送する方法が分からない" },
-  { keyword: "物流コスト見積もりの取り方", painPoint: "複数社から見積もりを取る手間が大きい" },
-  { keyword: "引越し・移転時の物流手配", painPoint: "オフィス移転時の物品輸送手配が分からない" },
-  { keyword: "スポット輸送と定期輸送の使い分け", painPoint: "いつスポットで頼んでいつ定期契約すべきか分からない" },
+async function getBlogSystemPrompt(targetType: string): Promise<string> {
+  const key = targetType === "rental_company" ? "ai_blog_rental_prompt" : "ai_blog_user_prompt";
+  try {
+    const [row] = await db.select().from(settingsTable).where(eq(settingsTable.key, key)).limit(1);
+    return row?.value ?? PROMPT_DEFAULTS[key as keyof typeof PROMPT_DEFAULTS] ?? "";
+  } catch {
+    return PROMPT_DEFAULTS[key as keyof typeof PROMPT_DEFAULTS] ?? "";
+  }
+}
+
+// ── ユーザー向けトピック（軽バン利用者） ──────────────────────────────────────
+const USER_TOPICS = [
+  { keyword: "軽バン レンタル 比較", painPoint: "どのサービスが自社に合うか分からない" },
+  { keyword: "個人事業主 軽バン 月額", painPoint: "月々の費用を抑えて軽バンを使いたい" },
+  { keyword: "軽バン サブスク メリット", painPoint: "購入とレンタルどちらが得か判断できない" },
+  { keyword: "軽バン 短期 レンタル", painPoint: "1〜3ヶ月だけ軽バンが必要な場面がある" },
+  { keyword: "軽バン 複数台 法人", painPoint: "複数台まとめて手配したいが手間がかかる" },
+  { keyword: "軽バン 配送 個人事業主 節税", painPoint: "軽バン費用を経費計上したい" },
+  { keyword: "軽バン ETCカード ドラレコ 標準装備", painPoint: "装備が揃った車両をすぐ使いたい" },
+  { keyword: "軽バン 審査 個人事業主", painPoint: "フリーランスでも審査が通るか不安" },
+  { keyword: "軽バン 保険 車検込み", painPoint: "保険・車検の手続きが面倒" },
+  { keyword: "軽バン 最短翌日 レンタル", painPoint: "急ぎで軽バンが必要になった" },
+  { keyword: "軽バン 積載量 用途別", painPoint: "荷物に合った車種の選び方が分からない" },
+  { keyword: "軽バン チャット 相談", painPoint: "電話なしで軽バンを手配したい" },
+  { keyword: "軽バン レンタル 解約 途中", painPoint: "急に不要になったときの解約条件が気になる" },
+  { keyword: "軽バン 月額 固定費", painPoint: "固定費として軽バンを管理したい" },
+  { keyword: "軽バン 配送業 開業", painPoint: "配送業を始めるための軽バン調達方法が分からない" },
+  { keyword: "軽バン 福祉 移送", painPoint: "福祉用途の軽バンを手軽に使いたい" },
+  { keyword: "軽バン 農業 運搬", painPoint: "農産物運搬用の軽バンをリーズナブルに使いたい" },
+  { keyword: "軽バン フードデリバリー 副業", painPoint: "副業で配送を始めるための軽バンが必要" },
+  { keyword: "軽バン 引越し 自分で", painPoint: "引越しで軽バンを自分で運転したい" },
+  { keyword: "軽バン ECショップ 発送", painPoint: "EC発送業務で軽バンを活用したい" },
+];
+
+// ── レンタル会社向けトピック ───────────────────────────────────────────────────
+const RENTAL_TOPICS = [
+  { keyword: "軽バン 遊休車両 活用", painPoint: "駐車場に眠っている車両から収益を得たい" },
+  { keyword: "レンタカー 稼働率 改善", painPoint: "車両稼働率が低く月次収益が安定しない" },
+  { keyword: "軽バン リース 収益 安定化", painPoint: "月次売上の波が大きく収益予測が立てにくい" },
+  { keyword: "レンタカー 法人契約 メリット", painPoint: "個人客よりも安定した法人契約を増やしたい" },
+  { keyword: "軽バン 車両管理 コスト削減", painPoint: "整備・管理コストが利益を圧迫している" },
+  { keyword: "カーシェア パートナー 収益", painPoint: "新しい収益源としてカーシェアを検討している" },
+  { keyword: "レンタカー 顧客獲得 コスト", painPoint: "集客コストが高くROIが見えない" },
+  { keyword: "軽バン サブスク パートナー", painPoint: "サブスクモデルで安定した収益を得たい" },
+  { keyword: "車両提供 法人向け 契約", painPoint: "法人向けに安定した月額契約を結びたい" },
+  { keyword: "レンタカー 繁忙期 対応策", painPoint: "繁忙期のみ売上が上がり閑散期は車両が遊ぶ" },
+  { keyword: "軽バン フリート 運用", painPoint: "複数台の車両を効率よく運用したい" },
+  { keyword: "レンタカー デジタル化 予約管理", painPoint: "電話・手書きでの予約管理に限界を感じている" },
+  { keyword: "車両保有 コスト 見直し", painPoint: "保険・税金・整備費を最適化したい" },
+  { keyword: "軽バン 月額提供 収益シミュレーション", painPoint: "月額いくらで提供すれば利益が出るか計算できない" },
+  { keyword: "レンタカー 事業 規模拡大", painPoint: "事業を拡大したいが資金・人材が限られている" },
 ];
 
 let scheduled = false;
 let task: ReturnType<typeof cron.schedule> | null = null;
 
-async function isEnabled(): Promise<boolean> {
-  const [row] = await db.select().from(settingsTable).where(eq(settingsTable.key, "blog_auto_gen_enabled")).limit(1);
+function settingKey(type: string, suffix: string): string {
+  return type === "rental_company" ? `blog_auto_gen_rental_${suffix}` : `blog_auto_gen_${suffix}`;
+}
+
+async function isEnabled(type = "user"): Promise<boolean> {
+  const key = settingKey(type, "enabled");
+  const [row] = await db.select().from(settingsTable).where(eq(settingsTable.key, key)).limit(1);
   return row?.value === "true";
 }
 
-export async function setEnabled(enabled: boolean): Promise<void> {
+export async function setEnabled(enabled: boolean, type = "user"): Promise<void> {
+  const key = settingKey(type, "enabled");
   await db.insert(settingsTable)
-    .values({ key: "blog_auto_gen_enabled", value: enabled ? "true" : "false", updatedAt: new Date() })
+    .values({ key, value: enabled ? "true" : "false", updatedAt: new Date() })
     .onConflictDoUpdate({ target: settingsTable.key, set: { value: enabled ? "true" : "false", updatedAt: new Date() } });
 }
 
-export async function getStatus() {
-  const [enabledRow] = await db.select().from(settingsTable).where(eq(settingsTable.key, "blog_auto_gen_enabled")).limit(1);
-  const [lastRow] = await db.select().from(settingsTable).where(eq(settingsTable.key, "blog_auto_gen_last_run")).limit(1);
-  const [lastTitleRow] = await db.select().from(settingsTable).where(eq(settingsTable.key, "blog_auto_gen_last_title")).limit(1);
+export async function getStatus(type = "user") {
+  const [enabledRow]   = await db.select().from(settingsTable).where(eq(settingsTable.key, settingKey(type, "enabled"))).limit(1);
+  const [lastRow]      = await db.select().from(settingsTable).where(eq(settingsTable.key, settingKey(type, "last_run"))).limit(1);
+  const [lastTitleRow] = await db.select().from(settingsTable).where(eq(settingsTable.key, settingKey(type, "last_title"))).limit(1);
   return {
     enabled: enabledRow?.value === "true",
     lastRun: lastRow?.value ?? null,
@@ -68,13 +94,29 @@ export async function getStatus() {
   };
 }
 
-export async function generateAndPublish(): Promise<{ title: string; slug: string }> {
+export async function generateAndPublish(targetType = "user"): Promise<{ title: string; slug: string }> {
+  const topics = targetType === "rental_company" ? RENTAL_TOPICS : USER_TOPICS;
   const dayOfYear = Math.floor((Date.now() - Date.UTC(new Date().getUTCFullYear(), 0, 0)) / 86400000);
-  const topic = TOPICS[dayOfYear % TOPICS.length];
+  const topic = topics[dayOfYear % topics.length];
 
-  logger.info({ keyword: topic.keyword }, "[BLOG AUTO-GEN] 生成開始");
+  logger.info({ keyword: topic.keyword, targetType }, "[BLOG AUTO-GEN] 生成開始");
 
-  const systemPrompt = "あなたは物流業界に特化したSEOコンテンツライターです。日本語の物流担当者・経営者に向けた、検索意図に沿った実用的なブログ記事を作成します。";
+  const isRental = targetType === "rental_company";
+
+  const systemPrompt = await getBlogSystemPrompt(targetType);
+
+  const readerDesc = isRental
+    ? "レンタカー会社・リース会社の経営者・管理職"
+    : "軽バンを利用したい法人担当者・個人事業主・配送業者";
+
+  const ctaDesc = isRental
+    ? "Chat VANへの車両提供・パートナー登録のCTA（「まずは無料でお問い合わせください」）"
+    : "Chat VANで軽バンを探すCTA（「まずは無料でご相談ください」）";
+
+  const categoryList = isRental
+    ? "稼働率改善/収益アップ/コスト管理/運営効率化/パートナー活用"
+    : "軽バン活用術/節約・コスト/レンタル基礎知識/個人事業主向け/法人向け/Chat VANコラム";
+
   const userPrompt = [
     `以下の条件でSEO記事を作成してください。`,
     ``,
@@ -83,10 +125,10 @@ export async function generateAndPublish(): Promise<{ title: string; slug: strin
     ``,
     `要件:`,
     `- 文字数: 1200〜1800文字`,
-    `- 読者: 物流担当者・中小企業の経営者`,
-    `- 構成: ペインを強調→原因分析→解決策提示→Chat LOGIのCTA`,
+    `- 読者: ${readerDesc}`,
+    `- 構成: ペインを強調→原因分析→解決策提示→Chat VANのCTA`,
     `- H2/H3を使った見出し構造（Markdownで記述）`,
-    `- 末尾にChat LOGIへの誘導CTA（「まずは無料でご相談ください」）`,
+    `- 末尾に${ctaDesc}`,
     ``,
     `出力形式はJSONのみ:`,
     `{`,
@@ -95,7 +137,7 @@ export async function generateAndPublish(): Promise<{ title: string; slug: strin
     `  "excerpt": "記事の要約（120文字以内）",`,
     `  "metaTitle": "メタタイトル（60文字以内）",`,
     `  "metaDescription": "メタディスクリプション（120文字以内）",`,
-    `  "category": "カテゴリ（コスト削減/物流DX/運送会社選び/物流戦略/物流運営 のいずれか）",`,
+    `  "category": "カテゴリ（${categoryList} のいずれか）",`,
     `  "tags": ["タグ1", "タグ2", "タグ3"],`,
     `  "content": "Markdown形式の本文（## で見出し）"`,
     `}`,
@@ -106,7 +148,7 @@ export async function generateAndPublish(): Promise<{ title: string; slug: strin
     max_completion_tokens: 4000,
     messages: [
       { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
+      { role: "user",   content: userPrompt },
     ],
   });
 
@@ -118,51 +160,57 @@ export async function generateAndPublish(): Promise<{ title: string; slug: strin
     throw new Error("AI生成結果が不完全です");
   }
 
-  // slugの重複回避：末尾に日付を付与
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   const slug = `${data.slug}-${dateStr}`;
 
-  const [post] = await db.insert(blogPostsTable).values({
-    slug,
-    title: data.title,
-    excerpt: data.excerpt ?? "",
-    content: data.content,
-    category: data.category ?? "物流コラム",
-    tags: data.tags ? JSON.stringify(data.tags) : null,
-    metaTitle: data.metaTitle ?? null,
-    metaDescription: data.metaDescription ?? null,
-    published: true,
-    publishedAt: new Date(),
-  }).returning();
+  await db.execute(drizzleSql`
+    INSERT INTO blog_posts (slug, title, excerpt, content, category, tags, meta_title, meta_description, published, published_at, target_type)
+    VALUES (
+      ${slug}, ${data.title}, ${data.excerpt ?? ""}, ${data.content},
+      ${data.category ?? (isRental ? "稼働率改善" : "Chat VANコラム")},
+      ${data.tags ? JSON.stringify(data.tags) : null},
+      ${data.metaTitle ?? null}, ${data.metaDescription ?? null},
+      true, ${new Date()}, ${targetType}
+    )
+  `);
 
-  // 最終実行日時とタイトルを保存
   const now = new Date().toISOString();
-  await db.insert(settingsTable)
-    .values({ key: "blog_auto_gen_last_run", value: now, updatedAt: new Date() })
-    .onConflictDoUpdate({ target: settingsTable.key, set: { value: now, updatedAt: new Date() } });
-  await db.insert(settingsTable)
-    .values({ key: "blog_auto_gen_last_title", value: data.title, updatedAt: new Date() })
-    .onConflictDoUpdate({ target: settingsTable.key, set: { value: data.title, updatedAt: new Date() } });
+  for (const [suffix, value] of [["last_run", now], ["last_title", data.title]] as [string, string][]) {
+    const key = settingKey(targetType, suffix);
+    await db.insert(settingsTable)
+      .values({ key, value, updatedAt: new Date() })
+      .onConflictDoUpdate({ target: settingsTable.key, set: { value, updatedAt: new Date() } });
+  }
 
-  logger.info({ title: post.title, slug: post.slug }, "[BLOG AUTO-GEN] 公開完了");
-  return { title: post.title, slug: post.slug };
+  logger.info({ title: data.title, slug, targetType }, "[BLOG AUTO-GEN] 公開完了");
+  return { title: data.title, slug };
 }
 
 export function startScheduler(): void {
   if (scheduled) return;
   scheduled = true;
 
-  // 毎朝9:00 JST (UTC+9 → UTC 0:00)
+  // 毎朝9:00 JST → UTC 0:00
   task = cron.schedule("0 0 * * *", async () => {
+    // ユーザー向け自動生成
     try {
-      const enabled = await isEnabled();
-      if (!enabled) {
-        logger.info("[BLOG AUTO-GEN] 無効のためスキップ");
-        return;
+      if (await isEnabled("user")) {
+        await generateAndPublish("user");
+      } else {
+        logger.info("[BLOG AUTO-GEN] ユーザー向け：無効のためスキップ");
       }
-      await generateAndPublish();
     } catch (e: any) {
-      logger.error({ err: e.message }, "[BLOG AUTO-GEN] エラー");
+      logger.error({ err: e.message }, "[BLOG AUTO-GEN] ユーザー向けエラー");
+    }
+    // レンタル会社向け自動生成
+    try {
+      if (await isEnabled("rental_company")) {
+        await generateAndPublish("rental_company");
+      } else {
+        logger.info("[BLOG AUTO-GEN] レンタル会社向け：無効のためスキップ");
+      }
+    } catch (e: any) {
+      logger.error({ err: e.message }, "[BLOG AUTO-GEN] レンタル会社向けエラー");
     }
   }, { timezone: "Asia/Tokyo" });
 
