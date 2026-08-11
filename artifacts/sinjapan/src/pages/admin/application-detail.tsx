@@ -245,24 +245,28 @@ export default function AdminApplicationDetail() {
   const [pickupForm, setPickupForm] = useState({ address: '', datetime: '' });
   const [pickupSaving, setPickupSaving] = useState(false);
 
-  // カード決済 手動入金確認
+  // カード決済 再決済 / 手動入金確認
   const [paymentConfirming, setPaymentConfirming] = useState<number | null>(null);
-  const manualPaymentSuccess = async (paymentId: number) => {
-    if (!confirm('この決済を手動で入金確認しますか？ユーザーに通知が送られます。')) return;
+  const retryPayment = async (paymentId: number, hasCard: boolean) => {
+    const msg = hasCard
+      ? '登録済みカードで再決済しますか？'
+      : 'カード情報がないため手動入金確認として記録します。よろしいですか？';
+    if (!confirm(msg)) return;
     setPaymentConfirming(paymentId);
     try {
       const token = localStorage.getItem('sinjapan_auth_token');
-      const r = await fetch(`${import.meta.env.BASE_URL}api/van/payment-retries/${paymentId}/manual-success`, {
+      const r = await fetch(`${import.meta.env.BASE_URL}api/van/payment-retries/${paymentId}/retry`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ manual: !hasCard }),
       });
-      if (!r.ok) throw new Error();
-      toast({ title: '手動入金確認しました。ユーザーに通知を送信しました。' });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? '');
+      toast({ title: json.method === 'card' ? '再決済が完了しました' : '手動入金確認しました' });
       setRelated(null);
       loadRelated();
-    } catch {
-      toast({ variant: 'destructive', title: 'エラー', description: '更新に失敗しました' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'エラー', description: e.message || '更新に失敗しました' });
     } finally { setPaymentConfirming(null); }
   };
 
@@ -1184,18 +1188,25 @@ export default function AdminApplicationDetail() {
                         <td className="py-2.5 text-xs text-muted-foreground">{p.attempted_at ? format(new Date(p.attempted_at), 'MM/dd HH:mm') : '-'}</td>
                         <td className="py-2.5 text-xs text-muted-foreground max-w-[160px] truncate">{p.failure_reason ?? '-'}</td>
                         <td className="py-2.5">
-                          {p.result === 'failed' && (
-                            <button
-                              onClick={() => manualPaymentSuccess(p.id)}
-                              disabled={paymentConfirming === p.id}
-                              className="flex items-center gap-1 px-2.5 py-1 text-xs border border-border rounded-lg hover:bg-muted disabled:opacity-50 whitespace-nowrap"
-                            >
-                              {paymentConfirming === p.id
-                                ? <Loader2 className="h-3 w-3 animate-spin" />
-                                : <Check className="h-3 w-3" />}
-                              手動入金確認
-                            </button>
-                          )}
+                          {p.result === 'failed' && (() => {
+                            const hasCard = !!(related?.userCard?.hasCardOnFile);
+                            return (
+                              <button
+                                onClick={() => retryPayment(p.id, hasCard)}
+                                disabled={paymentConfirming === p.id}
+                                className={`flex items-center gap-1 px-2.5 py-1 text-xs rounded-lg disabled:opacity-50 whitespace-nowrap ${
+                                  hasCard
+                                    ? 'bg-foreground text-background hover:opacity-90'
+                                    : 'border border-border hover:bg-muted'
+                                }`}
+                              >
+                                {paymentConfirming === p.id
+                                  ? <Loader2 className="h-3 w-3 animate-spin" />
+                                  : <Check className="h-3 w-3" />}
+                                {hasCard ? '再決済' : '手動入金確認'}
+                              </button>
+                            );
+                          })()}
                         </td>
                       </tr>
                     ))}

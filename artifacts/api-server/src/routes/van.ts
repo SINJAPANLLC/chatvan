@@ -1469,11 +1469,57 @@ router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request
     }
     await db.update(vehiclesTable).set({ status: "rented", updatedAt: new Date() }).where(eq(vehiclesTable.id, contract.vehicleId));
 
-    // カード情報をユーザーに保存
+    // カード情報 + Square Customer/Card on file を保存
     const card = data.payment?.card_details?.card;
     if (card && contract.userId) {
       const expiry = card.exp_month && card.exp_year ? `${String(card.exp_month).padStart(2,'0')}/${String(card.exp_year).slice(-2)}` : null;
-      await db.execute(sql`UPDATE users SET card_brand = ${card.card_brand ?? null}, card_last4 = ${card.last_4 ?? null}, card_expiry = ${expiry} WHERE id = ${contract.userId}`);
+
+      // 既存ユーザー情報を取得
+      const userRow = await db.execute(sql`SELECT square_customer_id, name, email FROM users WHERE id = ${contract.userId} LIMIT 1`);
+      const userInfo: any = ((userRow as any)?.rows ?? userRow)[0];
+      let customerId: string | null = userInfo?.square_customer_id ?? null;
+      let cardId: string | null = null;
+
+      try {
+        // Square Customer が未作成なら作成
+        if (!customerId) {
+          const custRes = await squareFetch("/v2/customers", "POST", {
+            idempotency_key: randomUUID(),
+            given_name: userInfo?.name ?? "Chat VAN User",
+            email_address: userInfo?.email ?? undefined,
+            reference_id: String(contract.userId),
+          });
+          if (custRes.ok) {
+            const custData = await custRes.json() as any;
+            customerId = custData.customer?.id ?? null;
+          }
+        }
+
+        // Card on file を作成
+        if (customerId) {
+          const cardRes = await squareFetch("/v2/cards", "POST", {
+            idempotency_key: randomUUID(),
+            source_id: sourceId,
+            card: { customer_id: customerId },
+          });
+          if (cardRes.ok) {
+            const cardData = await cardRes.json() as any;
+            cardId = cardData.card?.id ?? null;
+          }
+        }
+      } catch (e) {
+        console.error("Square customer/card creation error:", e);
+      }
+
+      await db.execute(sql`
+        UPDATE users SET
+          card_brand = ${card.card_brand ?? null},
+          card_last4 = ${card.last_4 ?? null},
+          card_expiry = ${expiry},
+          square_customer_id = ${customerId},
+          square_card_id = ${cardId}
+        WHERE id = ${contract.userId}
+      `);
     }
 
     await db.insert(notificationsTable).values({
@@ -1489,38 +1535,87 @@ router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request
   }
 });
 
-// POST /van/payment-retries/:id/manual-success  管理者が手動で入金確認
-router.post("/van/payment-retries/:id/manual-success", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+// POST /van/payment-retries/:id/retry  再決済（カード on file があれば Square 課金、なければ手動確認）
+router.post("/van/payment-retries/:id/retry", requireAuth, requireAdmin, async (req: Request, res: Response) => {
   try {
     const id = parseInt(String(req.params.id));
-    const { note } = req.body;
+    const { manual } = req.body; // manual=true のとき強制手動確認
+
     const rows = await db.execute(sql`
-      SELECT pr.*, vc.user_id FROM payment_retries pr
+      SELECT pr.*,
+        u.square_customer_id, u.square_card_id, u.name as user_name
+      FROM payment_retries pr
       LEFT JOIN van_contracts vc ON pr.contract_id = vc.id
+      LEFT JOIN users u ON pr.user_id = u.id
       WHERE pr.id = ${id} LIMIT 1
     `);
     const pr: any = ((rows as any)?.rows ?? rows)[0];
     if (!pr) return res.status(404).json({ error: "Not found" });
 
-    await db.execute(sql`
-      UPDATE payment_retries
-      SET result = 'success',
-          failure_reason = ${note ? `[手動入金確認] ${note}` : '[手動入金確認]'},
-          attempted_at = NOW()
-      WHERE id = ${id}
-    `);
+    const amount = Number(pr.amount ?? 0);
+    const hasCard = !manual && pr.square_card_id && pr.square_customer_id;
 
-    if (pr.user_id) {
-      await db.insert(notificationsTable).values({
-        userId: pr.user_id,
-        title: "Chat VAN - お支払いを確認しました",
-        message: `${pr.period_month ?? ''}分のお支払いを確認しました（¥${Number(pr.amount ?? 0).toLocaleString()}）。`,
+    if (hasCard) {
+      // Square カード on file で再課金
+      const squareRes = await squareFetch("/v2/payments", "POST", {
+        source_id: pr.square_card_id,
+        customer_id: pr.square_customer_id,
+        idempotency_key: randomUUID(),
+        amount_money: { amount, currency: "JPY" },
+        autocomplete: true,
+        note: `Chat VAN 再決済 period=${pr.period_month}`,
       });
-    }
+      const data = await squareRes.json() as any;
 
-    return res.json({ ok: true });
+      if (!squareRes.ok) {
+        const errCode = data.errors?.[0]?.code ?? "";
+        const errMsgs: Record<string, string> = {
+          INVALID_CARD_DATA: "カード情報が無効です", CARD_EXPIRED: "カードの有効期限が切れています",
+          INSUFFICIENT_FUNDS: "残高不足です", GENERIC_DECLINE: "カードが拒否されました",
+        };
+        const errMsg = errMsgs[errCode] ?? "Square課金に失敗しました";
+        await db.execute(sql`
+          UPDATE payment_retries SET result = 'failed', failure_reason = ${errMsg}, attempted_at = NOW()
+          WHERE id = ${id}
+        `);
+        return res.status(502).json({ error: errMsg });
+      }
+
+      await db.execute(sql`
+        UPDATE payment_retries
+        SET result = 'success', failure_reason = NULL,
+            square_payment_id = ${data.payment?.id ?? null}, attempted_at = NOW()
+        WHERE id = ${id}
+      `);
+      if (pr.user_id) {
+        await db.insert(notificationsTable).values({
+          userId: pr.user_id,
+          title: "Chat VAN - 月額料金のお支払いが完了しました",
+          message: `${pr.period_month ?? ''}分の月額料金（¥${amount.toLocaleString()}）のお支払いが完了しました。`,
+        });
+      }
+      return res.json({ ok: true, method: 'card' });
+
+    } else {
+      // カードなし → 手動入金確認
+      await db.execute(sql`
+        UPDATE payment_retries
+        SET result = 'success',
+            failure_reason = '[手動入金確認]',
+            attempted_at = NOW()
+        WHERE id = ${id}
+      `);
+      if (pr.user_id) {
+        await db.insert(notificationsTable).values({
+          userId: pr.user_id,
+          title: "Chat VAN - お支払いを確認しました",
+          message: `${pr.period_month ?? ''}分のお支払いを確認しました（¥${amount.toLocaleString()}）。`,
+        });
+      }
+      return res.json({ ok: true, method: 'manual' });
+    }
   } catch (err) {
-    console.error("manual-success error:", err);
+    console.error("retry error:", err);
     return res.status(500).json({ error: "Internal error" });
   }
 });
@@ -1910,6 +2005,12 @@ router.get("/van/applications/:id/related", requireAuth, requireAdmin, async (re
 
     const toR = (r: any) => r?.rows ?? (Array.isArray(r) ? r : []);
 
+    // ユーザーのカード on file 情報
+    const userCardRow = await db.execute(sql`
+      SELECT square_card_id, square_customer_id, card_brand, card_last4 FROM users WHERE id = ${userId} LIMIT 1
+    `);
+    const userCard: any = ((userCardRow as any)?.rows ?? userCardRow)[0] ?? {};
+
     return res.json({
       contracts: toR(contracts),
       insurance: toR(insurance),
@@ -1920,6 +2021,11 @@ router.get("/van/applications/:id/related", requireAuth, requireAdmin, async (re
       identityVerification: toR(identityVerification)[0] ?? null,
       payments: toR(payments),
       invoices: toR(invoices),
+      userCard: {
+        hasCardOnFile: !!(userCard.square_card_id && userCard.square_customer_id),
+        brand: userCard.card_brand ?? null,
+        last4: userCard.card_last4 ?? null,
+      },
     });
   } catch (err) {
     console.error("related data error:", err);
