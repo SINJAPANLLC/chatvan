@@ -1522,16 +1522,19 @@ router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request
           }
         }
 
-        // Card on file を作成
-        if (customerId) {
+        // Card on file を作成（nonce は使用済みなので payment ID を source_id に使う）
+        if (customerId && data.payment?.id) {
           const cardRes = await squareFetch("/v2/cards", "POST", {
             idempotency_key: randomUUID(),
-            source_id: sourceId,
+            source_id: data.payment.id,
             card: { customer_id: customerId },
           });
           if (cardRes.ok) {
             const cardData = await cardRes.json() as any;
             cardId = cardData.card?.id ?? null;
+          } else {
+            const errData = await cardRes.json() as any;
+            console.error("Card on file creation error:", JSON.stringify(errData));
           }
         }
       } catch (e) {
@@ -3145,7 +3148,7 @@ cron.schedule("0 0 * * *", async () => {
           // Square カード決済
           const squareRes = await squareFetch("/v2/payments", "POST", {
             source_id: user.squareCardId,
-            amount_money: { amount: amount * 100, currency: "JPY" },
+            amount_money: { amount: amount, currency: "JPY" },
             customer_id: user.squareCustomerId,
             location_id: process.env.SQUARE_LOCATION_ID,
             idempotency_key: idempotencyKey,
