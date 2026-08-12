@@ -23,13 +23,13 @@ function parsePhotos(raw: string | null | undefined): string[] {
 }
 
 /** 写真ギャラリー（サムネイル付き） */
-function PhotoGallery({ photos, alt }: { photos: string[]; alt: string }) {
+function PhotoGallery({ photos, alt, compact = false }: { photos: string[]; alt: string; compact?: boolean }) {
   const [current, setCurrent] = useState(0);
 
   if (photos.length === 0) {
     return (
-      <div className="w-full aspect-[16/9] bg-muted flex items-center justify-center rounded-xl overflow-hidden">
-        <img src="/logo.jpg" alt="Chat VAN" className="w-28 h-28 object-contain opacity-30" />
+      <div className={`w-full ${compact ? 'aspect-[4/3]' : 'aspect-[16/9]'} bg-muted flex items-center justify-center rounded-xl overflow-hidden`}>
+        <img src="/logo.jpg" alt="Chat VAN" className="w-20 h-20 object-contain opacity-30" />
       </div>
     );
   }
@@ -37,25 +37,25 @@ function PhotoGallery({ photos, alt }: { photos: string[]; alt: string }) {
   return (
     <div className="space-y-2">
       {/* メイン画像 */}
-      <div className="relative w-full aspect-[16/9] bg-muted rounded-xl overflow-hidden">
+      <div className={`relative w-full ${compact ? 'aspect-[4/3]' : 'aspect-[16/9]'} bg-muted rounded-xl overflow-hidden`}>
         <img
           src={photos[current]}
           alt={alt}
-          className="w-full h-full object-contain"
+          className="w-full h-full object-cover"
         />
         {photos.length > 1 && (
           <>
             <button
               onClick={() => setCurrent((c) => (c - 1 + photos.length) % photos.length)}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 transition-colors"
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 transition-colors"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={() => setCurrent((c) => (c + 1) % photos.length)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 transition-colors"
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 transition-colors"
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-3.5 w-3.5" />
             </button>
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
               {photos.map((_, i) => (
@@ -70,8 +70,8 @@ function PhotoGallery({ photos, alt }: { photos: string[]; alt: string }) {
         )}
       </div>
 
-      {/* サムネイル */}
-      {photos.length > 1 && (
+      {/* サムネイル（1台表示のみ） */}
+      {!compact && photos.length > 1 && (
         <div className="flex gap-2 overflow-x-auto pb-1">
           {photos.map((url, i) => (
             <button
@@ -203,7 +203,7 @@ export default function VanProposal() {
               <div key={v.id} className="border border-border rounded-2xl overflow-hidden shadow-sm flex flex-col">
                 {/* 写真 */}
                 <div className={isMulti ? 'px-3 pt-3 pb-2' : 'px-4 pt-4 pb-3'}>
-                  <PhotoGallery photos={photos} alt={`${v.maker} ${v.model}`} />
+                  <PhotoGallery photos={photos} alt={`${v.maker} ${v.model}`} compact={isMulti} />
                 </div>
 
                 <div className={`flex flex-col flex-1 ${isMulti ? 'px-3 pb-3' : 'px-4 pb-4'}`}>
