@@ -158,7 +158,7 @@ export default function Register() {
           </Form>
         </div>
 
-        <div className="text-center text-sm text-muted-foreground space-y-1">
+        <div className="text-center text-sm text-muted-foreground space-y-3">
           <div>
             すでにアカウントをお持ちですか？{' '}
             <Link href="/login" className="font-medium text-primary hover:underline">
