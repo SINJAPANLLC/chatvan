@@ -33,7 +33,7 @@ const PROMPT_SECTIONS: PromptSection[] = [
     description: 'ユーザーが相談チャットを開始した際のAIシステムプロンプト。ヒアリング項目・会話ルール・完了タグの出力形式を定義します。',
     icon: MessageCircle,
     badge: 'チャット',
-    badgeColor: 'bg-blue-100 text-blue-700',
+    badgeColor: 'bg-muted text-muted-foreground border border-border',
   },
   {
     key: 'ai_ekyc_prompt',
@@ -41,7 +41,7 @@ const PROMPT_SECTIONS: PromptSection[] = [
     description: '運転免許証・顔写真をAIが審査する際のシステムプロンプト。判定基準・出力JSONフォーマットを定義します。',
     icon: Shield,
     badge: 'eKYC',
-    badgeColor: 'bg-sky-100 text-sky-700',
+    badgeColor: 'bg-muted text-muted-foreground border border-border',
   },
   {
     key: 'ai_screening_prompt',
@@ -49,7 +49,7 @@ const PROMPT_SECTIONS: PromptSection[] = [
     description: 'eKYC通過後に申込内容をAIが審査するプロンプト。承認・却下の判断基準と審査方針を定義します。',
     icon: CheckCircle2,
     badge: '自動審査',
-    badgeColor: 'bg-teal-100 text-teal-700',
+    badgeColor: 'bg-muted text-muted-foreground border border-border',
   },
   {
     key: 'ai_blog_user_prompt',
@@ -57,7 +57,7 @@ const PROMPT_SECTIONS: PromptSection[] = [
     description: '軽バン利用者向けブログ記事の自動生成時に使うシステムプロンプト。記事の方向性・読者像・CTAの基本方針を記述します。',
     icon: FileText,
     badge: 'ブログ・ユーザー',
-    badgeColor: 'bg-violet-100 text-violet-700',
+    badgeColor: 'bg-muted text-muted-foreground border border-border',
   },
   {
     key: 'ai_blog_rental_prompt',
@@ -65,7 +65,7 @@ const PROMPT_SECTIONS: PromptSection[] = [
     description: 'レンタル会社向けブログ記事の自動生成時に使うシステムプロンプト。稼働率・収益改善の視点から記事方針を記述します。',
     icon: FileText,
     badge: 'ブログ・レンタル会社',
-    badgeColor: 'bg-amber-100 text-amber-700',
+    badgeColor: 'bg-muted text-muted-foreground border border-border',
   },
   {
     key: 'ai_prospect_score_prompt',
@@ -73,7 +73,7 @@ const PROMPT_SECTIONS: PromptSection[] = [
     description: 'DuckDuckGo / Braveで収集した企業をAIが評価・絞り込む際のプロンプト。パートナー候補の選定基準を記述します。',
     icon: Search,
     badge: '自動クロール',
-    badgeColor: 'bg-green-100 text-green-700',
+    badgeColor: 'bg-muted text-muted-foreground border border-border',
     placeholders: [
       { token: '{CANDIDATES}', desc: '収集した企業リスト（JSON）が自動挿入されます' },
       { token: '{INDUSTRY}', desc: '対象業種が自動挿入されます' },
@@ -85,7 +85,7 @@ const PROMPT_SECTIONS: PromptSection[] = [
     description: '自動クロールで収集した企業への個別営業メールを生成するプロンプト。メールの件名・本文の条件を記述します。',
     icon: Mail,
     badge: '自動クロール',
-    badgeColor: 'bg-green-100 text-green-700',
+    badgeColor: 'bg-muted text-muted-foreground border border-border',
     placeholders: [
       { token: '{COMPANY_NAME}', desc: '宛先企業名が自動挿入されます' },
       { token: '{INDUSTRY}', desc: '業種が自動挿入されます' },
@@ -95,19 +95,19 @@ const PROMPT_SECTIONS: PromptSection[] = [
 
 // ── 車両マッチングルール可視化 ──────────────────────────────────────────────────
 const MATCHING_RULES = [
-  { score: '+30点', label: 'エリア一致', desc: '車両の都道府県とユーザー希望エリアが一致', color: 'bg-blue-50 border-blue-200 text-blue-800' },
-  { score: '+25点', label: '予算内', desc: '月額合計（車両代＋手数料＋保険）が予算の110%以内', color: 'bg-green-50 border-green-200 text-green-800' },
-  { score: '+20点', label: '利用期間クリア', desc: 'ユーザーの希望期間が車両の最低利用期間以上', color: 'bg-violet-50 border-violet-200 text-violet-800' },
-  { score: '+コスパ加点', label: '価格が予算に近い', desc: '予算内で最もコスパが高い車両に追加点数', color: 'bg-amber-50 border-amber-200 text-amber-800' },
-  { score: 'TOP3', label: '上位3件を提案候補', desc: '合計スコアが高い車両から最大3件を管理者に提示', color: 'bg-gray-50 border-gray-200 text-gray-700' },
+  { score: '+30点', label: 'エリア一致', desc: '車両の都道府県とユーザー希望エリアが一致', color: 'bg-foreground border-foreground text-background' },
+  { score: '+25点', label: '予算内', desc: '月額合計（車両代＋手数料＋保険）が予算の110%以内', color: 'bg-foreground border-foreground text-background' },
+  { score: '+20点', label: '利用期間クリア', desc: 'ユーザーの希望期間が車両の最低利用期間以上', color: 'bg-foreground border-foreground text-background' },
+  { score: '+コスパ加点', label: '価格が予算に近い', desc: '予算内で最もコスパが高い車両に追加点数', color: 'bg-muted border-border text-foreground' },
+  { score: 'TOP3', label: '上位3件を提案候補', desc: '合計スコアが高い車両から最大3件を管理者に提示', color: 'bg-muted border-border text-muted-foreground' },
 ];
 
 const FLOW_STEPS = [
-  { icon: MessageCircle, label: 'チャット\nヒアリング', desc: '5項目収集', color: '#3b82f6', bg: '#eff6ff' },
-  { icon: Search,        label: '車両\nマッチング', desc: 'スコアリング', color: '#8b5cf6', bg: '#f5f3ff' },
-  { icon: Shield,        label: 'eKYC\n本人確認',   desc: 'AI画像判定',  color: '#0ea5e9', bg: '#f0f9ff' },
-  { icon: CheckCircle2,  label: 'AI\n自動審査',     desc: '申込スクリーニング', color: '#14b8a6', bg: '#f0fdfa' },
-  { icon: FileText,      label: '契約書\n自動生成',  desc: '電子署名へ',  color: '#10b981', bg: '#f0fdf4' },
+  { icon: MessageCircle, label: 'チャット\nヒアリング', desc: '5項目収集',        color: 'hsl(var(--foreground))', bg: 'hsl(var(--muted))' },
+  { icon: Search,        label: '車両\nマッチング',   desc: 'スコアリング',       color: 'hsl(var(--foreground))', bg: 'hsl(var(--muted))' },
+  { icon: Shield,        label: 'eKYC\n本人確認',    desc: 'AI画像判定',         color: 'hsl(var(--foreground))', bg: 'hsl(var(--muted))' },
+  { icon: CheckCircle2,  label: 'AI\n自動審査',      desc: '申込スクリーニング', color: 'hsl(var(--foreground))', bg: 'hsl(var(--muted))' },
+  { icon: FileText,      label: '契約書\n自動生成',   desc: '電子署名へ',         color: 'hsl(var(--foreground))', bg: 'hsl(var(--muted))' },
 ];
 
 function AIFlowVisualizer() {
@@ -240,7 +240,7 @@ function PromptEditor({
                 {section.badge}
               </span>
               {isCustomized ? (
-                <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
+                <span className="inline-flex items-center gap-1 text-xs text-foreground font-medium">
                   <CheckCircle2 className="h-3 w-3" />カスタム
                 </span>
               ) : (
@@ -276,12 +276,12 @@ function PromptEditor({
 
       {/* プレースホルダー案内 */}
       {section.placeholders && (
-        <div className="flex items-start gap-2 px-5 py-2.5 border-b border-border bg-blue-50/50">
-          <Info className="h-3.5 w-3.5 text-blue-500 mt-0.5 shrink-0" />
+        <div className="flex items-start gap-2 px-5 py-2.5 border-b border-border bg-muted/30">
+          <Info className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
           <div className="flex flex-wrap gap-x-4 gap-y-1">
             {section.placeholders.map(p => (
-              <span key={p.token} className="text-xs text-blue-700">
-                <code className="bg-white border border-blue-200 rounded px-1 font-mono">{p.token}</code>
+              <span key={p.token} className="text-xs text-muted-foreground">
+                <code className="bg-background border border-border rounded px-1 font-mono text-foreground">{p.token}</code>
                 {' '}{p.desc}
               </span>
             ))}
@@ -300,7 +300,7 @@ function PromptEditor({
         />
         <div className="absolute bottom-3 right-4 flex items-center gap-3 text-xs text-muted-foreground select-none pointer-events-none">
           {isDirty && (
-            <span className="text-amber-600 font-medium flex items-center gap-1">
+            <span className="text-muted-foreground font-medium flex items-center gap-1">
               <AlertCircle className="h-3 w-3" />未保存
             </span>
           )}
