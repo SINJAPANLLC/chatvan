@@ -3121,34 +3121,37 @@ db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS compulsory_insuranc
 // ── 月額自動決済スケジューラー (毎日 JST 9:00 = UTC 0:00) ────────────────
 cron.schedule("0 0 * * *", async () => {
   const jstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
-  const today = jstNow.getUTCDate();
-  console.log(`[月額決済] チェック開始 JST日付: ${today}日`);
+  const today    = jstNow.getUTCDate();
+  const jstYear  = jstNow.getUTCFullYear();
+  const jstMonth = jstNow.getUTCMonth(); // 0-indexed
+  console.log(`[月額決済] チェック開始 JST: ${jstYear}-${jstMonth + 1}-${today}`);
 
+  // ── ① カード払い：支払日に自動課金 ──────────────────────────────────
   try {
-    // 今日が支払日のアクティブ契約を取得
-    const rows = await db
+    const cardRows = await db
       .select({ contract: vanContractsTable, user: usersTable })
       .from(vanContractsTable)
       .leftJoin(usersTable, eq(vanContractsTable.userId, usersTable.id))
       .where(
         and(
           eq(vanContractsTable.status, "active" as any),
+          sql`${vanContractsTable.paymentMethod} = 'card'`,
           sql`${vanContractsTable.paymentDay} = ${today}`
         )
       );
 
-    console.log(`[月額決済] 対象契約: ${rows.length}件`);
+    console.log(`[月額決済] カード対象: ${cardRows.length}件`);
 
-    for (const { contract, user } of rows) {
-      const amount = Math.floor((Number(contract.monthlyPrice) + Number(contract.sinJapanFee ?? 0)) * 1.1);
-      const idempotencyKey = `monthly-${contract.id}-${jstNow.getUTCFullYear()}-${jstNow.getUTCMonth()}`;
+    for (const { contract, user } of cardRows) {
+      const preTax = Number(contract.monthlyPrice) + Number(contract.sinJapanFee ?? 0);
+      const amount = Math.floor(preTax * 1.1);
+      const idempotencyKey = `monthly-${contract.id}-${jstYear}-${jstMonth}`;
 
       try {
         if (user?.squareCardId && user?.squareCustomerId) {
-          // Square カード決済
           const squareRes = await squareFetch("/v2/payments", "POST", {
             source_id: user.squareCardId,
-            amount_money: { amount: amount, currency: "JPY" },
+            amount_money: { amount, currency: "JPY" },
             customer_id: user.squareCustomerId,
             location_id: process.env.SQUARE_LOCATION_ID,
             idempotency_key: idempotencyKey,
@@ -3156,8 +3159,7 @@ cron.schedule("0 0 * * *", async () => {
           const data = await squareRes.json() as any;
 
           if (!squareRes.ok) {
-            console.error(`[月額決済] 失敗 contract=${contract.id}:`, data.errors);
-            // 支払い問題ステータスに変更
+            console.error(`[月額決済] カード失敗 contract=${contract.id}:`, data.errors);
             if (contract.applicationId) {
               await db.update(vanApplicationsTable)
                 .set({ status: "payment_issue", updatedAt: new Date() })
@@ -3169,7 +3171,7 @@ cron.schedule("0 0 * * *", async () => {
               message: `月額料金（¥${amount.toLocaleString()}）の決済に失敗しました。お支払い情報をご確認ください。`,
             });
           } else {
-            console.log(`[月額決済] 成功 contract=${contract.id} ¥${amount}`);
+            console.log(`[月額決済] カード成功 contract=${contract.id} ¥${amount}`);
             await db.insert(notificationsTable).values({
               userId: contract.userId,
               title: "Chat VAN - 月額料金のお支払いが完了しました",
@@ -3177,37 +3179,101 @@ cron.schedule("0 0 * * *", async () => {
             });
           }
         } else {
-          // 請求書払い → invoices テーブルにレコード作成 + 管理者通知
-          console.log(`[月額決済] 請求書払い contract=${contract.id} ¥${amount}`);
-          const now = new Date();
-          const periodStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-          const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-          const periodEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${lastDay}`;
-          const dueDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-          const invoiceNumber = `INV-${contract.id}-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
-          const subtotal = amount;
-          const tax = Math.floor(subtotal * 0.1);
-          const totalAmount = subtotal + tax;
-          await db.execute(sql`
-            INSERT INTO invoices (user_id, invoice_number, period_start, period_end, subtotal, tax, total_amount, status, due_date, created_at)
-            VALUES (${contract.userId}, ${invoiceNumber}, ${periodStart}, ${periodEnd}, ${subtotal}, ${tax}, ${totalAmount}, 'pending', ${dueDate}, NOW())
-            ON CONFLICT DO NOTHING
-          `);
+          // カード情報未登録 → 管理者通知
+          console.warn(`[月額決済] カード情報なし contract=${contract.id}`);
           const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
           for (const admin of admins) {
             await db.insert(notificationsTable).values({
               userId: admin.id,
-              title: "Chat VAN - 月額請求書を発行してください",
-              message: `契約ID: ${contract.id} / ユーザーID: ${contract.userId} への月額請求書（${invoiceNumber} / ¥${totalAmount.toLocaleString()}）を発行してください。`,
+              title: "Chat VAN - カード情報未登録の契約があります",
+              message: `契約ID: ${contract.id} のユーザーがカード情報を登録していません。確認してください。`,
             });
           }
         }
       } catch (e) {
-        console.error(`[月額決済] エラー contract=${contract.id}:`, e);
+        console.error(`[月額決済] カードエラー contract=${contract.id}:`, e);
       }
     }
   } catch (e) {
-    console.error("[月額決済] スケジューラーエラー:", e);
+    console.error("[月額決済] カードスケジューラーエラー:", e);
+  }
+
+  // ── ② 請求書払い：月初（1日）に前月分を末締め翌月末払いで発行 ──────
+  if (today !== 1) return;
+
+  try {
+    // 前月の情報
+    const prevMonth     = jstMonth === 0 ? 11 : jstMonth - 1;  // 0-indexed
+    const prevYear      = jstMonth === 0 ? jstYear - 1 : jstYear;
+    const prevMonthDays = new Date(prevYear, prevMonth + 1, 0).getDate();
+    const periodStart   = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-01`;
+    const periodEnd     = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(prevMonthDays).padStart(2, '0')}`;
+    // 支払期限 = 当月末（翌月末払い）
+    const curMonthDays  = new Date(jstYear, jstMonth + 1, 0).getDate();
+    const dueDate       = `${jstYear}-${String(jstMonth + 1).padStart(2, '0')}-${String(curMonthDays).padStart(2, '0')}`;
+
+    const invoiceRows = await db
+      .select({ contract: vanContractsTable })
+      .from(vanContractsTable)
+      .where(
+        and(
+          eq(vanContractsTable.status, "active" as any),
+          sql`${vanContractsTable.paymentMethod} = 'invoice'`
+        )
+      );
+
+    console.log(`[月次請求書] 対象: ${invoiceRows.length}件 前月: ${prevYear}-${prevMonth + 1}`);
+
+    for (const { contract } of invoiceRows) {
+      try {
+        const preTaxMonthly = Number(contract.monthlyPrice) + Number(contract.sinJapanFee ?? 0);
+        const startDate = contract.startDate ? new Date(contract.startDate) : null;
+
+        // 初月日割り判定: 利用開始日が前月にある場合
+        let subtotal: number;
+        let billingNote = "";
+        if (
+          startDate &&
+          startDate.getFullYear() === prevYear &&
+          startDate.getMonth() === prevMonth
+        ) {
+          // 初月：日割り計算（開始日〜月末）
+          const daysInService = prevMonthDays - startDate.getDate() + 1;
+          subtotal = Math.round((preTaxMonthly / prevMonthDays) * daysInService);
+          billingNote = `（日割り: ${startDate.getDate()}日〜${prevMonthDays}日 / ${daysInService}日分）`;
+        } else if (startDate && startDate > new Date(periodEnd)) {
+          // まだ開始していない契約はスキップ
+          continue;
+        } else {
+          // 通常月：満額
+          subtotal = preTaxMonthly;
+        }
+
+        const tax         = Math.round(subtotal * 0.1);
+        const totalAmount = subtotal + tax;
+        const invoiceNumber = `INV-${contract.id}-${prevYear}${String(prevMonth + 1).padStart(2, '0')}`;
+
+        await db.execute(sql`
+          INSERT INTO invoices (user_id, invoice_number, period_start, period_end, subtotal, tax, total_amount, status, due_date, created_at)
+          VALUES (${contract.userId}, ${invoiceNumber}, ${periodStart}, ${periodEnd}, ${subtotal}, ${tax}, ${totalAmount}, 'pending', ${dueDate}, NOW())
+          ON CONFLICT DO NOTHING
+        `);
+
+        const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
+        for (const admin of admins) {
+          await db.insert(notificationsTable).values({
+            userId: admin.id,
+            title: "Chat VAN - 月次請求書を発行してください",
+            message: `契約ID: ${contract.id} / ${invoiceNumber}${billingNote}\n税抜: ¥${subtotal.toLocaleString()} 消費税: ¥${tax.toLocaleString()} 合計: ¥${totalAmount.toLocaleString()}\n支払期限: ${dueDate}`,
+          });
+        }
+        console.log(`[月次請求書] 発行 contract=${contract.id} ${invoiceNumber} ¥${totalAmount} 期限:${dueDate}${billingNote}`);
+      } catch (e) {
+        console.error(`[月次請求書] エラー contract=${contract.id}:`, e);
+      }
+    }
+  } catch (e) {
+    console.error("[月次請求書] スケジューラーエラー:", e);
   }
 }, { timezone: "UTC" });
 
