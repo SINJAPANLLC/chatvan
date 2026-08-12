@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Loader2, Upload, X, ScanFace, ChevronRight } from 'lucide-react';
+import { Loader2, Upload, X, Camera, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const apiUrl = (p: string) => `${import.meta.env.BASE_URL}api${p}`;
@@ -7,14 +7,16 @@ const token = () => localStorage.getItem('sinjapan_auth_token') ?? '';
 
 interface UploadedImage { path: string; preview: string }
 
-function ImageUploader({ label, value, onChange, accept }: {
+function ImageUploader({ label, value, onChange, facing }: {
   label: string;
   value: UploadedImage | null;
   onChange: (v: UploadedImage | null) => void;
-  accept?: string;
+  /** 'user' = インカメラ（セルフィー）, 'environment' = アウトカメラ（書類撮影）, undefined = カメラボタンなし */
+  facing?: 'user' | 'environment';
 }) {
   const [uploading, setUploading] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
 
   const handleFile = async (file: File) => {
     setUploading(true);
@@ -36,42 +38,76 @@ function ImageUploader({ label, value, onChange, accept }: {
     }
   };
 
+  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) handleFile(f);
+    e.target.value = '';
+  };
+
   return (
     <div>
       <p className="text-xs font-medium text-muted-foreground mb-1.5">{label}</p>
-      <div
-        className={`relative border-2 border-dashed rounded-xl flex flex-col items-center justify-center p-3 cursor-pointer hover:bg-muted transition-colors
-          ${value ? 'border-foreground bg-muted/40' : 'border-border'}`}
-        style={{ minHeight: 90 }}
-        onClick={() => !uploading && inputRef.current?.click()}
-      >
-        {uploading ? (
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        ) : value ? (
-          <>
-            <img src={value.preview} alt={label} className="max-h-20 object-contain rounded" />
-            <button
-              type="button"
-              className="absolute top-1 right-1 bg-background border border-border rounded-full p-0.5"
-              onClick={(e) => { e.stopPropagation(); onChange(null); }}
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </>
-        ) : (
-          <>
-            <Upload className="h-5 w-5 text-muted-foreground mb-1" />
-            <p className="text-xs text-muted-foreground text-center">タップして選択</p>
-          </>
-        )}
-        <input
-          ref={inputRef}
-          type="file"
-          accept={accept ?? 'image/*'}
-          className="hidden"
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
-        />
-      </div>
+
+      {/* プレビュー表示 */}
+      {value ? (
+        <div className="relative border-2 border-foreground border-dashed rounded-xl flex flex-col items-center justify-center p-3 bg-muted/40" style={{ minHeight: 90 }}>
+          {uploading ? (
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          ) : (
+            <>
+              <img src={value.preview} alt={label} className="max-h-20 object-contain rounded" />
+              <button
+                type="button"
+                className="absolute top-1 right-1 bg-background border border-border rounded-full p-0.5"
+                onClick={() => onChange(null)}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </>
+          )}
+        </div>
+      ) : facing ? (
+        /* カメラあり：2ボタンレイアウト */
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={() => cameraRef.current?.click()}
+            className="flex flex-col items-center justify-center gap-1 border-2 border-dashed border-border rounded-xl py-3 text-xs text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+          >
+            {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
+            <span>カメラ撮影</span>
+          </button>
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={() => fileRef.current?.click()}
+            className="flex flex-col items-center justify-center gap-1 border-2 border-dashed border-border rounded-xl py-3 text-xs text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+          >
+            {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
+            <span>ファイル選択</span>
+          </button>
+        </div>
+      ) : (
+        /* カメラなし：従来の1ボタン */
+        <div
+          className="border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center p-3 cursor-pointer hover:bg-muted transition-colors"
+          style={{ minHeight: 90 }}
+          onClick={() => !uploading && fileRef.current?.click()}
+        >
+          {uploading
+            ? <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            : <><Upload className="h-5 w-5 text-muted-foreground mb-1" /><p className="text-xs text-muted-foreground">タップして選択</p></>
+          }
+        </div>
+      )}
+
+      {/* 隠し input：ファイル選択 */}
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFileChange} />
+      {/* 隠し input：カメラ撮影 */}
+      {facing && (
+        <input ref={cameraRef} type="file" accept="image/*" capture={facing} className="hidden" onChange={onFileChange} />
+      )}
     </div>
   );
 }
@@ -102,8 +138,8 @@ export default function EkycInlineForm({ applicationId, rejectionReason, onSubmi
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!frontImage) { toast({ title: '免許証表面の画像を添付してください', variant: 'destructive' }); return; }
-    if (!backImage)  { toast({ title: '免許証裏面の画像を添付してください', variant: 'destructive' }); return; }
+    if (!frontImage)  { toast({ title: '免許証表面の画像を添付してください', variant: 'destructive' }); return; }
+    if (!backImage)   { toast({ title: '免許証裏面の画像を添付してください', variant: 'destructive' }); return; }
     if (!selfieImage) { toast({ title: '顔写真を添付してください', variant: 'destructive' }); return; }
 
     setSubmitting(true);
@@ -162,8 +198,8 @@ export default function EkycInlineForm({ applicationId, rejectionReason, onSubmi
       <div className="rounded-xl border border-border p-4 space-y-3">
         <p className="text-sm font-semibold">運転免許証</p>
         <div className="grid grid-cols-2 gap-3">
-          <ImageUploader label="表面 *" value={frontImage} onChange={setFrontImage} />
-          <ImageUploader label="裏面 *" value={backImage} onChange={setBackImage} />
+          <ImageUploader label="表面 *" value={frontImage} onChange={setFrontImage} facing="environment" />
+          <ImageUploader label="裏面 *" value={backImage}  onChange={setBackImage}  facing="environment" />
         </div>
         <div className="grid grid-cols-3 gap-3">
           <div>
@@ -187,8 +223,8 @@ export default function EkycInlineForm({ applicationId, rejectionReason, onSubmi
       <div className="rounded-xl border border-border p-4 space-y-3">
         <p className="text-sm font-semibold">顔写真（セルフィー）</p>
         <p className="text-xs text-muted-foreground">正面・帽子なし・明るい場所で撮影。免許証の顔写真と照合します。</p>
-        <div className="max-w-[160px]">
-          <ImageUploader label="顔写真 *" value={selfieImage} onChange={setSelfieImage} />
+        <div className="max-w-xs">
+          <ImageUploader label="顔写真 *" value={selfieImage} onChange={setSelfieImage} facing="user" />
         </div>
       </div>
 
