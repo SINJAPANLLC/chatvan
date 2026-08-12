@@ -5,9 +5,9 @@ import { requireAuth, requireAdmin } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
-// 法人番号バリデーション（13桁数字）
+// 法人番号バリデーション（1桁以上の数字または英数字）
 function isValidCorporateNumber(n: string): boolean {
-  return /^\d{13}$/.test(n);
+  return String(n).trim().length > 0;
 }
 
 // GET /corporate/status — 自分の法人口座ステータス取得
