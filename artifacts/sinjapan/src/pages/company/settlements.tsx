@@ -107,6 +107,8 @@ function DetailTable({ rows, initialMonth }: { rows: any[]; initialMonth: string
   const totalPayout  = monthRows.reduce((s, r) => s + Number(r.rental_company_amount ?? 0), 0);
   const totalBlack   = monthRows.reduce((s, r) => s + Number(r.black_number_fee ?? 0), 0);
   const totalUser    = monthRows.reduce((s, r) => s + Number(r.user_payment_amount ?? 0), 0);
+  const subtotal     = totalPayout + totalBlack;
+  const totalWithTax = Math.round(subtotal * 1.1);
 
   const fmtMonth = (ym: string) => { const [y, m] = ym.split('-'); return `${y}年${Number(m)}月`; };
 
@@ -167,11 +169,13 @@ function DetailTable({ rows, initialMonth }: { rows: any[]; initialMonth: string
 
       {/* サマリーカード */}
       {monthRows.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
             { label: '件数',           value: `${monthRows.length}件` },
-            { label: '月額受取合計',   value: yen(totalPayout), bold: true },
+            { label: '月額受取合計',   value: yen(totalPayout) },
             { label: '黒ナンバー合計', value: yen(totalBlack) },
+            { label: '小計',           value: yen(subtotal) },
+            { label: '税込合計',       value: yen(totalWithTax), bold: true },
           ].map(c => (
             <div key={c.label} className="rounded-xl border border-border bg-card px-4 py-3">
               <div className="text-xs text-muted-foreground mb-1">{c.label}</div>
