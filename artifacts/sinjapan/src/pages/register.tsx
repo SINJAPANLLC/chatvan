@@ -158,11 +158,19 @@ export default function Register() {
           </Form>
         </div>
 
-        <div className="text-center text-sm text-muted-foreground">
-          すでにアカウントをお持ちですか？{' '}
-          <Link href="/login" className="font-medium text-primary hover:underline">
-            ログイン
-          </Link>
+        <div className="text-center text-sm text-muted-foreground space-y-1">
+          <div>
+            すでにアカウントをお持ちですか？{' '}
+            <Link href="/login" className="font-medium text-primary hover:underline">
+              ログイン
+            </Link>
+          </div>
+          <div>
+            レンタル会社様の新規登録は{' '}
+            <Link href="/company/register" className="font-medium text-primary hover:underline">
+              こちら
+            </Link>
+          </div>
         </div>
       </div>
     </div>
