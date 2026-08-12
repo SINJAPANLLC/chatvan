@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import 'leaflet/dist/leaflet.css';
 import {
-  Loader2, ChevronLeft, FileText, Calendar, Phone, Mail,
+  Loader2, ChevronLeft, FileText, Calendar, Phone, Mail, Filter,
   User, Car, ScrollText, Wallet, MapPinned, AlertTriangle,
   ClipboardList, Truck, RotateCcw, MapPin, Shield, BadgeCheck,
 } from 'lucide-react';
@@ -590,10 +590,12 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
 export default function CompanyContracts() {
   const [contracts, setContracts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [selected, setSelected] = useState<any | null>(null);
 
   const load = () => {
+    setIsLoading(true);
     fetch(API('/company/contracts'), { headers: { Authorization: `Bearer ${tok()}` } })
       .then(r => r.ok ? r.json() : [])
       .then(j => setContracts(Array.isArray(j) ? j : []))
@@ -601,96 +603,150 @@ export default function CompanyContracts() {
   };
   useEffect(() => { load(); }, []);
 
-  if (isLoading) return (
-    <div className="flex-1 flex items-center justify-center min-h-[50vh]">
-      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-    </div>
-  );
-
   // 詳細ビュー
   if (selected) return <ContractDetail contract={selected} onBack={() => { setSelected(null); load(); }} />;
 
-  const filtered = filter === 'all' ? contracts : contracts.filter(c => (c.application_status ?? c.status) === filter);
+  // フィルタリング
+  const filtered = contracts.filter(c => {
+    const st = c.application_status ?? c.status;
+    if (statusFilter && st !== statusFilter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return (
+        (c.user_name ?? '').toLowerCase().includes(q) ||
+        (c.user_phone ?? '').includes(q) ||
+        (c.user_email ?? '').toLowerCase().includes(q) ||
+        (`${c.maker ?? ''} ${c.model ?? ''}`).toLowerCase().includes(q) ||
+        (c.license_plate ?? '').includes(q) ||
+        String(c.id).includes(q)
+      );
+    }
+    return true;
+  });
+
+  // サマリ集計
+  const stats = [
+    { label: '総契約数',  value: contracts.length },
+    { label: '利用中',    value: contracts.filter(c => (c.application_status ?? c.status) === 'active').length },
+    { label: '納車待ち',  value: contracts.filter(c => (c.application_status ?? c.status) === 'delivery_pending').length },
+    { label: '未払い',    value: contracts.filter(c => (c.application_status ?? c.status) === 'payment_issue').length },
+  ];
 
   return (
     <div className="space-y-6">
       {/* ヘッダー */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">契約</h1>
+        <h1 className="text-2xl font-bold tracking-tight">契約一覧</h1>
         <p className="text-muted-foreground text-sm mt-1">自社車両の利用契約を確認・管理します。</p>
       </div>
 
-      {/* フィルタータブ */}
-      <div className="flex gap-1 border-b border-border">
-        {FILTERS.map(f => {
-          const count = f.key === 'all' ? contracts.length : contracts.filter(c => (c.application_status ?? c.status) === f.key).length;
-          return (
-            <button key={f.key} onClick={() => setFilter(f.key)}
-              className={`px-4 py-2.5 text-sm font-medium transition-colors ${
-                filter === f.key ? 'text-foreground border-b-2 border-foreground -mb-px' : 'text-muted-foreground hover:text-foreground'
-              }`}>
-              {f.label}
-              <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{count}</span>
-            </button>
-          );
-        })}
+      {/* サマリカード */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {stats.map(s => (
+          <div key={s.label} className="bg-card border border-border rounded-xl p-4 shadow-sm">
+            <p className="text-xs text-muted-foreground mb-1">{s.label}</p>
+            <p className="text-2xl font-bold">{s.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* 検索 + ステータスフィルター */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="名前・電話・車両・ナンバーで検索..."
+          className="flex-1 px-3 py-2 bg-background border border-border rounded-lg text-sm outline-none focus:border-foreground/50"
+        />
+        <div className="relative sm:w-52">
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 bg-background border border-border rounded-lg text-sm outline-none focus:border-foreground/50 appearance-none"
+          >
+            <option value="">すべてのステータス</option>
+            {STATUS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        </div>
       </div>
 
       {/* テーブル */}
-      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-        {filtered.length === 0 ? (
-          <div className="py-20 text-center space-y-2">
-            <FileText className="h-8 w-8 mx-auto text-muted-foreground/30" />
-            <p className="text-sm text-muted-foreground">該当する契約はありません</p>
-          </div>
-        ) : (
-          <table className="w-full text-sm text-left">
-            <thead className="bg-muted/40 text-muted-foreground">
-              <tr>
-                <th className="px-5 py-3 font-medium">契約ID</th>
-                <th className="px-5 py-3 font-medium">ユーザー</th>
-                <th className="px-5 py-3 font-medium">車両</th>
-                <th className="px-5 py-3 font-medium">月額</th>
-                <th className="px-5 py-3 font-medium">開始日</th>
-                <th className="px-5 py-3 font-medium">ステータス</th>
-                <th className="px-5 py-3 font-medium"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border bg-card">
-              {filtered.map(c => (
-                <tr key={c.id} className="hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => setSelected(c)}>
-                  <td className="px-5 py-3.5 font-mono text-xs text-muted-foreground">#{c.id}</td>
-                  <td className="px-5 py-3.5">
-                    <p className="font-medium">{c.user_name ?? '—'}</p>
-                    {c.user_phone && <p className="text-xs text-muted-foreground">{c.user_phone}</p>}
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <p className="font-medium">{c.maker} {c.model}</p>
-                    {c.prefecture && <p className="text-xs text-muted-foreground">{c.prefecture}</p>}
-                  </td>
-                  <td className="px-5 py-3.5">{c.monthlyPrice ? yen(Number(c.monthlyPrice)) : '—'}</td>
-                  <td className="px-5 py-3.5 text-xs">
-                    <div className="flex items-center gap-1 text-muted-foreground">
-                      <Calendar className="h-3 w-3" />
-                      {fmtD(c.start_date ?? c.startDate)}
-                    </div>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <span className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${statusCls(c.status)}`}>
-                      {statusLabel(c.status)}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <button className="text-xs text-muted-foreground hover:text-foreground hover:underline" onClick={e => { e.stopPropagation(); setSelected(c); }}>
-                      詳細 →
-                    </button>
-                  </td>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-muted text-muted-foreground text-xs uppercase tracking-wide">
+                <tr>
+                  <th className="px-4 py-3 font-medium w-16">ID</th>
+                  <th className="px-4 py-3 font-medium">ステータス</th>
+                  <th className="px-4 py-3 font-medium">ユーザー情報</th>
+                  <th className="px-4 py-3 font-medium">車両</th>
+                  <th className="px-4 py-3 font-medium">月額</th>
+                  <th className="px-4 py-3 font-medium">開始日</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-10 text-center text-muted-foreground text-sm">
+                      該当する契約が見つかりませんでした。
+                    </td>
+                  </tr>
+                ) : filtered.map(c => (
+                  <tr
+                    key={c.id}
+                    onClick={() => setSelected(c)}
+                    className="hover:bg-muted/40 cursor-pointer transition-colors"
+                  >
+                    <td className="px-4 py-3.5 font-mono text-xs text-muted-foreground">#{c.id}</td>
+                    <td className="px-4 py-3.5">
+                      <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border whitespace-nowrap ${statusCls(c.application_status ?? c.status)}`}>
+                        {statusLabel(c.application_status ?? c.status)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-medium text-foreground truncate max-w-[140px]">
+                          {c.user_name || <span className="text-muted-foreground">未入力</span>}
+                        </span>
+                        {c.user_phone && (
+                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Phone className="h-3 w-3" />{c.user_phone}
+                          </span>
+                        )}
+                        {c.user_email && (
+                          <span className="flex items-center gap-1 text-xs text-muted-foreground truncate max-w-[180px]">
+                            <Mail className="h-3 w-3" />{c.user_email}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <p className="font-medium truncate max-w-[140px]">{c.maker} {c.model}</p>
+                      {c.license_plate && <p className="text-xs text-muted-foreground font-mono">{c.license_plate}</p>}
+                    </td>
+                    <td className="px-4 py-3.5 font-medium">
+                      {c.monthlyPrice ? yen(Number(c.monthlyPrice)) : <span className="text-muted-foreground">—</span>}
+                    </td>
+                    <td className="px-4 py-3.5 text-xs text-muted-foreground whitespace-nowrap">
+                      {fmtD(c.start_date ?? c.startDate)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-4 py-2.5 border-t border-border bg-muted/30 text-xs text-muted-foreground">
+            {filtered.length}件 / 全{contracts.length}件
+          </div>
+        </div>
+      )}
     </div>
   );
 }
