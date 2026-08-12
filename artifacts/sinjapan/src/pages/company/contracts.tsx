@@ -210,6 +210,7 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
 
       {/* ════ TAB: 概要 ════ */}
       {tab === 'overview' && (
+        <div className="space-y-5">
         {/* 上段：3カード横並び */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* 契約概要 */}
@@ -269,6 +270,7 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
             </div>
           </Section>
         )}
+        </div>
       )}
 
       {/* ════ TAB: 顧客 ════ */}
