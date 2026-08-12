@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
   Loader2, Plus, Edit, Save, Upload, X, ImageIcon,
   FileSearch, Camera, FileText, ExternalLink, Car,
+  MoreHorizontal, RefreshCw, Trash2,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -81,6 +82,14 @@ export default function CompanyVehicles() {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [isSaving, setIsSaving] = useState(false);
   const set = (k: string, v: any) => setFormData(p => ({ ...p, [k]: v }));
+
+  // ── 申請系 state ──
+  const [openMenuId, setOpenMenuId]       = useState<number | null>(null);
+  const [deleteReqVehicle, setDeleteReqVehicle] = useState<any | null>(null);
+  const [statusReqVehicle, setStatusReqVehicle] = useState<any | null>(null);
+  const [reqStatus, setReqStatus]         = useState('');
+  const [reqNote,   setReqNote]           = useState('');
+  const [sending,   setSending]           = useState(false);
 
   // ── Multi-photo state ──
   const [photoPaths, setPhotoPaths] = useState<(string | null)[]>(Array(MAX_PHOTOS).fill(null));
@@ -213,6 +222,47 @@ export default function CompanyVehicles() {
     setIsModalOpen(true);
   };
 
+  // ── 申請ハンドラ ──────────────────────────────────────────────────────────
+  const sendAdminMsg = async (message: string) => {
+    const r = await fetch(API('/company/notify-admin'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok()}` },
+      body: JSON.stringify({ message }),
+    });
+    if (!r.ok) throw new Error('送信に失敗しました');
+  };
+
+  const handleDeleteRequest = async () => {
+    if (!deleteReqVehicle) return;
+    setSending(true);
+    try {
+      await sendAdminMsg(`【削除申請】${deleteReqVehicle.maker} ${deleteReqVehicle.model}（車両ID: ${deleteReqVehicle.id}）の削除を申請します。`);
+      toast({ title: '削除申請を送信しました', description: '担当者が確認後、対応いたします。' });
+      setDeleteReqVehicle(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: e.message });
+    } finally { setSending(false); }
+  };
+
+  const handleStatusRequest = async () => {
+    if (!statusReqVehicle || !reqStatus) return;
+    setSending(true);
+    try {
+      const fromLabel = STATUS_LABEL[statusReqVehicle.status] ?? statusReqVehicle.status;
+      const toLabel   = STATUS_LABEL[reqStatus] ?? reqStatus;
+      const msg = [
+        `【ステータス変更申請】${statusReqVehicle.maker} ${statusReqVehicle.model}（車両ID: ${statusReqVehicle.id}）`,
+        `現在: ${fromLabel} → 希望: ${toLabel}`,
+        reqNote ? `備考: ${reqNote}` : '',
+      ].filter(Boolean).join('\n');
+      await sendAdminMsg(msg);
+      toast({ title: 'ステータス変更申請を送信しました', description: '担当者が確認後、対応いたします。' });
+      setStatusReqVehicle(null); setReqNote(''); setReqStatus('');
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: e.message });
+    } finally { setSending(false); }
+  };
+
   const handleSave = async () => {
     if (!formData.maker || !formData.model) {
       toast({ variant: 'destructive', title: 'メーカーと車種は必須です' }); return;
@@ -317,7 +367,33 @@ export default function CompanyVehicles() {
                   </td>
                   <td className="px-4 py-4">{v.prefecture || '—'}</td>
                   <td className="px-4 py-4 text-right">
-                    <button onClick={() => handleOpenEdit(v)} className="p-1.5 text-muted-foreground hover:text-foreground"><Edit className="h-4 w-4" /></button>
+                    <div className="relative inline-block">
+                      <button
+                        onClick={() => setOpenMenuId(openMenuId === v.id ? null : v.id)}
+                        className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </button>
+                      {openMenuId === v.id && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)} />
+                          <div className="absolute right-0 top-8 z-50 bg-card border border-border rounded-lg shadow-lg w-52 py-1">
+                            <button onClick={() => { handleOpenEdit(v); setOpenMenuId(null); }}
+                              className="w-full text-left px-4 py-2 text-sm hover:bg-muted flex items-center gap-2.5">
+                              <Edit className="h-3.5 w-3.5 text-muted-foreground" />編集
+                            </button>
+                            <button onClick={() => { setStatusReqVehicle(v); setReqStatus(''); setReqNote(''); setOpenMenuId(null); }}
+                              className="w-full text-left px-4 py-2 text-sm hover:bg-muted flex items-center gap-2.5">
+                              <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />ステータス変更申請
+                            </button>
+                            <div className="border-t border-border my-1" />
+                            <button onClick={() => { setDeleteReqVehicle(v); setOpenMenuId(null); }}
+                              className="w-full text-left px-4 py-2 text-sm hover:bg-muted flex items-center gap-2.5 text-destructive">
+                              <Trash2 className="h-3.5 w-3.5" />削除申請
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -325,6 +401,81 @@ export default function CompanyVehicles() {
           </table>
         )}
       </div>
+
+      {/* ── 削除申請ダイアログ ── */}
+      <Dialog open={!!deleteReqVehicle} onOpenChange={v => { if (!v) setDeleteReqVehicle(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>削除申請</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              以下の車両の削除をSIN JAPANへ申請します。<br />
+              担当者が確認後、対応いたします。
+            </p>
+            {deleteReqVehicle && (
+              <div className="bg-muted/40 border border-border rounded-lg px-4 py-3 text-sm font-medium">
+                {deleteReqVehicle.maker} {deleteReqVehicle.model}
+                {deleteReqVehicle.licensePlate && <span className="text-muted-foreground font-normal ml-2">· {deleteReqVehicle.licensePlate}</span>}
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-3 pt-2 border-t border-border">
+            <button onClick={() => setDeleteReqVehicle(null)} className="px-4 py-2 border rounded-md text-sm font-medium hover:bg-muted">キャンセル</button>
+            <button onClick={handleDeleteRequest} disabled={sending}
+              className="px-4 py-2 bg-destructive text-white rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
+              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              削除申請を送信
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── ステータス変更申請ダイアログ ── */}
+      <Dialog open={!!statusReqVehicle} onOpenChange={v => { if (!v) { setStatusReqVehicle(null); setReqStatus(''); setReqNote(''); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>ステータス変更申請</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              希望するステータスを選択してSIN JAPANへ申請します。
+            </p>
+            {statusReqVehicle && (
+              <div className="bg-muted/40 border border-border rounded-lg px-4 py-3 text-sm">
+                <span className="font-medium">{statusReqVehicle.maker} {statusReqVehicle.model}</span>
+                <span className="ml-2 text-muted-foreground">現在：{STATUS_LABEL[statusReqVehicle.status] ?? statusReqVehicle.status}</span>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">希望ステータス <span className="text-red-500">*</span></label>
+              <select value={reqStatus} onChange={e => setReqStatus(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:border-foreground/50 bg-background">
+                <option value="">選択してください</option>
+                {Object.entries(STATUS_LABEL).map(([k, label]) => (
+                  <option key={k} value={k}>{label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">備考（任意）</label>
+              <textarea value={reqNote} onChange={e => setReqNote(e.target.value)}
+                placeholder="変更理由や補足があれば記入してください"
+                rows={3}
+                className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:border-foreground/50 bg-background resize-none font-sans" />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-2 border-t border-border">
+            <button onClick={() => { setStatusReqVehicle(null); setReqStatus(''); setReqNote(''); }}
+              className="px-4 py-2 border rounded-md text-sm font-medium hover:bg-muted">キャンセル</button>
+            <button onClick={handleStatusRequest} disabled={sending || !reqStatus}
+              className="px-4 py-2 bg-foreground text-background rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
+              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              申請を送信
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Modal ── */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
