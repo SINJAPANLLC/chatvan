@@ -27,7 +27,7 @@ function MonthlyTable({ rows, onMonthClick }: { rows: any[]; onMonthClick: (key:
   const grid = Array.from({ length: 12 }, (_, i) => {
     const key = `${year}-${String(i + 1).padStart(2, '0')}`;
     const month_rows = rows.filter(r => (r.period_month ?? '').startsWith(key));
-    const amount = month_rows.reduce((s, r) => s + Number(r.rental_company_amount ?? 0), 0);
+    const amount = month_rows.reduce((s, r) => s + Number(r.rental_company_amount ?? 0) + Number(r.black_number_fee ?? 0), 0);
     const count  = month_rows.length;
     const done   = month_rows.filter(r => r.status === 'completed').length;
     return { key, amount, count, done };
@@ -104,10 +104,9 @@ function DetailTable({ rows, initialMonth }: { rows: any[]; initialMonth: string
   useEffect(() => { if (initialMonth) setSelectedMonth(initialMonth); }, [initialMonth]);
 
   const monthRows = rows.filter(r => (r.period_month ?? '').startsWith(selectedMonth));
-  const totalAmount  = monthRows.reduce((s, r) => s + Number(r.rental_company_amount ?? 0), 0);
+  const totalPayout  = monthRows.reduce((s, r) => s + Number(r.rental_company_amount ?? 0), 0);
+  const totalBlack   = monthRows.reduce((s, r) => s + Number(r.black_number_fee ?? 0), 0);
   const totalUser    = monthRows.reduce((s, r) => s + Number(r.user_payment_amount ?? 0), 0);
-  const totalFee     = monthRows.reduce((s, r) => s + Number(r.chat_van_fee ?? 0), 0);
-  const completedCnt = monthRows.filter(r => r.status === 'completed').length;
 
   const fmtMonth = (ym: string) => { const [y, m] = ym.split('-'); return `${y}年${Number(m)}月`; };
 
@@ -168,10 +167,11 @@ function DetailTable({ rows, initialMonth }: { rows: any[]; initialMonth: string
 
       {/* サマリーカード */}
       {monthRows.length > 0 && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           {[
-            { label: '件数', value: `${monthRows.length}件` },
-            { label: '月額合計', value: yen(totalUser), bold: true },
+            { label: '件数',           value: `${monthRows.length}件` },
+            { label: '月額受取合計',   value: yen(totalPayout), bold: true },
+            { label: '黒ナンバー合計', value: yen(totalBlack) },
           ].map(c => (
             <div key={c.label} className="rounded-xl border border-border bg-card px-4 py-3">
               <div className="text-xs text-muted-foreground mb-1">{c.label}</div>
@@ -190,13 +190,14 @@ function DetailTable({ rows, initialMonth }: { rows: any[]; initialMonth: string
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">契約番号</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">車両</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">ご利用者</th>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground">月額</th>
+                <th className="px-4 py-3 text-right font-medium text-muted-foreground">月額受取</th>
+                <th className="px-4 py-3 text-right font-medium text-muted-foreground">黒ナンバー取得費</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border bg-card">
               {monthRows.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-12 text-center text-sm text-muted-foreground">
+                  <td colSpan={5} className="py-12 text-center text-sm text-muted-foreground">
                     この月の明細データはありません
                   </td>
                 </tr>
@@ -205,7 +206,10 @@ function DetailTable({ rows, initialMonth }: { rows: any[]; initialMonth: string
                   <td className="px-4 py-3.5 text-xs text-muted-foreground font-mono">{r.contract_number ?? '—'}</td>
                   <td className="px-4 py-3.5">{r.maker && r.model ? `${r.maker} ${r.model}` : '—'}</td>
                   <td className="px-4 py-3.5 text-muted-foreground">{r.user_name ?? '—'}</td>
-                  <td className="px-4 py-3.5 text-right font-semibold">{r.user_payment_amount != null ? yen(Number(r.user_payment_amount)) : '—'}</td>
+                  <td className="px-4 py-3.5 text-right font-semibold">{yen(Number(r.rental_company_amount ?? 0))}</td>
+                  <td className="px-4 py-3.5 text-right text-muted-foreground">
+                    {Number(r.black_number_fee) > 0 ? yen(Number(r.black_number_fee)) : '—'}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -213,7 +217,8 @@ function DetailTable({ rows, initialMonth }: { rows: any[]; initialMonth: string
               <tfoot>
                 <tr className="bg-foreground text-background">
                   <td colSpan={3} className="px-4 py-3.5 font-bold">合計 {monthRows.length}件</td>
-                  <td className="px-4 py-3.5 text-right font-bold">{yen(totalUser)}</td>
+                  <td className="px-4 py-3.5 text-right font-bold">{yen(totalPayout)}</td>
+                  <td className="px-4 py-3.5 text-right font-bold">{totalBlack > 0 ? yen(totalBlack) : '—'}</td>
                 </tr>
               </tfoot>
             )}
