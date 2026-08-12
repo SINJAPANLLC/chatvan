@@ -1774,6 +1774,13 @@ router.post("/van/contracts/:id/pay", requireAuth, async (req: Request, res: Res
         .where(eq(vanApplicationsTable.id, contract.applicationId));
     }
 
+    // 車両を rented に（提案一覧から除外するため）
+    if (contract.vehicleId) {
+      await db.update(vehiclesTable)
+        .set({ status: "rented", updatedAt: new Date() })
+        .where(eq(vehiclesTable.id, contract.vehicleId));
+    }
+
     // ユーザー通知
     await db.insert(notificationsTable).values({
       userId: contract.userId,
