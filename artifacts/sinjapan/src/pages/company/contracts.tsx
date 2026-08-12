@@ -108,7 +108,7 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
   const [relLoading, setRelLoading] = useState(false);
   const [confirming, setConfirming] = useState<string | null>(null);
 
-  const RELATED_TABS: DetailTab[] = ['contract', 'payment', 'gps', 'incident'];
+  const RELATED_TABS: DetailTab[] = ['customer', 'contract', 'payment', 'gps', 'incident'];
   const appId = contract.application_id;
 
   const loadRelated = async () => {
@@ -281,6 +281,67 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
               <DL label="メールアドレス" value={contract.user_email ? <a href={`mailto:${contract.user_email}`} className="break-all hover:underline">{contract.user_email}</a> : null} span2 />
             </dl>
           </Section>
+
+          {relLoading ? (
+            <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : related?.identityVerification ? (() => {
+            const kyc = related.identityVerification;
+            const statusMap: Record<string, { label: string; cls: string }> = {
+              verified:    { label: '確認済み',   cls: 'bg-green-50 text-green-700 border-green-200' },
+              approved:    { label: '承認済み',   cls: 'bg-green-50 text-green-700 border-green-200' },
+              rejected:    { label: '否認',       cls: 'bg-red-50 text-red-700 border-red-200'       },
+              pending:     { label: '審査中',     cls: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
+              not_started: { label: '未提出',     cls: 'bg-gray-100 text-gray-600 border-gray-200'  },
+            };
+            const s = statusMap[kyc.status] ?? { label: kyc.status, cls: 'bg-gray-100 text-gray-600 border-gray-200' };
+            return (
+              <Section title="eKYC（本人確認）">
+                <dl className="grid grid-cols-2 gap-4 mb-4">
+                  <DL label="確認ステータス" value={
+                    <span className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${s.cls}`}>{s.label}</span>
+                  } />
+                  <DL label="確認日時"     value={fmtDT(kyc.verified_at)} />
+                  <DL label="氏名（免許）" value={kyc.full_name} />
+                  <DL label="生年月日"     value={kyc.birth_date} />
+                  <DL label="免許種別"     value={kyc.license_type} />
+                  <DL label="免許番号"     value={kyc.license_number} />
+                  <DL label="免許有効期限" value={fmtD(kyc.license_expiry)} />
+                  <DL label="住所"         value={kyc.address} span2 />
+                  {kyc.rejection_reason && <DL label="否認理由" value={kyc.rejection_reason} span2 />}
+                </dl>
+                {(kyc.license_front || kyc.license_back || kyc.selfie_photo) && (
+                  <div className="border-t border-border pt-4">
+                    <p className="text-xs text-muted-foreground mb-2">提出書類・写真</p>
+                    <div className="flex flex-wrap gap-3">
+                      {kyc.license_front && (
+                        <div className="text-center">
+                          <img src={`${import.meta.env.BASE_URL}api/storage${kyc.license_front}`} alt="免許証（表）"
+                            className="h-28 w-auto rounded-lg border border-border object-cover" />
+                          <p className="text-xs text-muted-foreground mt-1">免許証（表）</p>
+                        </div>
+                      )}
+                      {kyc.license_back && (
+                        <div className="text-center">
+                          <img src={`${import.meta.env.BASE_URL}api/storage${kyc.license_back}`} alt="免許証（裏）"
+                            className="h-28 w-auto rounded-lg border border-border object-cover" />
+                          <p className="text-xs text-muted-foreground mt-1">免許証（裏）</p>
+                        </div>
+                      )}
+                      {kyc.selfie_photo && (
+                        <div className="text-center">
+                          <img src={`${import.meta.env.BASE_URL}api/storage${kyc.selfie_photo}`} alt="顔写真"
+                            className="h-28 w-auto rounded-lg border border-border object-cover" />
+                          <p className="text-xs text-muted-foreground mt-1">顔写真</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </Section>
+            );
+          })() : (
+            <div className="bg-card border border-border rounded-xl p-10 text-center text-muted-foreground text-sm">本人確認書類はありません</div>
+          )}
         </div>
       )}
 

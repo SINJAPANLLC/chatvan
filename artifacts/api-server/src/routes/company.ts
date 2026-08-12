@@ -192,8 +192,7 @@ router.get("/company/contracts", requireAuth, requireRentalCompany, async (req: 
       ? await db.execute(sql`
           SELECT vc.*, u.name as user_name, u.phone as user_phone, u.email as user_email,
             v.maker, v.model, v.license_plate, v.prefecture,
-            va.id as application_id, va.status as application_status,
-            va.black_number_requested, va.insurance_referral_requested
+            va.id as application_id, va.status as application_status
           FROM van_contracts vc
           LEFT JOIN users u ON vc.user_id = u.id
           LEFT JOIN vehicles v ON vc.vehicle_id = v.id
@@ -204,8 +203,7 @@ router.get("/company/contracts", requireAuth, requireRentalCompany, async (req: 
       : await db.execute(sql`
           SELECT vc.*, u.name as user_name, u.phone as user_phone, u.email as user_email,
             v.maker, v.model, v.license_plate, v.prefecture,
-            va.id as application_id, va.status as application_status,
-            va.black_number_requested, va.insurance_referral_requested
+            va.id as application_id, va.status as application_status
           FROM van_contracts vc
           LEFT JOIN users u ON vc.user_id = u.id
           LEFT JOIN vehicles v ON vc.vehicle_id = v.id
