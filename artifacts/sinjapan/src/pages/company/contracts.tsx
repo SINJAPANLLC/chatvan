@@ -210,69 +210,65 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
 
       {/* ════ TAB: 概要 ════ */}
       {tab === 'overview' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:items-stretch">
-          <div className="lg:col-span-2 space-y-5">
-            <Section title="契約概要">
-              <dl className="grid grid-cols-2 gap-4">
-                <DL label="ステータス" value={
-                  <span className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${statusCls(contract.status)}`}>{statusLabel(contract.status)}</span>
-                } />
-                <DL label="月額料金" value={(contract.monthly_price ?? contract.monthlyPrice) ? yen(Number(contract.monthly_price ?? contract.monthlyPrice)) : null} />
-                <DL label="利用開始日" value={fmtD(contract.start_date ?? contract.startDate)} />
-                <DL label="支払日" value="末締め翌月末払い" />
-              </dl>
-            </Section>
+        {/* 上段：3カード横並び */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {/* 契約概要 */}
+          <Section title="契約概要">
+            <dl className="grid grid-cols-2 gap-4">
+              <DL label="ステータス" value={
+                <span className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${statusCls(contract.status)}`}>{statusLabel(contract.status)}</span>
+              } />
+              <DL label="月額料金" value={(contract.monthly_price ?? contract.monthlyPrice) ? yen(Number(contract.monthly_price ?? contract.monthlyPrice)) : null} />
+              <DL label="利用開始日" value={fmtD(contract.start_date ?? contract.startDate)} />
+              <DL label="支払日" value="末締め翌月末払い" />
+            </dl>
+          </Section>
 
-            {(contract.pickup_address || contract.pickup_datetime) && (
-              <Section title="受け取り日時・場所">
-                <dl className="grid grid-cols-2 gap-4">
-                  <DL label="受け取り日時" value={fmtDT(contract.pickup_datetime)} />
-                  <DL label="受け取り場所"  value={contract.pickup_address} span2 />
-                </dl>
-              </Section>
-            )}
-
-            {related && (rc?.black_number_requested || rc?.insurance_referral_requested) && (
-              <Section title="オプション申請">
-                <div className="flex flex-wrap gap-2">
-                  {rc?.black_number_requested && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-foreground text-background text-xs font-medium rounded-full">
-                      <BadgeCheck className="h-3.5 w-3.5" />黒ナンバー取得申請あり
-                    </span>
-                  )}
-                  {rc?.insurance_referral_requested && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-foreground text-background text-xs font-medium rounded-full">
-                      <Shield className="h-3.5 w-3.5" />保険紹介申請あり
-                    </span>
-                  )}
-                </div>
-              </Section>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-5">
-            <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden flex-1">
-              <div className="px-5 py-3.5 border-b border-border bg-muted/30">
-                <h3 className="text-sm font-semibold">顧客サマリ</h3>
-              </div>
-              <div className="p-5 space-y-2.5 text-sm">
-                <div className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground shrink-0" /><span>{contract.user_name ?? '未入力'}</span></div>
-                {contract.user_phone && <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground shrink-0" /><a href={`tel:${contract.user_phone}`} className="hover:underline">{contract.user_phone}</a></div>}
-                {contract.user_email && <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground shrink-0" /><a href={`mailto:${contract.user_email}`} className="break-all hover:underline">{contract.user_email}</a></div>}
-              </div>
+          {/* 顧客サマリ */}
+          <Section title="顧客サマリ">
+            <div className="space-y-2.5 text-sm">
+              <div className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground shrink-0" /><span>{contract.user_name ?? '未入力'}</span></div>
+              {contract.user_phone && <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground shrink-0" /><a href={`tel:${contract.user_phone}`} className="hover:underline">{contract.user_phone}</a></div>}
+              {contract.user_email && <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground shrink-0" /><a href={`mailto:${contract.user_email}`} className="break-all hover:underline">{contract.user_email}</a></div>}
             </div>
-            <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden flex-1">
-              <div className="px-5 py-3.5 border-b border-border bg-muted/30">
-                <h3 className="text-sm font-semibold">車両サマリ</h3>
-              </div>
-              <div className="p-5 space-y-2.5 text-sm">
-                <div className="flex items-center gap-2"><Car className="h-4 w-4 text-muted-foreground shrink-0" /><span className="font-medium">{contract.maker} {contract.model}</span></div>
-                {contract.prefecture && <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-muted-foreground shrink-0" /><span>{contract.prefecture}</span></div>}
-                {contract.license_plate && <div className="flex items-center gap-2"><FileText className="h-4 w-4 text-muted-foreground shrink-0" /><span className="font-mono text-xs">{contract.license_plate}</span></div>}
-              </div>
+          </Section>
+
+          {/* 車両サマリ */}
+          <Section title="車両サマリ">
+            <div className="space-y-2.5 text-sm">
+              <div className="flex items-center gap-2"><Car className="h-4 w-4 text-muted-foreground shrink-0" /><span className="font-medium">{contract.maker} {contract.model}</span></div>
+              {contract.prefecture && <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-muted-foreground shrink-0" /><span>{contract.prefecture}</span></div>}
+              {contract.license_plate && <div className="flex items-center gap-2"><FileText className="h-4 w-4 text-muted-foreground shrink-0" /><span className="font-mono text-xs">{contract.license_plate}</span></div>}
             </div>
-          </div>
+          </Section>
         </div>
+
+        {/* 下段：受け取り・オプション */}
+        {(contract.pickup_address || contract.pickup_datetime) && (
+          <Section title="受け取り日時・場所">
+            <dl className="grid grid-cols-2 gap-4">
+              <DL label="受け取り日時" value={fmtDT(contract.pickup_datetime)} />
+              <DL label="受け取り場所"  value={contract.pickup_address} span2 />
+            </dl>
+          </Section>
+        )}
+
+        {related && (rc?.black_number_requested || rc?.insurance_referral_requested) && (
+          <Section title="オプション申請">
+            <div className="flex flex-wrap gap-2">
+              {rc?.black_number_requested && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-foreground text-background text-xs font-medium rounded-full">
+                  <BadgeCheck className="h-3.5 w-3.5" />黒ナンバー取得申請あり
+                </span>
+              )}
+              {rc?.insurance_referral_requested && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-foreground text-background text-xs font-medium rounded-full">
+                  <Shield className="h-3.5 w-3.5" />保険紹介申請あり
+                </span>
+              )}
+            </div>
+          </Section>
+        )}
       )}
 
       {/* ════ TAB: 顧客 ════ */}
