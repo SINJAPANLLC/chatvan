@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Loader2, Upload, X, Camera, ChevronRight } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Loader2, Upload, X, Camera, ChevronRight, SwitchCamera } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const apiUrl = (p: string) => `${import.meta.env.BASE_URL}api${p}`;
@@ -7,16 +7,119 @@ const token = () => localStorage.getItem('sinjapan_auth_token') ?? '';
 
 interface UploadedImage { path: string; preview: string }
 
+// ── カメラモーダル ────────────────────────────────────────────────────────────
+function CameraModal({ facing, onCapture, onClose }: {
+  facing: 'user' | 'environment';
+  onCapture: (file: File) => void;
+  onClose: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState('');
+
+  const startCamera = useCallback(async (facingMode: 'user' | 'environment') => {
+    // 既存のストリームを停止
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    setReady(false);
+    setError('');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: facingMode } },
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play();
+          setReady(true);
+        };
+      }
+    } catch {
+      setError('カメラにアクセスできませんでした。\nブラウザの設定でカメラの使用を許可してください。');
+    }
+  }, []);
+
+  useEffect(() => {
+    startCamera(facing);
+    return () => { streamRef.current?.getTracks().forEach(t => t.stop()); };
+  }, [facing, startCamera]);
+
+  const handleCapture = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d')?.drawImage(video, 0, 0);
+    canvas.toBlob(blob => {
+      if (blob) {
+        const file = new File([blob], `capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
+        onCapture(file);
+        onClose();
+      }
+    }, 'image/jpeg', 0.92);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={onClose}>
+      <div className="relative w-full max-w-sm mx-4 rounded-2xl overflow-hidden bg-black" onClick={e => e.stopPropagation()}>
+        {/* 閉じるボタン */}
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute top-3 right-3 z-10 bg-black/50 text-white rounded-full p-1.5"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        {/* 映像エリア */}
+        <div className="relative bg-black" style={{ aspectRatio: '3/4' }}>
+          <video
+            ref={videoRef}
+            playsInline
+            muted
+            className="w-full h-full object-cover"
+            style={{ transform: facing === 'user' ? 'scaleX(-1)' : 'none' }}
+          />
+          {!ready && !error && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-white" />
+            </div>
+          )}
+          {error && (
+            <div className="absolute inset-0 flex items-center justify-center p-6">
+              <p className="text-white text-sm text-center whitespace-pre-line">{error}</p>
+            </div>
+          )}
+        </div>
+
+        {/* 撮影ボタン */}
+        <div className="flex items-center justify-center gap-4 py-5 bg-black">
+          <button
+            type="button"
+            disabled={!ready}
+            onClick={handleCapture}
+            className="w-16 h-16 rounded-full bg-white disabled:opacity-40 flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+          >
+            <Camera className="h-7 w-7 text-black" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── 画像アップローダー ────────────────────────────────────────────────────────
 function ImageUploader({ label, value, onChange, facing, cameraOnly }: {
   label: string;
   value: UploadedImage | null;
   onChange: (v: UploadedImage | null) => void;
-  /** 'user' = インカメラ（セルフィー）, 'environment' = アウトカメラ（書類撮影）, undefined = カメラボタンなし */
   facing?: 'user' | 'environment';
-  /** true のときカメラ撮影のみ（ファイル選択なし） */
   cameraOnly?: boolean;
 }) {
   const [uploading, setUploading] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleFile = async (file: File) => {
@@ -49,47 +152,59 @@ function ImageUploader({ label, value, onChange, facing, cameraOnly }: {
     <div>
       <p className="text-xs font-medium text-muted-foreground mb-1.5">{label}</p>
 
-      {/* プレビュー表示 */}
+      {/* カメラモーダル */}
+      {showCamera && facing && (
+        <CameraModal
+          facing={facing}
+          onCapture={handleFile}
+          onClose={() => setShowCamera(false)}
+        />
+      )}
+
       {value ? (
+        /* プレビュー */
         <div className="relative border-2 border-foreground border-dashed rounded-xl flex flex-col items-center justify-center p-3 bg-muted/40" style={{ minHeight: 90 }}>
-          {uploading ? (
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          ) : (
-            <>
-              <img src={value.preview} alt={label} className="max-h-20 object-contain rounded" />
-              <button
-                type="button"
-                className="absolute top-1 right-1 bg-background border border-border rounded-full p-0.5"
-                onClick={() => onChange(null)}
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </>
-          )}
+          {uploading
+            ? <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            : <>
+                <img src={value.preview} alt={label} className="max-h-20 object-contain rounded" />
+                <button type="button" className="absolute top-1 right-1 bg-background border border-border rounded-full p-0.5" onClick={() => onChange(null)}>
+                  <X className="h-3 w-3" />
+                </button>
+              </>
+          }
         </div>
       ) : facing && cameraOnly ? (
-        /* カメラのみ：label で input を直接紐付け */
-        <label className={`w-full flex flex-col items-center justify-center gap-1 border-2 border-dashed border-border rounded-xl py-4 text-xs text-muted-foreground hover:bg-muted transition-colors cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+        /* カメラのみ */
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={() => setShowCamera(true)}
+          className="w-full flex flex-col items-center justify-center gap-1 border-2 border-dashed border-border rounded-xl py-4 text-xs text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+        >
           {uploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Camera className="h-6 w-6" />}
           <span>カメラで撮影</span>
-          <input type="file" accept="image/*" capture={facing} className="hidden" onChange={onFileChange} />
-        </label>
+        </button>
       ) : facing ? (
-        /* カメラあり：2ボタンレイアウト */
+        /* カメラ + ファイル選択 */
         <div className="grid grid-cols-2 gap-2">
-          <label className={`flex flex-col items-center justify-center gap-1 border-2 border-dashed border-border rounded-xl py-3 text-xs text-muted-foreground hover:bg-muted transition-colors cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={() => setShowCamera(true)}
+            className="flex flex-col items-center justify-center gap-1 border-2 border-dashed border-border rounded-xl py-3 text-xs text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+          >
             {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
             <span>カメラ撮影</span>
-            <input type="file" accept="image/*" capture={facing} className="hidden" onChange={onFileChange} />
-          </label>
+          </button>
           <label className={`flex flex-col items-center justify-center gap-1 border-2 border-dashed border-border rounded-xl py-3 text-xs text-muted-foreground hover:bg-muted transition-colors cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
             {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
             <span>ファイル選択</span>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFileChange} />
+            <input type="file" accept="image/*" className="hidden" onChange={onFileChange} />
           </label>
         </div>
       ) : (
-        /* カメラなし：従来の1ボタン */
+        /* ファイル選択のみ */
         <div
           className="border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center p-3 cursor-pointer hover:bg-muted transition-colors"
           style={{ minHeight: 90 }}
@@ -102,14 +217,12 @@ function ImageUploader({ label, value, onChange, facing, cameraOnly }: {
         </div>
       )}
 
-      {/* ファイル選択（カメラなしの単体ボタン用） */}
-      {!facing && (
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFileChange} />
-      )}
+      {!facing && <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFileChange} />}
     </div>
   );
 }
 
+// ── メインフォーム ────────────────────────────────────────────────────────────
 interface Props {
   applicationId: number;
   rejectionReason?: string;
