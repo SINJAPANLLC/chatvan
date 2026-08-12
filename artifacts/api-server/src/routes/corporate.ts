@@ -15,6 +15,7 @@ router.get("/corporate/status", requireAuth, async (req, res): Promise<void> => 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!)).limit(1);
   if (!user) { res.status(404).json({ error: "ユーザーが見つかりません" }); return; }
 
+  res.set("Cache-Control", "no-store");
   res.json({
     isCompany: user.isCompany,
     corporateNumber: user.corporateNumber,
