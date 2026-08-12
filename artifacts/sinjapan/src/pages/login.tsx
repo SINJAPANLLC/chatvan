@@ -26,6 +26,7 @@ export default function Login() {
   React.useEffect(() => {
     if (!isLoading && user) {
       if (user.role === 'admin') setLocation('/admin');
+      else if (user.role === 'rental_company') setLocation('/company');
       else setLocation('/');
     }
   }, [user, isLoading, setLocation]);
@@ -43,6 +44,7 @@ export default function Login() {
         localStorage.setItem('sinjapan_auth_token', (res as any).token);
       }
       if (res.user.role === 'admin') setLocation('/admin');
+      else if (res.user.role === 'rental_company') setLocation('/company');
       else setLocation('/');
     } catch (err) {
       toast({
