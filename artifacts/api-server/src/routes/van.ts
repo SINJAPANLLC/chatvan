@@ -97,7 +97,7 @@ ${selfieB64 ? "3枚目: 本人セルフィー（免許証の顔写真と照合�
     if (selfieB64) userContent.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${selfieB64}`, detail: "high" } });
 
     // eKYCプロンプトをDB優先で取得
-    let ekycSystemPrompt = `あなたは日本の運転免許証と顔写真を審査するeKYCシステムです。\n提出データ・免許証画像・セルフィーを総合的に照合し、以下のJSONのみ返してください:\n{"result": "verified" | "rejected", "reason": "理由（日本語、30文字以内）"}`;
+    let ekycSystemPrompt = `あなたは日本の運転免許証を審査するeKYCシステムです。\n以下のJSONのみ返してください:\n{"result": "verified" | "rejected", "reason": "理由（日本語、30文字以内）"}\n\n【審査方針】\n以下のいずれかに該当する場合のみ rejected にすること。それ以外は必ず verified にすること。\n- 有効期限が本日より過去（明らかに期限切れ）\n- 免許証画像が免許証以外のもの（例：白紙・全くの別物）\n- 年齢が18歳未満\n- 氏名が明らかに無意味な文字列（例：aaaaa、テスト）\n\n【重要】\n- 顔写真の照合はしないこと。カメラの画質・角度・明るさにより異なって見えることがあるため、顔の一致・不一致を理由にした rejected は禁止。\n- 免許証の文字が読み取りにくい場合も verified にすること。\n- 少しでも本物らしい免許証であれば verified にすること。`;
     try {
       const [row] = await db.select().from(settingsTable).where(eq(settingsTable.key, "ai_ekyc_prompt")).limit(1);
       if (row?.value) ekycSystemPrompt = row.value;
