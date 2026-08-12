@@ -114,6 +114,12 @@ export default function Login() {
               新規登録
             </Link>
           </div>
+          <div>
+            レンタル会社様の新規登録は{' '}
+            <Link href="/company/register" className="font-medium text-primary hover:underline">
+              こちら
+            </Link>
+          </div>
         </div>
       </div>
     </div>
