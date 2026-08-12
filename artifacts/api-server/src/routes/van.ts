@@ -2051,6 +2051,10 @@ router.get("/van/applications/:id/related", requireAuth, requireAdmin, async (re
           v.photos as vehicle_photos, v.vin, v.grade, v.smoking_policy,
           v.insurance_company, v.insurance_expiry, v.compulsory_insurance_expiry,
           v.mileage_limit, v.excess_mileage_fee,
+          v.color, v.engine_displacement, v.fuel_type, v.transmission,
+          v.black_number_status, v.max_period_months,
+          v.shaken_cert_path, v.kensakusho_cert_path,
+          v.jibaiseki_cert_path, v.ninni_hoken_cert_path,
           rc.name as rental_company_name, rc.phone as rental_company_phone
         FROM van_contracts vc
         LEFT JOIN vehicles v ON vc.vehicle_id = v.id

@@ -108,7 +108,7 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
   const [relLoading, setRelLoading] = useState(false);
   const [confirming, setConfirming] = useState<string | null>(null);
 
-  const RELATED_TABS: DetailTab[] = ['customer', 'contract', 'payment', 'gps', 'incident'];
+  const RELATED_TABS: DetailTab[] = ['customer', 'vehicle', 'contract', 'payment', 'gps', 'incident'];
   const appId = contract.application_id;
 
   const loadRelated = async () => {
@@ -353,49 +353,81 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
       )}
 
       {/* ════ TAB: 車両 ════ */}
-      {tab === 'vehicle' && (
-        <div className="space-y-5">
-          <Section title="車両情報">
-            {/* 写真 */}
-            {vPhotos.length > 0 && (
-              <div className="flex gap-1 overflow-x-auto bg-muted/30 rounded-lg p-2 mb-5 -mx-1">
-                {vPhotos.map((p, i) => (
-                  <img key={i} src={`${import.meta.env.BASE_URL}api/storage${p}`} alt={`車両写真${i+1}`}
-                    className="h-36 w-auto rounded-lg object-cover shrink-0 border border-border" />
+      {tab === 'vehicle' && (() => {
+        const v = related?.contracts?.[0] ?? contract;
+        const photos: string[] = (() => { try { const p = JSON.parse(v.vehicle_photos ?? contract.vehicle_photos ?? '[]'); return Array.isArray(p) ? p : []; } catch { return []; } })();
+        const BLACK_NUM_STATUS: Record<string, string> = { applied: '申請中', approved: '取得済み', not_applied: '未申請' };
+        const CERT_DOCS = [
+          { label: '車検証',     key: 'shaken_cert_path'      },
+          { label: '検査証記録', key: 'kensakusho_cert_path'  },
+          { label: '自賠責',     key: 'jibaiseki_cert_path'   },
+          { label: '任意保険',   key: 'ninni_hoken_cert_path' },
+        ];
+        return (
+          <div className="space-y-5">
+            {relLoading && !related && (
+              <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            )}
+            <Section title="車両情報">
+              {photos.length > 0 && (
+                <div className="flex gap-1 overflow-x-auto bg-muted/30 rounded-lg p-2 mb-5 -mx-1">
+                  {photos.map((p: string, i: number) => (
+                    <img key={i} src={`${import.meta.env.BASE_URL}api/storage${p}`} alt={`車両写真${i+1}`}
+                      className="h-36 w-auto rounded-lg object-cover shrink-0 border border-border" />
+                  ))}
+                </div>
+              )}
+              <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <DL label="メーカー・車種"  value={`${v.maker ?? ''} ${v.model ?? ''}`.trim() || null} />
+                <DL label="グレード"        value={v.grade} />
+                <DL label="年式"            value={v.year ? `${v.year}年式` : null} />
+                <DL label="ナンバー"        value={<span className="font-mono">{v.license_plate}</span>} />
+                <DL label="都道府県"        value={v.prefecture} />
+                <DL label="車台番号"        value={v.vin} />
+                <DL label="車体色"          value={v.color} />
+                <DL label="排気量"          value={v.engine_displacement} />
+                <DL label="燃料"            value={v.fuel_type} />
+                <DL label="ミッション"      value={v.transmission} />
+                <DL label="走行距離"        value={v.mileage ? `${Number(v.mileage).toLocaleString()} km` : null} />
+                <DL label="車検満了"        value={fmtD(v.inspection_expiry)} />
+                <DL label="走行上限"        value={v.mileage_limit ? `${Number(v.mileage_limit).toLocaleString()} km/月` : null} />
+                <DL label="超過料金"        value={v.excess_mileage_fee ? `${yen(Number(v.excess_mileage_fee))}/km` : null} />
+                <DL label="最大契約期間"    value={v.max_period_months ? `${v.max_period_months}ヶ月` : null} />
+                <DL label="喫煙"            value={v.smoking_policy === 'no_smoking' ? '禁煙' : v.smoking_policy === 'smoking_ok' ? '喫煙可' : v.smoking_policy} />
+                <DL label="黒ナンバー状況"  value={v.black_number_status ? (BLACK_NUM_STATUS[v.black_number_status] ?? v.black_number_status) : null} />
+              </dl>
+              <div className="flex gap-2 mt-3">
+                {[['ETC', v.has_etc], ['ドラレコ', v.has_dashcam], ['バックカメラ', v.has_backup_cam]].map(([lbl, val]) => (
+                  <span key={lbl as string} className={`text-xs px-2.5 py-1 rounded-full border ${val ? 'border-border bg-muted' : 'border-border text-muted-foreground line-through'}`}>{lbl}</span>
                 ))}
               </div>
-            )}
-            <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <DL label="メーカー・車種"  value={`${contract.maker ?? ''} ${contract.model ?? ''}`} />
-              <DL label="年式"           value={contract.year ? `${contract.year}年式` : null} />
-              <DL label="ナンバー"       value={<span className="font-mono">{contract.license_plate ?? contract.licensePlate}</span>} />
-              <DL label="都道府県"       value={contract.prefecture} />
-              <DL label="走行距離"       value={contract.mileage ? `${Number(contract.mileage).toLocaleString()} km` : null} />
-              <DL label="車検満了"       value={fmtD(contract.inspection_expiry)} />
-              <DL label="走行上限"       value={contract.mileage_limit ? `${Number(contract.mileage_limit).toLocaleString()} km/月` : null} />
-              <DL label="超過料金"       value={contract.excess_mileage_fee ? `${yen(Number(contract.excess_mileage_fee))}/km` : null} />
-              <DL label="喫煙"           value={contract.smoking_policy === 'no_smoking' ? '禁煙' : contract.smoking_policy === 'smoking_ok' ? '喫煙可' : contract.smoking_policy} />
-            </dl>
-            <div className="flex gap-2 mt-3">
-              {[['ETC', contract.has_etc ?? contract.hasEtc], ['ドラレコ', contract.has_dashcam ?? contract.hasDashcam], ['バックカメラ', contract.has_backup_cam ?? contract.hasBackupCam]].map(([lbl, val]) => (
-                <span key={lbl as string} className={`text-xs px-2.5 py-1 rounded-full border ${val ? 'border-border bg-muted' : 'border-border text-muted-foreground line-through'}`}>{lbl}</span>
-              ))}
-            </div>
-          </Section>
-
-          {(contract.insurance_company || contract.insuranceCompany) && (
-            <Section title="保険情報">
-              <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                <DL label="保険会社"     value={contract.insurance_company ?? contract.insuranceCompany} />
-                <DL label="証券番号"     value={contract.insurance_policy_number ?? contract.insurancePolicyNumber} />
-                <DL label="保険連絡先"   value={contract.insurance_contact ?? contract.insuranceContact} />
-                <DL label="任意保険満了" value={fmtD(contract.insurance_expiry ?? contract.insuranceExpiry)} />
-                <DL label="自賠責満了"   value={fmtD(contract.compulsory_insurance_expiry ?? contract.compulsoryInsuranceExpiry)} />
-              </dl>
             </Section>
-          )}
-        </div>
-      )}
+
+            {(v.insurance_company || contract.insurance_company) && (
+              <Section title="保険情報">
+                <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  <DL label="任意保険満了" value={fmtD(v.insurance_expiry ?? contract.insurance_expiry)} />
+                  <DL label="自賠責満了"   value={fmtD(v.compulsory_insurance_expiry ?? contract.compulsory_insurance_expiry)} />
+                </dl>
+              </Section>
+            )}
+
+            {CERT_DOCS.some(d => v[d.key]) && (
+              <Section title="書類ファイル">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {CERT_DOCS.map(({ label, key }) => v[key] ? (
+                    <a key={key} href={`${import.meta.env.BASE_URL}api/storage${v[key]}`} target="_blank" rel="noopener noreferrer"
+                      className="flex flex-col items-center gap-2 p-4 border border-border rounded-xl hover:bg-muted transition-colors text-center">
+                      <FileText className="h-6 w-6 text-muted-foreground" />
+                      <span className="text-xs font-medium">{label}</span>
+                    </a>
+                  ) : null)}
+                </div>
+              </Section>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ════ TAB: 契約 ════ */}
       {tab === 'contract' && (
