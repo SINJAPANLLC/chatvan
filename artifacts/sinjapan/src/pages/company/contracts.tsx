@@ -352,6 +352,9 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
       {tab === 'vehicle' && (() => {
         const v = related?.contracts?.[0] ?? contract;
         const photos: string[] = (() => { try { const p = JSON.parse(v.vehicle_photos ?? contract.vehicle_photos ?? '[]'); return Array.isArray(p) ? p : []; } catch { return []; } })();
+        const vehiclePhotoUrl = (p: string) => p.startsWith('/objects/')
+          ? `${import.meta.env.BASE_URL}api/storage/user-objects/${p.replace(/^\/objects\//, '')}`
+          : `${import.meta.env.BASE_URL}api/storage${p}`;
         const BLACK_NUM_STATUS: Record<string, string> = { applied: '申請中', approved: '取得済み', not_applied: '未申請' };
         const CERT_DOCS = [
           { label: '車検証',     key: 'shaken_cert_path'      },
@@ -368,7 +371,7 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
               {photos.length > 0 && (
                 <div className="flex gap-1 overflow-x-auto bg-muted/30 rounded-lg p-2 mb-5 -mx-1">
                   {photos.map((p: string, i: number) => (
-                    <img key={i} src={`${import.meta.env.BASE_URL}api/storage${p}`} alt={`車両写真${i+1}`}
+                    <img key={i} src={vehiclePhotoUrl(p)} alt={`車両写真${i+1}`}
                       className="h-36 w-auto rounded-lg object-cover shrink-0 border border-border" />
                   ))}
                 </div>
