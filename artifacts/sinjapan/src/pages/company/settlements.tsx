@@ -140,7 +140,22 @@ function DetailTable({ rows, initialMonth }: { rows: any[]; initialMonth: string
   const yenPdf = (n: number) => `¥${new Intl.NumberFormat('ja-JP').format(Math.round(n))}`;
 
   const handlePrint = () => {
-    const bankInfo  = companyInfo?.bank_information || companyInfo?.payment_info || '';
+    const bankInfo  = (() => {
+      try {
+        const raw = companyInfo?.bank_information;
+        if (!raw) return companyInfo?.payment_info || '';
+        const b = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        return [
+          b.bankName    ? `銀行名：${b.bankName}`     : '',
+          b.bankBranch  ? `支店名：${b.bankBranch}`   : '',
+          b.bankType    ? `口座種別：${b.bankType}`   : '',
+          b.bankAccount ? `口座番号：${b.bankAccount}` : '',
+          b.bankHolder  ? `口座名義：${b.bankHolder}` : '',
+        ].filter(Boolean).join('\n');
+      } catch {
+        return companyInfo?.bank_information || companyInfo?.payment_info || '';
+      }
+    })();
     const rcName    = companyInfo?.company_name || companyInfo?.name || '—';
     const rcAddress = companyInfo?.address || '';
     const rcPhone   = companyInfo?.company_phone || companyInfo?.phone || '';
