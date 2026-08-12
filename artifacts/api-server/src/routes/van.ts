@@ -1752,6 +1752,15 @@ router.post("/van/contracts/:id/pay", requireAuth, async (req: Request, res: Res
     const [contract] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.id, id));
     if (!contract) return res.status(404).json({ error: "Contract not found" });
 
+    // invoice 払いは法人口座申請済み（pending or approved）のみ許可
+    if (method === "invoice") {
+      const [user] = await db.select({ creditStatus: usersTable.creditStatus })
+        .from(usersTable).where(eq(usersTable.id, req.session.userId!)).limit(1);
+      if (!user || (user.creditStatus !== "pending" && user.creditStatus !== "approved")) {
+        return res.status(400).json({ error: "法人口座の申請が必要です。先に法人情報を入力してください。" });
+      }
+    }
+
     // 契約をアクティブに・申込は「受け取り待ち」に・支払方法を記録
     await db.execute(sql`UPDATE van_contracts SET status = 'active', payment_method = ${method ?? 'card'}, updated_at = NOW() WHERE id = ${id}`);
 
