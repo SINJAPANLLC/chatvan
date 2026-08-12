@@ -1890,6 +1890,23 @@ router.post("/van/applications/:id/confirm-pickup", requireAuth, async (req: Req
       });
     }
 
+    // 協力会社へ通知（自社車両の貸出開始）
+    if (contract?.vehicleId) {
+      const vehRaw = await db.execute(sql`SELECT rental_company_id FROM vehicles WHERE id = ${contract.vehicleId} LIMIT 1`);
+      const rcId = ((vehRaw as any).rows ?? vehRaw)[0]?.rental_company_id;
+      if (rcId) {
+        const rcUsersRaw = await db.execute(sql`SELECT id FROM users WHERE rental_company_id = ${rcId}`);
+        const rcUsers = (rcUsersRaw as any)?.rows ?? (Array.isArray(rcUsersRaw) ? rcUsersRaw : []);
+        for (const u of rcUsers) {
+          await db.insert(notificationsTable).values({
+            userId: (u as any).id,
+            title: "車両の貸出が開始されました",
+            message: `契約番号 ${contract.contractNumber ?? `#${contract.id}`} の車両受け取りが完了し、貸出が開始されました。`,
+          });
+        }
+      }
+    }
+
     return res.json({ ok: true });
   } catch (err) {
     console.error("confirm-pickup error:", err);
@@ -1948,6 +1965,25 @@ router.post("/van/applications/:id/request-return", requireAuth, async (req: Req
         title: "Chat VAN - 解約申請",
         message: `申込ID: ${appId} から解約申請が届きました。${reason ? `理由: ${reason}` : ""}`,
       });
+    }
+
+    // 協力会社へ通知（解約申請）
+    const contractForRc = await db.execute(sql`
+      SELECT vc.id, vc.contract_number, v.rental_company_id
+      FROM van_contracts vc JOIN vehicles v ON v.id = vc.vehicle_id
+      WHERE vc.application_id = ${appId} LIMIT 1
+    `);
+    const rcContractRow = ((contractForRc as any).rows ?? contractForRc)[0];
+    if (rcContractRow?.rental_company_id) {
+      const rcUsersRaw2 = await db.execute(sql`SELECT id FROM users WHERE rental_company_id = ${rcContractRow.rental_company_id}`);
+      const rcUsers2 = (rcUsersRaw2 as any)?.rows ?? (Array.isArray(rcUsersRaw2) ? rcUsersRaw2 : []);
+      for (const u of rcUsers2) {
+        await db.insert(notificationsTable).values({
+          userId: (u as any).id,
+          title: "解約申請が届きました",
+          message: `契約番号 ${rcContractRow.contract_number ?? `#${rcContractRow.id}`} の解約申請が届きました。返却手続きをご確認ください。`,
+        });
+      }
     }
 
     return res.json({ ok: true });
@@ -2023,6 +2059,23 @@ router.post("/van/applications/:id/confirm-return", requireAuth, async (req: Req
         title: "Chat VAN - 返却完了",
         message: `申込ID: ${appId} の車両返却が完了しました。`,
       });
+    }
+
+    // 協力会社へ通知（返却完了）
+    if (contract?.vehicleId) {
+      const vehRaw3 = await db.execute(sql`SELECT rental_company_id FROM vehicles WHERE id = ${contract.vehicleId} LIMIT 1`);
+      const rcId3 = ((vehRaw3 as any).rows ?? vehRaw3)[0]?.rental_company_id;
+      if (rcId3) {
+        const rcUsersRaw3 = await db.execute(sql`SELECT id FROM users WHERE rental_company_id = ${rcId3}`);
+        const rcUsers3 = (rcUsersRaw3 as any)?.rows ?? (Array.isArray(rcUsersRaw3) ? rcUsersRaw3 : []);
+        for (const u of rcUsers3) {
+          await db.insert(notificationsTable).values({
+            userId: (u as any).id,
+            title: "車両が返却されました",
+            message: `契約番号 ${contract.contractNumber ?? `#${contract.id}`} の車両が返却されました。`,
+          });
+        }
+      }
     }
 
     return res.json({ ok: true });
