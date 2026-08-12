@@ -63,6 +63,7 @@ export default function CompanySettings() {
           address:       j.address        ?? '',
           serviceAreas:  j.service_areas  ?? j.serviceAreas   ?? '',
           fleetSize:     j.fleet_size     ?? j.fleetSize       ?? '',
+          businessHours: j.business_hours ?? j.businessHours   ?? '',
           bankName:      bank.bankName    ?? '',
           bankBranch:    bank.bankBranch  ?? '',
           bankType:      bank.bankType    ?? '普通',
@@ -202,6 +203,9 @@ export default function CompanySettings() {
               <Section title="所在地・対応エリア" />
               <Field label="住所" full>
                 <input type="text" value={form.address ?? ''} onChange={set('address')} placeholder="例: 東京都渋谷区○○1-2-3" className={inp} />
+              </Field>
+              <Field label="営業時間" full note="例: 平日9:00-17:00（ユーザーの受け取り画面に表示されます）">
+                <input type="text" value={form.businessHours ?? ''} onChange={set('businessHours')} placeholder="例: 平日9:00-17:00" className={inp} />
               </Field>
               <Field label="対応エリア" full note="マッチングの際に参照されます">
                 <textarea value={form.serviceAreas ?? ''} onChange={set('serviceAreas')} rows={3}

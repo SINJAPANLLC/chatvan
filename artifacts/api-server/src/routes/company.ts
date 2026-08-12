@@ -31,7 +31,7 @@ router.get("/company/me", requireAuth, requireRentalCompany, async (req: Request
       SELECT u.id, u.email, u.name, u.phone, u.role, u.rental_company_id,
         rc.name as company_name, rc.corporate_name, rc.contact_name, rc.phone as company_phone,
         rc.email as company_email, rc.address, rc.service_areas, rc.notes,
-        rc.fleet_size, rc.status, rc.bank_information, rc.payment_info
+        rc.fleet_size, rc.status, rc.business_hours, rc.bank_information, rc.payment_info
       FROM users u
       LEFT JOIN rental_companies rc ON rc.id = u.rental_company_id
       WHERE u.id = ${userId}
@@ -549,6 +549,7 @@ router.patch("/company/settings", requireAuth, requireRentalCompany, async (req:
     const rcId = await getMyCompanyId(req.session.userId);
     if (!rcId) return res.status(403).json({ error: "会社が紐付けられていません" });
     const { name, corporateName, contactName, phone, email, address, serviceAreas, fleetSize, notes,
+            businessHours,
             bankName, bankBranch, bankType, bankAccount, bankHolder } = req.body;
 
     // 既存の銀行情報を取得してマージ
@@ -575,6 +576,7 @@ router.patch("/company/settings", requireAuth, requireRentalCompany, async (req:
       ...(serviceAreas !== undefined ? { serviceAreas } : {}),
       ...(fleetSize !== undefined ? { fleetSize: fleetSize ? parseInt(String(fleetSize)) : null } : {}),
       ...(notes !== undefined ? { notes } : {}),
+      ...(businessHours !== undefined ? { businessHours } : {}),
       bankInformation: JSON.stringify(bankInfo),
       updatedAt: new Date(),
     } as any).where(eq(rentalCompaniesTable.id, rcId)).returning();
