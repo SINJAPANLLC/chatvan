@@ -256,16 +256,24 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
 
         {related && (rc?.black_number_requested || rc?.insurance_referral_requested) && (
           <Section title="オプション申請">
-            <div className="flex flex-wrap gap-2">
+            <div className="space-y-3">
               {rc?.black_number_requested && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-foreground text-background text-xs font-medium rounded-full">
-                  <BadgeCheck className="h-3.5 w-3.5" />黒ナンバー取得申請あり
-                </span>
+                <div className="flex items-center justify-between py-3 px-4 bg-muted/50 rounded-lg border border-border">
+                  <div className="flex items-center gap-2.5">
+                    <BadgeCheck className="h-4 w-4 text-foreground shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium">黒ナンバー取得申請</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">協力会社対応</p>
+                    </div>
+                  </div>
+                  <span className="text-sm font-semibold">¥10,000</span>
+                </div>
               )}
               {rc?.insurance_referral_requested && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-foreground text-background text-xs font-medium rounded-full">
-                  <Shield className="h-3.5 w-3.5" />保険紹介申請あり
-                </span>
+                <div className="flex items-center gap-2.5 py-3 px-4 bg-muted/50 rounded-lg border border-border">
+                  <Shield className="h-4 w-4 text-foreground shrink-0" />
+                  <p className="text-sm font-medium">保険紹介申請あり</p>
+                </div>
               )}
             </div>
           </Section>
