@@ -217,7 +217,7 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
                 <DL label="ステータス" value={
                   <span className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${statusCls(contract.status)}`}>{statusLabel(contract.status)}</span>
                 } />
-                <DL label="月額料金" value={contract.monthlyPrice ? yen(Number(contract.monthlyPrice)) : null} />
+                <DL label="月額料金" value={(contract.monthly_price ?? contract.monthlyPrice) ? yen(Number(contract.monthly_price ?? contract.monthlyPrice)) : null} />
                 <DL label="利用開始日" value={fmtD(contract.start_date ?? contract.startDate)} />
                 <DL label="支払日" value={contract.payment_day ? `毎月${contract.payment_day}日` : null} />
               </dl>
@@ -732,7 +732,7 @@ export default function CompanyContracts() {
                       {c.license_plate && <p className="text-xs text-muted-foreground font-mono">{c.license_plate}</p>}
                     </td>
                     <td className="px-4 py-3.5 font-medium">
-                      {c.monthlyPrice ? yen(Number(c.monthlyPrice)) : <span className="text-muted-foreground">—</span>}
+                      {(c.monthly_price ?? c.monthlyPrice) ? yen(Number(c.monthly_price ?? c.monthlyPrice)) : <span className="text-muted-foreground">—</span>}
                     </td>
                     <td className="px-4 py-3.5 text-xs text-muted-foreground whitespace-nowrap">
                       {fmtD(c.start_date ?? c.startDate)}
