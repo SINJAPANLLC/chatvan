@@ -7,9 +7,12 @@ import {
   FileText, Mail, Search, CheckCircle2, AlertCircle, Shield
 } from 'lucide-react';
 
+const BASE = import.meta.env.BASE_URL;
+
 function apiFetch(path: string, opts?: RequestInit) {
   const token = localStorage.getItem('sinjapan_auth_token');
-  return fetch(path, {
+  const url = path.startsWith('http') ? path : `${BASE}${path.replace(/^\//, '')}`;
+  return fetch(url, {
     ...opts,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...opts?.headers },
   }).then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); });
