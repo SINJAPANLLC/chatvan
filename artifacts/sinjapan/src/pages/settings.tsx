@@ -1,8 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { useGetMe, useUpdateUser } from '@workspace/api-client-react';
+import { useGetMe } from '@workspace/api-client-react';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { getGetMeQueryKey } from '@workspace/api-client-react';
+
+const BASE = import.meta.env.BASE_URL;
+async function patchMe(data: Record<string, string>) {
+  const token = localStorage.getItem('sinjapan_auth_token');
+  const res = await fetch(`${BASE}api/auth/me`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error ?? '保存に失敗しました');
+  return json;
+}
 
 function Field({
   label, value, onChange, type = 'text', placeholder = '', disabled = false
@@ -50,9 +66,9 @@ function SaveButton({ pending, disabled }: { pending: boolean; disabled?: boolea
 
 export default function Settings() {
   const { data: user } = useGetMe();
-  const updateUser = useUpdateUser();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [pending, setPending] = useState(false);
 
   // Profile
   const [name, setName] = useState('');
@@ -76,13 +92,15 @@ export default function Settings() {
   }, [user]);
 
   const save = async (data: Record<string, string>) => {
-    if (!user?.id) return;
+    setPending(true);
     try {
-      await updateUser.mutateAsync({ id: user.id, data });
+      await patchMe(data);
       queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
       toast({ title: '保存しました' });
     } catch (err: any) {
-      toast({ title: err?.response?.data?.error ?? '保存に失敗しました', variant: 'destructive' });
+      toast({ title: err?.message ?? '保存に失敗しました', variant: 'destructive' });
+    } finally {
+      setPending(false);
     }
   };
 
@@ -104,13 +122,9 @@ export default function Settings() {
     if (newPassword.length < 8) {
       toast({ title: 'パスワードは8文字以上にしてください', variant: 'destructive' }); return;
     }
-    try {
-      await updateUser.mutateAsync({ data: { currentPassword, newPassword } });
+    save({ currentPassword, newPassword }).then(() => {
       setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
-      toast({ title: 'パスワードを変更しました' });
-    } catch (err: any) {
-      toast({ title: err?.response?.data?.error ?? 'パスワードの変更に失敗しました', variant: 'destructive' });
-    }
+    });
   };
 
   return (
@@ -126,7 +140,7 @@ export default function Settings() {
             <Field label="会社名" value={companyName} onChange={setCompanyName} placeholder="株式会社〇〇" />
           </div>
           <Field label="電話番号" value={phone} onChange={setPhone} placeholder="090-0000-0000" type="tel" />
-          <SaveButton pending={updateUser.isPending} />
+          <SaveButton pending={pending} />
         </form>
       </Section>
 
@@ -141,7 +155,7 @@ export default function Settings() {
             onChange={setBillingAddress}
             placeholder="東京都渋谷区〇〇 1-2-3"
           />
-          <SaveButton pending={updateUser.isPending} />
+          <SaveButton pending={pending} />
         </form>
       </Section>
 
@@ -153,7 +167,7 @@ export default function Settings() {
           <Field label="現在のパスワード" value={currentPassword} onChange={setCurrentPassword} type="password" />
           <Field label="新しいパスワード" value={newPassword} onChange={setNewPassword} type="password" />
           <Field label="新しいパスワード（確認）" value={confirmPassword} onChange={setConfirmPassword} type="password" />
-          <SaveButton pending={updateUser.isPending} disabled={!currentPassword || !newPassword || !confirmPassword} />
+          <SaveButton pending={pending} disabled={!currentPassword || !newPassword || !confirmPassword} />
         </form>
       </Section>
 
