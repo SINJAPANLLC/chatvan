@@ -268,7 +268,7 @@ export default function VanPayment() {
           <CheckCircle2 className="h-10 w-10 text-background" />
         </div>
         <h1 className="text-2xl font-bold mb-2">
-          {method === 'invoice' ? '請求書払いを受け付けました' : 'お支払い完了'}
+          {method === 'invoice' ? '申請を受け付けました' : 'お支払い完了'}
         </h1>
         <p className="text-muted-foreground mb-8">
           {method === 'invoice'
