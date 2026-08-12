@@ -878,7 +878,18 @@ router.post("/van/applications/:id/accept", requireAuth, async (req: Request, re
         title: 'Chat VAN - 申込受付',
       });
     }
-    // AI審査はeKYC完了後に自動起動するため、ここでは実行しない
+    // 既にeKYC済みのユーザーはAI審査を即時実行
+    if (app.userId) {
+      const existingKyc = await db.execute(sql`
+        SELECT id FROM identity_verifications
+        WHERE user_id = ${app.userId} AND status = 'verified'
+        LIMIT 1
+      `);
+      const kycRow = ((existingKyc as any)?.rows ?? existingKyc)[0];
+      if (kycRow) {
+        setImmediate(() => runAIScreening(appId));
+      }
+    }
     return res.json(app);
   } catch (err) {
     console.error("accept error:", err);
@@ -2166,6 +2177,8 @@ router.get("/van/applications/:id/identity-verification", requireAuth, async (re
 
     const app = await getOwnedApplication(appId, userId, isAdmin);
     if (!app) return res.status(404).json({ error: "Not found" });
+
+    res.set("Cache-Control", "no-store");
 
     // application_id で検索、なければ user_id で最新の verified 記録を取得（eKYC スキップ）
     let result: any = null;
