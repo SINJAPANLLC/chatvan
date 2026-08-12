@@ -419,7 +419,7 @@ router.get("/company/settlements", requireAuth, requireRentalCompany, async (req
         to_char(gs.month, 'YYYY-MM')       AS period_month,
         vc.monthly_price                   AS user_payment_amount,
         vc.sin_japan_fee                   AS chat_van_fee,
-        (vc.monthly_price - COALESCE(vc.sin_japan_fee, 0)) AS rental_company_amount,
+        vc.monthly_price                   AS rental_company_amount,
         -- 黒ナンバー取得費（初月かつ申請あり → 固定1万円）
         CASE WHEN date_trunc('month', gs.month) = date_trunc('month', vc.start_date::date)
              AND vc.black_number_requested = true
