@@ -297,7 +297,7 @@ export default function CompanyVehicles() {
                     {(() => {
                       try {
                         const photos = JSON.parse(v.photos || '[]');
-                        if (photos[0]) return <img src={API(`/storage${photos[0]}`)} alt="" className="w-10 h-10 rounded-md object-cover border border-border" />;
+                        if (photos[0]) return <img src={API(`/storage/user-objects/${photos[0].replace(/^\/objects\//, '')}`)} alt="" className="w-10 h-10 rounded-md object-cover border border-border" />;
                       } catch {}
                       return <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center"><ImageIcon className="h-4 w-4 text-muted-foreground" /></div>;
                     })()}

@@ -138,10 +138,37 @@ router.patch("/company/vehicles/:id", requireAuth, requireRentalCompany, async (
       }
     }
 
-    const { notes, monthlyPrice, prefecture, features } = req.body;
+    const {
+      notes, monthlyPrice, prefecture, features,
+      photos, shakenCertPath, kensakushoCertPath, jibaisekiCertPath, ninniHokenCertPath,
+      maker, model, year, licensePlate, mileage, inspectionExpiryDate,
+      insuranceCompany, insurancePolicyNumber, insuranceContact, insuranceExpiry,
+      color, engineDisplacement, fuelType, transmission, minPeriodMonths, smokingPolicy,
+    } = req.body;
     const [updated] = await db.update(vehiclesTable).set({
       notes, monthlyPrice, prefecture, features, updatedAt: new Date(),
-    }).where(eq(vehiclesTable.id, id)).returning();
+      ...(photos !== undefined ? { photos } : {}),
+      ...(shakenCertPath !== undefined ? { shakenCertPath } : {}),
+      ...(kensakushoCertPath !== undefined ? { kensakushoCertPath } : {}),
+      ...(jibaisekiCertPath !== undefined ? { jibaisekiCertPath } : {}),
+      ...(ninniHokenCertPath !== undefined ? { ninniHokenCertPath } : {}),
+      ...(maker !== undefined ? { maker } : {}),
+      ...(model !== undefined ? { model } : {}),
+      ...(year !== undefined ? { year: year ? parseInt(String(year)) : null } : {}),
+      ...(licensePlate !== undefined ? { licensePlate } : {}),
+      ...(mileage !== undefined ? { mileage } : {}),
+      ...(inspectionExpiryDate !== undefined ? { inspectionExpiryDate } : {}),
+      ...(insuranceCompany !== undefined ? { insuranceCompany } : {}),
+      ...(insurancePolicyNumber !== undefined ? { insurancePolicyNumber } : {}),
+      ...(insuranceContact !== undefined ? { insuranceContact } : {}),
+      ...(insuranceExpiry !== undefined ? { insuranceExpiry } : {}),
+      ...(color !== undefined ? { color } : {}),
+      ...(engineDisplacement !== undefined ? { engineDisplacement } : {}),
+      ...(fuelType !== undefined ? { fuelType } : {}),
+      ...(transmission !== undefined ? { transmission } : {}),
+      ...(minPeriodMonths !== undefined ? { minPeriodMonths } : {}),
+      ...(smokingPolicy !== undefined ? { smokingPolicy } : {}),
+    } as any).where(eq(vehiclesTable.id, id)).returning();
     return res.json(updated);
   } catch (err) {
     return res.status(500).json({ error: "Internal error" });
@@ -298,6 +325,9 @@ router.post("/company/vehicles", requireAuth, requireRentalCompany, async (req: 
     if (!maker || !model || !monthlyPrice) {
       return res.status(400).json({ error: "メーカー・モデル・月額料金は必須です" });
     }
+    const {
+      photos, shakenCertPath, kensakushoCertPath, jibaisekiCertPath, ninniHokenCertPath,
+    } = req.body;
     const [vehicle] = await db.insert(vehiclesTable).values({
       maker,
       model,
@@ -311,6 +341,11 @@ router.post("/company/vehicles", requireAuth, requireRentalCompany, async (req: 
       inspectionExpiryDate: inspectionExpiryDate || null,
       rentalCompanyId: rcId,
       status: "reviewing",
+      photos: photos || '[]',
+      shakenCertPath: shakenCertPath || null,
+      kensakushoCertPath: kensakushoCertPath || null,
+      jibaisekiCertPath: jibaisekiCertPath || null,
+      ninniHokenCertPath: ninniHokenCertPath || null,
     } as any).returning();
     const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
     for (const admin of admins) {
