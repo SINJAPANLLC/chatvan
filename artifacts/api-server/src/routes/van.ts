@@ -1558,6 +1558,23 @@ router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request
       message: `カード決済が完了しました（¥${totalAmount.toLocaleString()}）。レンタル会社から受け取り案内が届きます。`,
     });
 
+    // 協力会社へ通知（受け取り準備）
+    if (contract.vehicleId) {
+      const vehRcRaw = await db.execute(sql`SELECT rental_company_id FROM vehicles WHERE id = ${contract.vehicleId} LIMIT 1`);
+      const rcIdForPickup = ((vehRcRaw as any).rows ?? vehRcRaw)[0]?.rental_company_id;
+      if (rcIdForPickup) {
+        const rcUsersRaw = await db.execute(sql`SELECT id FROM users WHERE rental_company_id = ${rcIdForPickup}`);
+        const rcUsers = (rcUsersRaw as any)?.rows ?? (Array.isArray(rcUsersRaw) ? rcUsersRaw : []);
+        for (const u of rcUsers) {
+          await db.insert(notificationsTable).values({
+            userId: (u as any).id,
+            title: "車両の受け取り準備をしてください",
+            message: `契約番号 ${contract.contractNumber ?? `#${contract.id}`} の決済が完了しました。利用者が車両を受け取りに来ます。`,
+          });
+        }
+      }
+    }
+
     return res.json({ ok: true, paymentId: data.payment?.id });
   } catch (err) {
     console.error("square-charge error:", err);
@@ -1812,6 +1829,23 @@ router.post("/van/contracts/:id/pay", requireAuth, async (req: Request, res: Res
         title: "Chat VAN - 決済完了・受け取り待ち",
         message: `決済完了（契約ID: ${id} / 支払方法: ${method === 'invoice' ? '法人請求書' : 'カード'}）。車両受け取り待ちです。`,
       });
+    }
+
+    // 協力会社へ通知（受け取り準備）
+    if (contract.vehicleId) {
+      const vehRcRaw2 = await db.execute(sql`SELECT rental_company_id FROM vehicles WHERE id = ${contract.vehicleId} LIMIT 1`);
+      const rcIdForPickup2 = ((vehRcRaw2 as any).rows ?? vehRcRaw2)[0]?.rental_company_id;
+      if (rcIdForPickup2) {
+        const rcUsersRaw2 = await db.execute(sql`SELECT id FROM users WHERE rental_company_id = ${rcIdForPickup2}`);
+        const rcUsers2 = (rcUsersRaw2 as any)?.rows ?? (Array.isArray(rcUsersRaw2) ? rcUsersRaw2 : []);
+        for (const u of rcUsers2) {
+          await db.insert(notificationsTable).values({
+            userId: (u as any).id,
+            title: "車両の受け取り準備をしてください",
+            message: `契約番号 ${contract.contractNumber ?? `#${contract.id}`} の${method === 'invoice' ? '法人請求書払い申請' : '決済'}が完了しました。利用者が車両を受け取りに来ます。`,
+          });
+        }
+      }
     }
 
     return res.json({ ok: true });
