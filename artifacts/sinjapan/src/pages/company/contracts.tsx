@@ -527,39 +527,17 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
           ) : !incidents?.length ? (
             <div className="bg-card border border-border rounded-xl p-12 text-center text-muted-foreground text-sm">事故・故障の報告はありません</div>
           ) : incidents.map((inc: any) => {
-            const STATUS_CLS: Record<string, string> = {
-              reported: 'bg-red-50 text-red-700 border-red-200',
-              in_progress: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-              resolved: 'bg-muted text-foreground border-border',
-            };
-            const STATUS_LABEL: Record<string, string> = { reported: '報告済み', in_progress: '対応中', resolved: '解決済み' };
-            const bPhotos: string[] = (() => { try { const p = JSON.parse(inc.photos ?? '[]'); return Array.isArray(p) ? p : []; } catch { return []; } })();
+            const firstLine = (inc.message as string).split('\n')[0] ?? '';
+            const typeIcon = firstLine.includes('交通事故') ? '🚨' : firstLine.includes('故障') ? '🔧' : firstLine.includes('盗難') ? '🚗' : '⚠️';
+            const title = firstLine.replace(/【|】/g, '');
+            const body = (inc.message as string).split('\n').slice(1).join('\n').trim();
             return (
-              <Section key={inc.id} title={`#${inc.id} 🔧 故障・不具合`}>
-                <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-                  <DL label="ステータス" value={
-                    <span className={`px-2 py-0.5 rounded-full text-xs border ${STATUS_CLS[inc.status] ?? 'bg-muted border-border text-foreground'}`}>
-                      {STATUS_LABEL[inc.status] ?? inc.status}
-                    </span>
-                  } />
-                  <DL label="報告者"   value={inc.user_name} />
-                  <DL label="報告日時" value={fmtDT(inc.created_at)} />
-                  <DL label="発生日時" value={fmtDT(inc.occurred_at)} />
-                  <DL label="場所"     value={inc.location} />
-                  <DL label="走行可否" value={inc.can_drive != null ? (inc.can_drive ? '走行可' : '走行不可') : null} />
-                  {inc.symptom    && <DL label="症状"       value={inc.symptom}    span2 />}
-                  {inc.user_comment && <DL label="ユーザーコメント" value={inc.user_comment} span2 />}
-                  {inc.ai_summary && <DL label="AI要約"     value={inc.ai_summary} span2 />}
-                  {inc.admin_notes && <DL label="管理者メモ" value={inc.admin_notes} span2 />}
-                </dl>
-                {bPhotos.length > 0 && (
-                  <div className="flex gap-1 overflow-x-auto bg-muted/30 rounded-lg p-2 mt-4 -mx-1">
-                    {bPhotos.map((p: string, i: number) => (
-                      <img key={i} src={p.startsWith('/objects/') ? `${import.meta.env.BASE_URL}api/storage/user-objects/${p.replace(/^\/objects\//, '')}` : `${import.meta.env.BASE_URL}api/storage${p}`}
-                        alt={`故障写真${i+1}`} className="h-28 w-auto rounded-lg object-cover shrink-0 border border-border" />
-                    ))}
-                  </div>
-                )}
+              <Section key={inc.id} title={`${typeIcon} ${title}`}>
+                <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
+                  <span>{inc.user_name}</span>
+                  <span>{fmtDT(inc.created_at)}</span>
+                </div>
+                <pre className="text-sm whitespace-pre-wrap font-sans leading-relaxed text-foreground">{body}</pre>
               </Section>
             );
           })}

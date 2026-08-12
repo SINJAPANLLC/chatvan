@@ -433,20 +433,34 @@ router.get("/company/settlements", requireAuth, requireRentalCompany, async (req
   }
 });
 
-// ── GET /company/contracts/:id/incidents ── 契約の事故・故障一覧 ──────────────
+// ── GET /company/contracts/:id/incidents ── 契約の事故・故障報告メッセージ ──
 router.get("/company/contracts/:id/incidents", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
     const contractId = Number(req.params.id);
     const rcId = await resolveRcId(req.session.userId, req.session.userRole);
-    const raw = await db.execute(sql`
-      SELECT b.*, u.name as user_name
-      FROM breakdowns b
-      LEFT JOIN users u ON b.user_id = u.id
-      JOIN van_contracts vc ON b.contract_id = vc.id
+    // 自社契約かチェック
+    const contractCheck = await db.execute(sql`
+      SELECT vc.id FROM van_contracts vc
       JOIN vehicles v ON vc.vehicle_id = v.id
-      WHERE b.contract_id = ${contractId}
+      WHERE vc.id = ${contractId}
         AND (${rcId}::int IS NULL OR v.rental_company_id = ${rcId})
-      ORDER BY b.created_at DESC
+      LIMIT 1
+    `);
+    if (!toRow(contractCheck)) return res.json([]);
+    // 事故・故障系のチャットメッセージを抽出
+    const raw = await db.execute(sql`
+      SELECT cm.id, cm.message, cm.created_at, u.name as user_name
+      FROM contract_messages cm
+      LEFT JOIN users u ON cm.sender_id = u.id
+      WHERE cm.contract_id = ${contractId}
+        AND cm.sender_role = 'user'
+        AND (
+          cm.message LIKE '【交通事故】%'
+          OR cm.message LIKE '【車両故障】%'
+          OR cm.message LIKE '【盗難・不正使用】%'
+          OR cm.message LIKE '【その他トラブル】%'
+        )
+      ORDER BY cm.created_at DESC
     `);
     return res.json(toRows(raw));
   } catch (err) {
