@@ -61,8 +61,6 @@ export default function CompanyDashboard() {
       sub: `稼働中 ${stats.rented_vehicles ?? 0} 台`,
       icon: Car,
       href: '/company/vehicles',
-      accent: 'bg-blue-50 text-blue-600 border-blue-100',
-      iconBg: 'bg-blue-100',
     },
     {
       label: '契約中',
@@ -70,8 +68,6 @@ export default function CompanyDashboard() {
       sub: `返却予定 ${stats.return_pending ?? 0} 件`,
       icon: FileText,
       href: '/company/contracts',
-      accent: 'bg-green-50 text-green-600 border-green-100',
-      iconBg: 'bg-green-100',
     },
     {
       label: '今月の売上',
@@ -79,8 +75,6 @@ export default function CompanyDashboard() {
       sub: '確定済み金額',
       icon: TrendingUp,
       href: '/company/settlements',
-      accent: 'bg-violet-50 text-violet-600 border-violet-100',
-      iconBg: 'bg-violet-100',
     },
     {
       label: '未払い',
@@ -88,8 +82,6 @@ export default function CompanyDashboard() {
       sub: '対応が必要',
       icon: AlertTriangle,
       href: '/company/contracts',
-      accent: stats.payment_issues > 0 ? 'bg-red-50 text-red-600 border-red-100' : 'bg-gray-50 text-gray-500 border-gray-100',
-      iconBg: stats.payment_issues > 0 ? 'bg-red-100' : 'bg-gray-100',
     },
   ];
 
@@ -119,15 +111,15 @@ export default function CompanyDashboard() {
 
       {/* KPIカード */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {kpiCards.map(({ label, value, sub, icon: Icon, href, accent, iconBg }) => (
+        {kpiCards.map(({ label, value, sub, icon: Icon, href }) => (
           <Link key={label} href={href}>
-            <div className={`border rounded-xl p-4 cursor-pointer hover:shadow-sm transition-all group ${accent}`}>
-              <div className={`w-8 h-8 ${iconBg} rounded-lg flex items-center justify-center mb-3`}>
-                <Icon className="h-4 w-4" />
+            <div className="border border-border rounded-xl p-4 cursor-pointer hover:bg-muted/40 transition-colors bg-card">
+              <div className="w-8 h-8 bg-muted rounded-lg flex items-center justify-center mb-3">
+                <Icon className="h-4 w-4 text-foreground" />
               </div>
-              <p className="text-2xl font-bold tracking-tight">{value}</p>
-              <p className="text-xs font-medium mt-0.5">{label}</p>
-              <p className="text-xs opacity-70 mt-0.5">{sub}</p>
+              <p className="text-2xl font-bold tracking-tight text-foreground">{value}</p>
+              <p className="text-xs font-medium mt-0.5 text-foreground">{label}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
             </div>
           </Link>
         ))}
