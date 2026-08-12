@@ -2831,12 +2831,49 @@ router.post("/users", requireAuth, requireAdmin, async (req: Request, res: Respo
 
 // POST /van/vehicles/parse-shaken  車検証 OCR → 車両情報を抽出
 router.post("/van/vehicles/parse-shaken", requireAuth, async (req: Request, res: Response) => {
+  const os = await import("os");
+  const fs = await import("fs/promises");
+  const path = await import("path");
+  const { execFile } = await import("child_process");
+  const { promisify } = await import("util");
+  const execFileAsync = promisify(execFile);
+
+  const tmpFiles: string[] = [];
+  const cleanup = async () => { for (const f of tmpFiles) { try { await fs.unlink(f); } catch {} } };
+
   try {
     const { imageBase64, mimeType = "image/jpeg" } = req.body;
     if (!imageBase64) return res.status(400).json({ error: "imageBase64 is required" });
-    const allowed = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"]);
-    if (!allowed.has(mimeType)) {
-      return res.status(400).json({ error: "画像ファイル（JPEG/PNG/WebP）でOCRしてください。PDFは非対応です。" });
+
+    const supported = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"]);
+    let finalBase64 = imageBase64;
+    let finalMime = mimeType;
+
+    if (!supported.has(mimeType)) {
+      // PDF or HEIC → convert to JPEG
+      const tmpIn = path.join(os.tmpdir(), `shaken-in-${Date.now()}`);
+      const ext = mimeType === "application/pdf" ? ".pdf" : ".heic";
+      const inFile = tmpIn + ext;
+      await fs.writeFile(inFile, Buffer.from(imageBase64, "base64"));
+      tmpFiles.push(inFile);
+
+      const outJpeg = tmpIn + "-out.jpg";
+      tmpFiles.push(outJpeg);
+
+      if (mimeType === "application/pdf") {
+        // pdftoppm: PDF の1ページ目を PPM に変換 → convert で JPEG へ
+        const ppmPrefix = tmpIn + "-page";
+        tmpFiles.push(ppmPrefix + "-1.ppm");
+        await execFileAsync("pdftoppm", ["-r", "200", "-f", "1", "-l", "1", inFile, ppmPrefix]);
+        await execFileAsync("convert", [ppmPrefix + "-1.ppm", outJpeg]);
+      } else {
+        // HEIC → JPEG
+        await execFileAsync("convert", [inFile, outJpeg]);
+      }
+
+      const jpegBuf = await fs.readFile(outJpeg);
+      finalBase64 = jpegBuf.toString("base64");
+      finalMime = "image/jpeg";
     }
 
     const completion = await openai.chat.completions.create({
@@ -2844,7 +2881,7 @@ router.post("/van/vehicles/parse-shaken", requireAuth, async (req: Request, res:
       messages: [{
         role: "user",
         content: [
-          { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBase64}`, detail: "high" } },
+          { type: "image_url", image_url: { url: `data:${finalMime};base64,${finalBase64}`, detail: "high" } },
           { type: "text", text: `この画像は日本の自動車検査証（車検証）です。以下のキーのJSONを返してください。読み取れない値はnullにしてください。
 {
   "licensePlate": "登録番号（例: 横浜300あ1234）",
@@ -2869,11 +2906,13 @@ JSONのみ返してください。` }
 
     const text = completion.choices[0]?.message?.content ?? "";
     const match = text.match(/\{[\s\S]*\}/);
+    await cleanup();
     if (!match) return res.status(422).json({ error: "OCR結果を解析できませんでした" });
     return res.json(JSON.parse(match[0]));
   } catch (err) {
+    await cleanup();
     console.error("parse-shaken error:", err);
-    return res.status(500).json({ error: "Internal error" });
+    return res.status(500).json({ error: "OCR処理に失敗しました" });
   }
 });
 
