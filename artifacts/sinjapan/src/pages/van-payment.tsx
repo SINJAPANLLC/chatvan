@@ -284,7 +284,7 @@ export default function VanPayment() {
         <p className="text-muted-foreground mb-8">
           {method === 'invoice'
             ? (invoicePreApproved
-                ? '法人請求書を登録メールへ送付します。担当者よりご連絡いたします。'
+                ? ''
                 : '審査結果を2〜3営業日以内にメールでご連絡します。')
             : 'お支払いが完了しました。レンタル会社へ連絡して車両を受け取ってください。'}
         </p>
