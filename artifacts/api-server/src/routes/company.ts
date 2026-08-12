@@ -451,6 +451,7 @@ router.get("/company/settlements", requireAuth, requireRentalCompany, async (req
         LIMIT 1
       ) i ON true
       WHERE vc.status IN ('active', 'completed')
+        AND vc.payment_method IS NOT NULL
         AND ${rcFilter}
       ORDER BY period_month DESC, vc.id
     `;
