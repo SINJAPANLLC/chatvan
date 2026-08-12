@@ -881,6 +881,7 @@ router.post("/van/applications/:id/accept", requireAuth, async (req: Request, re
     // AI自動審査をバックグラウンドで実行（レスポンスをブロックしない）
     setImmediate(() => runAIScreening(appId));
 
+    // ※ AI審査はeKYC完了後に自動起動するため、ここでは実行しない
     return res.json(app);
   } catch (err) {
     console.error("accept error:", err);
