@@ -48,6 +48,12 @@ export default function CompanySettings() {
       .then(j => {
         if (!j) return;
         setStatus(j.status ?? '');
+        // bank_information は DB では JSON テキスト列
+        let bank: Record<string, string> = {};
+        try {
+          const raw = j.bank_information;
+          if (raw) bank = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        } catch {}
         setForm({
           name:          j.name          ?? j.company_name    ?? '',
           corporateName: j.corporate_name ?? j.corporateName  ?? '',
@@ -57,10 +63,10 @@ export default function CompanySettings() {
           address:       j.address        ?? '',
           serviceAreas:  j.service_areas  ?? j.serviceAreas   ?? '',
           fleetSize:     j.fleet_size     ?? j.fleetSize       ?? '',
-          bankName:      j.bank_name      ?? j.bankName        ?? '',
-          bankBranch:    j.bank_branch    ?? j.bankBranch      ?? '',
-          bankAccount:   j.bank_account   ?? j.bankAccount     ?? '',
-          bankHolder:    j.bank_holder    ?? j.bankHolder      ?? '',
+          bankName:      bank.bankName    ?? '',
+          bankBranch:    bank.bankBranch  ?? '',
+          bankAccount:   bank.bankAccount ?? '',
+          bankHolder:    bank.bankHolder  ?? '',
           notes:         j.notes          ?? '',
         });
       })
