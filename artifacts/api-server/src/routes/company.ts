@@ -361,7 +361,7 @@ router.get("/company/settlements", requireAuth, requireRentalCompany, async (req
 router.get("/company/notifications", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
     const raw = await db.execute(sql`
-      SELECT id, title, message, read, created_at
+      SELECT id, title, message, read_status, created_at
       FROM notifications
       WHERE user_id = ${req.session.userId}
       ORDER BY created_at DESC
@@ -378,7 +378,7 @@ router.get("/company/notifications", requireAuth, requireRentalCompany, async (r
 router.patch("/company/notifications/:id/read", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
     const id = parseInt(String(req.params.id));
-    await db.execute(sql`UPDATE notifications SET read = true WHERE id = ${id} AND user_id = ${req.session.userId}`);
+    await db.execute(sql`UPDATE notifications SET read_status = true WHERE id = ${id} AND user_id = ${req.session.userId}`);
     return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ error: "Internal error" });
@@ -388,7 +388,7 @@ router.patch("/company/notifications/:id/read", requireAuth, requireRentalCompan
 // ── PATCH /company/notifications/read-all ────────────────────────────────────
 router.patch("/company/notifications/read-all", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
-    await db.execute(sql`UPDATE notifications SET read = true WHERE user_id = ${req.session.userId}`);
+    await db.execute(sql`UPDATE notifications SET read_status = true WHERE user_id = ${req.session.userId}`);
     return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ error: "Internal error" });
