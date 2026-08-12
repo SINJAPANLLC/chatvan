@@ -277,11 +277,15 @@ export default function VanPayment() {
           <CheckCircle2 className="h-10 w-10 text-background" />
         </div>
         <h1 className="text-2xl font-bold mb-2">
-          {method === 'invoice' ? '申請を受け付けました' : 'お支払い完了'}
+          {method === 'invoice'
+            ? (invoicePreApproved ? 'お支払いありがとうございました' : '申請を受け付けました')
+            : 'お支払い完了'}
         </h1>
         <p className="text-muted-foreground mb-8">
           {method === 'invoice'
-            ? '審査結果を2〜3営業日以内にメールでご連絡します。'
+            ? (invoicePreApproved
+                ? '法人請求書を登録メールへ送付します。担当者よりご連絡いたします。'
+                : '審査結果を2〜3営業日以内にメールでご連絡します。')
             : 'お支払いが完了しました。レンタル会社へ連絡して車両を受け取ってください。'}
         </p>
         <button onClick={() => setLocation(`/van/${applicationId}/status`)}
