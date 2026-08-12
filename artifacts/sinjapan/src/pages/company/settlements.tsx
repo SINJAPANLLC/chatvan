@@ -195,7 +195,7 @@ function DetailTable({ rows, initialMonth }: { rows: any[]; initialMonth: string
         <div class="party">
           <div class="party-title">お支払い元（発行者）</div>
           <div class="party-name">合同会社SIN JAPAN</div>
-          <div class="party-detail">〒243-0415 神奈川県愛甲郡愛川町中津7287
+          <div class="party-detail">〒243-0303 神奈川県愛甲郡愛川町中津7287
 TEL: 050-5526-9906
 Email: info@sinjapan.jp</div>
         </div>
