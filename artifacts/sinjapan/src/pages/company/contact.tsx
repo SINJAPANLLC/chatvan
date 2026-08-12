@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Send, Mail, Clock, Loader2 } from 'lucide-react';
+import { Send, Mail, Clock, Loader2, Phone, MapPin, Building2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const API = (path: string) => `${import.meta.env.BASE_URL}api${path}`;
@@ -45,16 +45,31 @@ export default function CompanyContact() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* 左: 直接連絡先 */}
+        {/* 左: 送信連絡先 */}
         <div className="lg:col-span-2">
-          <div className="bg-card border border-border rounded-xl p-5 space-y-3">
-            <p className="font-semibold text-sm">直接連絡先</p>
-            <div className="space-y-2.5">
+          <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+              <p className="font-semibold text-sm">合同会社SIN JAPAN</p>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 text-sm">
+                <div className="w-8 h-8 bg-muted rounded-lg flex items-center justify-center shrink-0 mt-0.5">
+                  <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                </div>
+                <span className="text-muted-foreground leading-relaxed">〒243-0303<br />神奈川県愛甲郡愛川町<br />中津7287</span>
+              </div>
+              <div className="flex items-center gap-3 text-sm">
+                <div className="w-8 h-8 bg-muted rounded-lg flex items-center justify-center shrink-0">
+                  <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                </div>
+                <a href="tel:0505526-9906" className="hover:underline">050-5526-9906</a>
+              </div>
               <div className="flex items-center gap-3 text-sm">
                 <div className="w-8 h-8 bg-muted rounded-lg flex items-center justify-center shrink-0">
                   <Mail className="h-3.5 w-3.5 text-muted-foreground" />
                 </div>
-                <span>info@sinjapan.jp</span>
+                <a href="mailto:info@sinjapan.jp" className="hover:underline">info@sinjapan.jp</a>
               </div>
               <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 <div className="w-8 h-8 bg-muted rounded-lg flex items-center justify-center shrink-0">
