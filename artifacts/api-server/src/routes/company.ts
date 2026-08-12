@@ -412,43 +412,44 @@ router.get("/company/settlements", requireAuth, requireRentalCompany, async (req
     const rcId = await resolveRcId(req.session.userId, req.session.userRole);
     if (!rcId && req.session.userRole !== "admin") return res.json([]);
 
-    const invoiceQuery = (rcFilter: any) => sql`
-      SELECT DISTINCT ON (i.id)
-        ('inv-' || i.id)                   AS id,
-        to_char(i.period_start::date, 'YYYY-MM') AS period_month,
-        i.total_amount                     AS user_payment_amount,
-        vc.sin_japan_fee                   AS chat_van_fee,
-        (i.subtotal - COALESCE(vc.sin_japan_fee, 0)) AS rental_company_amount,
-        CASE i.status WHEN 'paid' THEN 'completed' ELSE i.status END AS status,
-        i.due_date                         AS scheduled_date,
-        i.invoice_number,
-        vc.contract_number,
-        vc.monthly_price,
-        v.maker, v.model, v.license_plate,
-        u.name AS user_name,
-        'invoice' AS payment_method
-      FROM invoices i
-      JOIN users u ON i.user_id = u.id
-      JOIN van_contracts vc ON vc.user_id = i.user_id
-      JOIN vehicles v ON vc.vehicle_id = v.id
-      WHERE ${rcFilter}
-      ORDER BY i.id, vc.created_at DESC, i.period_start::date DESC
-    `;
-    const cardQuery = (rcFilter: any) => sql`
+    const buildQuery = (rcFilter: any) => sql`
+      SELECT * FROM (
+        SELECT DISTINCT ON (i.id)
+          ('inv-' || i.id)                   AS id,
+          to_char(i.period_start::date, 'YYYY-MM') AS period_month,
+          i.total_amount                     AS user_payment_amount,
+          vc.sin_japan_fee                   AS chat_van_fee,
+          (i.subtotal - COALESCE(vc.sin_japan_fee, 0)) AS rental_company_amount,
+          CASE i.status WHEN 'paid' THEN 'completed' ELSE i.status END AS status,
+          i.due_date                         AS scheduled_date,
+          i.invoice_number,
+          vc.contract_number,
+          vc.monthly_price,
+          v.maker, v.model, v.license_plate,
+          u.name AS user_name,
+          'invoice'::text AS payment_method
+        FROM invoices i
+        JOIN users u ON i.user_id = u.id
+        JOIN van_contracts vc ON vc.user_id = i.user_id
+        JOIN vehicles v ON vc.vehicle_id = v.id
+        WHERE ${rcFilter}
+        ORDER BY i.id, vc.created_at DESC, i.period_start::date DESC
+      ) inv_rows
+      UNION ALL
       SELECT
         ('card-' || vc.id || '-' || to_char(gs.month, 'YYYYMM')) AS id,
         to_char(gs.month, 'YYYY-MM')       AS period_month,
         vc.monthly_price                   AS user_payment_amount,
         vc.sin_japan_fee                   AS chat_van_fee,
         (vc.monthly_price - COALESCE(vc.sin_japan_fee, 0)) AS rental_company_amount,
-        'completed'                        AS status,
+        'completed'::text                  AS status,
         NULL::text                         AS scheduled_date,
         NULL::text                         AS invoice_number,
         vc.contract_number,
         vc.monthly_price,
         v.maker, v.model, v.license_plate,
         u.name AS user_name,
-        'card' AS payment_method
+        'card'::text AS payment_method
       FROM van_contracts vc
       JOIN vehicles v ON vc.vehicle_id = v.id
       JOIN users u ON vc.user_id = u.id
@@ -459,20 +460,11 @@ router.get("/company/settlements", requireAuth, requireRentalCompany, async (req
       ) AS gs(month) ON true
       WHERE vc.payment_method = 'card'
         AND ${rcFilter}
+      ORDER BY period_month DESC
     `;
     const raw = rcId
-      ? await db.execute(sql`
-          ${invoiceQuery(sql`v.rental_company_id = ${rcId}`)}
-          UNION ALL
-          ${cardQuery(sql`v.rental_company_id = ${rcId}`)}
-          ORDER BY period_month DESC
-        `)
-      : await db.execute(sql`
-          ${invoiceQuery(sql`true`)}
-          UNION ALL
-          ${cardQuery(sql`true`)}
-          ORDER BY period_month DESC
-        `);
+      ? await db.execute(buildQuery(sql`v.rental_company_id = ${rcId}`))
+      : await db.execute(buildQuery(sql`true`));
     return res.json(toRows(raw));
   } catch (err) {
     console.error("company/settlements error:", err);
