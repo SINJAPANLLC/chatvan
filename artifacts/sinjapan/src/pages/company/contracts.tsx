@@ -219,7 +219,7 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
                 } />
                 <DL label="月額料金" value={(contract.monthly_price ?? contract.monthlyPrice) ? yen(Number(contract.monthly_price ?? contract.monthlyPrice)) : null} />
                 <DL label="利用開始日" value={fmtD(contract.start_date ?? contract.startDate)} />
-                <DL label="支払日" value={contract.payment_day ? `毎月${contract.payment_day}日` : null} />
+                <DL label="支払日" value="末締め翌月末払い" />
               </dl>
             </Section>
 
@@ -346,7 +346,7 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
                   <DL label="月額"     value={rc.monthly_price ? yen(Number(rc.monthly_price)) : null} />
                   <DL label="開始日"   value={fmtD(rc.start_date)} />
                   <DL label="終了予定" value={fmtD(rc.planned_end_date ?? rc.end_date)} />
-                  <DL label="支払日"   value={rc.payment_day ? `毎月${rc.payment_day}日` : null} />
+                  <DL label="支払日"   value="末締め翌月末払い" />
                   <DL label="支払方法" value={rc.payment_method === 'invoice' ? '請求書払い' : rc.payment_method === 'card' ? 'カード' : rc.payment_method} />
                   <DL label="最低期間" value={rc.minimum_term ? `${rc.minimum_term}ヶ月` : null} />
                 </dl>
