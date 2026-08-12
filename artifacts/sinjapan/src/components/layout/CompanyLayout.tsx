@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useGetMe, useLogout } from '@workspace/api-client-react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   LayoutDashboard, Car, FileText, TrendingUp,
   Bell, Settings, MessageSquare,
@@ -21,6 +22,7 @@ export function CompanyLayout({ children }: { children: React.ReactNode }) {
   const { data: user, isLoading } = useGetMe();
   const [location, setLocation] = useLocation();
   const logout = useLogout();
+  const queryClient = useQueryClient();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   React.useEffect(() => {
@@ -40,8 +42,10 @@ export function CompanyLayout({ children }: { children: React.ReactNode }) {
 
   const handleLogout = () => {
     localStorage.removeItem('sinjapan_auth_token');
-    logout.mutate(undefined);
-    setLocation('/login');
+    queryClient.clear();
+    logout.mutate(undefined, {
+      onSettled: () => setLocation('/login'),
+    });
     setMobileOpen(false);
   };
 
