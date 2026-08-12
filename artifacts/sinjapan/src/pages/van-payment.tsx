@@ -50,31 +50,40 @@ function InvoiceForm({
     getCorporateStatus().then(s => { setStatus(s); setLoading(false); });
   }, []);
 
-  const handleApply = async (skipApply = false) => {
-    if (!skipApply && (!form.corporateNumber || !form.companyName)) {
+  const handleApply = async () => {
+    if (!form.corporateNumber || !form.companyName) {
       toast({ variant: 'destructive', title: '必須項目を入力してください' });
       return;
     }
     setSubmitting(true);
     try {
-      if (!skipApply) {
-        // 1. 法人口座申請（未承認の場合のみ）
-        const r1 = await fetch(apiUrl('/corporate/apply'), {
-          method: 'POST', credentials: 'include', headers: authHeader(),
-          body: JSON.stringify({ ...form, paymentTerms: 'Net30' }),
-        });
-        const d1 = await r1.json().catch(() => ({}));
-        if (!r1.ok) throw new Error(d1.error ?? '申請に失敗しました');
-      }
+      // 法人口座申請のみ（支払いは管理者承認後）
+      const r1 = await fetch(apiUrl('/corporate/apply'), {
+        method: 'POST', credentials: 'include', headers: authHeader(),
+        body: JSON.stringify({ ...form, paymentTerms: 'Net30' }),
+      });
+      const d1 = await r1.json().catch(() => ({}));
+      if (!r1.ok) throw new Error(d1.error ?? '申請に失敗しました');
+      // 審査中状態に更新するためステータスを再取得
+      setStatus({ creditStatus: 'pending' });
+      toast({ title: '申請を受け付けました', description: '2〜3営業日以内に審査結果をメールでご連絡します。' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'エラー', description: e.message });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-      // 2. 契約の支払い方法を invoice で記録
+  const handlePay = async () => {
+    setSubmitting(true);
+    try {
+      // 承認済みのみ支払い確定
       const r2 = await fetch(apiUrl(`/van/contracts/${contractId}/pay`), {
         method: 'POST', credentials: 'include', headers: authHeader(),
         body: JSON.stringify({ method: 'invoice' }),
       });
       if (!r2.ok) { const d2 = await r2.json().catch(() => ({})); throw new Error(d2.error ?? '処理に失敗しました'); }
-
-      onDone(skipApply);
+      onDone(true);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'エラー', description: e.message });
     } finally {
@@ -95,7 +104,7 @@ function InvoiceForm({
         <div className="flex items-center gap-2 text-sm text-foreground bg-muted border border-border rounded-lg px-4 py-3">
           <CheckCircle2 className="h-4 w-4 shrink-0" />法人口座が承認済みです。請求書払いでご利用いただけます。
         </div>
-        <button onClick={() => handleApply(true)} disabled={submitting}
+        <button onClick={handlePay} disabled={submitting}
           className="w-full py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2">
           {submitting ? <><Loader2 className="h-4 w-4 animate-spin" />処理中…</> : '法人請求書払いで確定する'}
         </button>

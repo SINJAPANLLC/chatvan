@@ -1752,12 +1752,16 @@ router.post("/van/contracts/:id/pay", requireAuth, async (req: Request, res: Res
     const [contract] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.id, id));
     if (!contract) return res.status(404).json({ error: "Contract not found" });
 
-    // invoice 払いは法人口座申請済み（pending or approved）のみ許可
+    // invoice 払いは法人口座が承認済み（approved）のみ許可
     if (method === "invoice") {
       const [user] = await db.select({ creditStatus: usersTable.creditStatus })
         .from(usersTable).where(eq(usersTable.id, req.session.userId!)).limit(1);
-      if (!user || (user.creditStatus !== "pending" && user.creditStatus !== "approved")) {
-        return res.status(400).json({ error: "法人口座の申請が必要です。先に法人情報を入力してください。" });
+      if (!user || user.creditStatus !== "approved") {
+        return res.status(400).json({
+          error: user?.creditStatus === "pending"
+            ? "法人口座は現在審査中です。承認後にご利用いただけます。"
+            : "法人口座の申請が必要です。先に法人情報を入力してください。"
+        });
       }
     }
 
