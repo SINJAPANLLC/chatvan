@@ -197,7 +197,7 @@ export default function VanStatus() {
 
   const fetchEkyc = useCallback(() => {
     if (!applicationId) return;
-    fetch(apiUrl(`/van/applications/${applicationId}/identity-verification`), { credentials: 'include', headers: authHeader() })
+    fetch(apiUrl(`/van/applications/${applicationId}/identity-verification?_=${Date.now()}`), { credentials: 'include', headers: authHeader() })
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.status) { setEkycStatus(d.status); setEkycRejReason(d.rejectionReason ?? ''); } })
       .catch(() => {});
