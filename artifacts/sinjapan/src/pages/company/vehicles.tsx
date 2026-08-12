@@ -25,7 +25,7 @@ function fileToBase64(file: File): Promise<string> {
 }
 
 async function uploadPhoto(file: File, token: string): Promise<string> {
-  const urlRes = await fetch(API('/storage/uploads/request-url'), {
+  const urlRes = await fetch(API('/storage/company-uploads/request-url'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),

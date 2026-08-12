@@ -43,6 +43,39 @@ const ALLOWED_IMAGE_TYPES = new Set([
 ]);
 
 /**
+ * POST /storage/company-uploads/request-url
+ * Auth-required (non-admin): presigned PUT URL for company vehicle photos & documents.
+ * Allows images and PDFs.
+ */
+router.post(
+  '/storage/company-uploads/request-url',
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const { name, contentType } = req.body ?? {};
+    if (!name || !contentType) {
+      res.status(400).json({ error: 'name, contentType が必要です' });
+      return;
+    }
+    const allowed = new Set([
+      'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif',
+      'application/pdf',
+    ]);
+    if (!allowed.has(contentType)) {
+      res.status(400).json({ error: '画像（JPEG/PNG/WebP/HEIC）またはPDFのみアップロードできます' });
+      return;
+    }
+    try {
+      const uploadURL = await storage.getObjectEntityUploadURL();
+      const objectPath = storage.normalizeObjectEntityPath(uploadURL);
+      res.json({ uploadURL, objectPath });
+    } catch (err) {
+      console.error('[storage] company upload URL error:', err);
+      res.status(500).json({ error: 'アップロードURLの生成に失敗しました' });
+    }
+  },
+);
+
+/**
  * POST /storage/user-uploads/request-url
  * Auth-required: request a presigned PUT URL for license image upload.
  * Stores an upload claim (objectPath → userId) in DB to enable ownership verification at submit time.
