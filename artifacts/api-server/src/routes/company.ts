@@ -112,12 +112,11 @@ async function resolveRcId(userId: number, userRole: string): Promise<number | n
 router.get("/company/vehicles", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
     const rcId = await resolveRcId(req.session.userId, req.session.userRole);
-    // admin以外で rcId が取れない場合は空配列（他社の車両を見せない）
     if (!rcId && req.session.userRole !== "admin") return res.json([]);
-    const raw = rcId
-      ? await db.execute(sql`SELECT * FROM vehicles WHERE rental_company_id = ${rcId} ORDER BY created_at DESC`)
-      : await db.execute(sql`SELECT * FROM vehicles ORDER BY created_at DESC`);
-    return res.json(toRows(raw));
+    const rows = rcId
+      ? await db.select().from(vehiclesTable).where(eq(vehiclesTable.rentalCompanyId, rcId)).orderBy(sql`created_at DESC`)
+      : await db.select().from(vehiclesTable).orderBy(sql`created_at DESC`);
+    return res.json(rows);
   } catch (err) {
     return res.status(500).json({ error: "Internal error" });
   }
