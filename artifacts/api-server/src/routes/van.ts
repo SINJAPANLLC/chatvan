@@ -2160,8 +2160,22 @@ router.get("/van/applications/:id/identity-verification", requireAuth, async (re
     const app = await getOwnedApplication(appId, userId, isAdmin);
     if (!app) return res.status(404).json({ error: "Not found" });
 
-    const [result] = await db.select().from(identityVerificationsTable)
+    // application_id で検索、なければ user_id で最新の verified 記録を取得（eKYC スキップ）
+    let result: any = null;
+    const [byApp] = await db.select().from(identityVerificationsTable)
       .where(eq(identityVerificationsTable.applicationId, appId)).limit(1);
+    if (byApp) {
+      result = byApp;
+    } else {
+      const rows = await db.execute(sql`
+        SELECT * FROM identity_verifications
+        WHERE user_id = ${app.userId}
+          AND status = 'verified'
+        ORDER BY created_at DESC
+        LIMIT 1
+      `);
+      result = ((rows as any)?.rows ?? rows)[0] ?? null;
+    }
     return res.json(result ?? null);
   } catch (err) {
     return res.status(500).json({ error: "Internal error" });
