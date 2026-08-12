@@ -629,7 +629,7 @@ export default function CompanyContracts() {
     { label: '総契約数',  value: contracts.length },
     { label: '利用中',    value: contracts.filter(c => (c.application_status ?? c.status) === 'active').length },
     { label: '納車待ち',  value: contracts.filter(c => (c.application_status ?? c.status) === 'delivery_pending').length },
-    { label: '未払い',    value: contracts.filter(c => (c.application_status ?? c.status) === 'payment_issue').length },
+    { label: '返却予定',  value: contracts.filter(c => (c.application_status ?? c.status) === 'return_pending').length },
   ];
 
   return (
