@@ -104,7 +104,7 @@ ${selfieB64 ? "3枚目: 本人セルフィー（免許証の顔写真と照合�
     } catch { /* fallback */ }
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5.4-mini",
       messages: [
         { role: "system", content: ekycSystemPrompt },
         { role: "user", content: userContent }
@@ -217,7 +217,7 @@ async function runAIScreening(appId: number) {
     } catch { /* fallback */ }
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5.4-mini",
       messages: [
         {
           role: "system",
@@ -452,7 +452,7 @@ router.post("/van/start", optionalAuth, async (req: Request, res: Response) => {
 
     const systemPrompt = await getSystemPrompt(userInfo);
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5.4-mini",
       messages: [{ role: "system", content: systemPrompt }, { role: "user", content: message }],
     });
 
@@ -2554,7 +2554,7 @@ router.post("/van/breakdowns", requireAuth, async (req: Request, res: Response) 
     const userId: number | undefined = (req.session as any)?.userId;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5.4-mini",
       messages: [{ role: "system", content: BREAKDOWN_PROMPT }, { role: "user", content: message }],
     });
     const aiText = completion.choices[0]?.message?.content ?? "";
@@ -2877,31 +2877,53 @@ router.post("/van/vehicles/parse-shaken", requireAuth, async (req: Request, res:
     }
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5.4-mini",
       messages: [{
         role: "user",
         content: [
           { type: "image_url", image_url: { url: `data:${finalMime};base64,${finalBase64}`, detail: "high" } },
-          { type: "text", text: `この画像は日本の自動車検査証（車検証）です。以下のキーのJSONを返してください。読み取れない値はnullにしてください。
+          { type: "text", text: `あなたは日本の自動車検査証（車検証）のOCR専門家です。
+画像から以下の情報を正確に読み取り、JSONのみを返してください。マークダウンや説明文は不要です。
+
+【車検証のレイアウトガイド】
+- 左上エリア：「登録番号」（ナンバープレートの番号）
+- 上段中央：「車名」（メーカー名）、「型式」（車種コード）
+- 中段：「車台番号」（VIN、アルファベット+数字）、「原動機の型式」
+- 「初度登録年月」：和暦または西暦で記載（例: 令和6年 → 2024年）
+- 「有効期間の満了する日」：車検満了日（例: 令和8年8月14日 → 2026-08-14）
+- 「所有者」：車検証の所有者氏名・法人名（左下エリア）
+- 「使用者」：使用者氏名・法人名（所有者の下または右）
+- 「総排気量」：単位はL（例: 0.66L → "660cc"に変換）
+- 「燃料の種類」：ガソリン、軽油、電気、LPG等
+- 「車体の色」：白、黒、シルバー等
+
+【抽出ルール】
+- 和暦→西暦変換: 令和1年=2019年、令和2年=2020年（以降+1）、平成1年=1989年（以降+1）
+- inspectionExpiry は YYYY-MM-DD 形式で返す
+- year は4桁の西暦整数で返す
+- licensePlate は「地域名 分類番号 ひらがな 一連番号」の完全な形式（例: "横浜 300 あ 1234"）
+- engineDisplacement は "660cc" のようなcc表記に統一
+- transmission が読み取れない場合はnull（「AT」「CVT」「MT」「AMT」のいずれか）
+- 読み取れない・記載なしの項目はnullにする
+
 {
-  "licensePlate": "登録番号（例: 横浜300あ1234）",
-  "maker": "メーカー名（車名）",
-  "model": "車種・型式（例: エブリイ）",
-  "grade": "グレード",
-  "vin": "車台番号",
-  "year": "初度登録年（西暦の整数）",
-  "engineDisplacement": "排気量（例: 660cc）",
-  "fuelType": "燃料種類（例: ガソリン）",
-  "transmission": "変速機（例: AT、MT）",
-  "color": "車体色",
-  "inspectionExpiry": "車検満了日（YYYY-MM-DD形式）",
-  "inspectionCertificateOwner": "所有者の氏名または名称",
-  "inspectionCertificateUser": "使用者の氏名または名称（所有者と同じ場合はnull）"
-}
-JSONのみ返してください。` }
+  "licensePlate": null,
+  "maker": null,
+  "model": null,
+  "grade": null,
+  "vin": null,
+  "year": null,
+  "engineDisplacement": null,
+  "fuelType": null,
+  "transmission": null,
+  "color": null,
+  "inspectionExpiry": null,
+  "inspectionCertificateOwner": null,
+  "inspectionCertificateUser": null
+}` }
         ]
       }],
-      max_tokens: 600,
+      max_tokens: 800,
     });
 
     const text = completion.choices[0]?.message?.content ?? "";
