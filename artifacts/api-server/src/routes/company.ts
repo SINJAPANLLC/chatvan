@@ -192,6 +192,14 @@ router.get("/company/contracts", requireAuth, requireRentalCompany, async (req: 
       ? await db.execute(sql`
           SELECT vc.*, u.name as user_name, u.phone as user_phone, u.email as user_email,
             v.maker, v.model, v.license_plate, v.prefecture,
+            v.year, v.mileage, v.inspection_expiry, v.has_etc, v.has_dashcam, v.has_backup_cam,
+            v.photos as vehicle_photos, v.vin, v.grade, v.smoking_policy,
+            v.insurance_company, v.insurance_expiry, v.compulsory_insurance_expiry,
+            v.mileage_limit, v.excess_mileage_fee,
+            v.color, v.engine_displacement, v.fuel_type, v.transmission,
+            v.black_number_status, v.max_period_months,
+            v.shaken_cert_path, v.kensakusho_cert_path,
+            v.jibaiseki_cert_path, v.ninni_hoken_cert_path,
             va.id as application_id, va.status as application_status
           FROM van_contracts vc
           LEFT JOIN users u ON vc.user_id = u.id
@@ -203,6 +211,14 @@ router.get("/company/contracts", requireAuth, requireRentalCompany, async (req: 
       : await db.execute(sql`
           SELECT vc.*, u.name as user_name, u.phone as user_phone, u.email as user_email,
             v.maker, v.model, v.license_plate, v.prefecture,
+            v.year, v.mileage, v.inspection_expiry, v.has_etc, v.has_dashcam, v.has_backup_cam,
+            v.photos as vehicle_photos, v.vin, v.grade, v.smoking_policy,
+            v.insurance_company, v.insurance_expiry, v.compulsory_insurance_expiry,
+            v.mileage_limit, v.excess_mileage_fee,
+            v.color, v.engine_displacement, v.fuel_type, v.transmission,
+            v.black_number_status, v.max_period_months,
+            v.shaken_cert_path, v.kensakusho_cert_path,
+            v.jibaiseki_cert_path, v.ninni_hoken_cert_path,
             va.id as application_id, va.status as application_status
           FROM van_contracts vc
           LEFT JOIN users u ON vc.user_id = u.id

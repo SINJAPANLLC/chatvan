@@ -350,8 +350,8 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
 
       {/* ════ TAB: 車両 ════ */}
       {tab === 'vehicle' && (() => {
-        const v = related?.contracts?.[0] ?? contract;
-        const photos: string[] = (() => { try { const p = JSON.parse(v.vehicle_photos ?? contract.vehicle_photos ?? '[]'); return Array.isArray(p) ? p : []; } catch { return []; } })();
+        const v = contract;
+        const photos: string[] = (() => { try { const p = JSON.parse(v.vehicle_photos ?? '[]'); return Array.isArray(p) ? p : []; } catch { return []; } })();
         const vehiclePhotoUrl = (p: string) => p.startsWith('/objects/')
           ? `${import.meta.env.BASE_URL}api/storage/user-objects/${p.replace(/^\/objects\//, '')}`
           : `${import.meta.env.BASE_URL}api/storage${p}`;
