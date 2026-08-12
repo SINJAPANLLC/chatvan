@@ -403,28 +403,55 @@ router.post("/company/vehicles", requireAuth, requireRentalCompany, async (req: 
   }
 });
 
-// ── GET /company/settlements ── 支払い明細 ───────────────────────────────────
+// ── GET /company/settlements ── 支払い明細（invoices ベース）──────────────────
 router.get("/company/settlements", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
     const rcId = await resolveRcId(req.session.userId, req.session.userRole);
     if (!rcId && req.session.userRole !== "admin") return res.json([]);
+
     const raw = rcId
       ? await db.execute(sql`
-          SELECT s.*, vc.contract_number, vc.monthly_price, v.maker, v.model, v.license_plate, u.name as user_name
-          FROM settlements s
-          LEFT JOIN van_contracts vc ON s.contract_id = vc.id
-          LEFT JOIN vehicles v ON vc.vehicle_id = v.id
-          LEFT JOIN users u ON vc.user_id = u.id
-          WHERE s.rental_company_id = ${rcId}
-          ORDER BY s.period_month DESC
+          SELECT DISTINCT ON (i.id)
+            i.id,
+            to_char(i.period_start, 'YYYY-MM') AS period_month,
+            i.total_amount                     AS user_payment_amount,
+            vc.sin_japan_fee                   AS chat_van_fee,
+            (i.subtotal - COALESCE(vc.sin_japan_fee, 0)) AS rental_company_amount,
+            CASE i.status WHEN 'paid' THEN 'completed' ELSE i.status END AS status,
+            i.due_date                         AS scheduled_date,
+            i.invoice_number,
+            vc.contract_number,
+            vc.monthly_price,
+            v.maker, v.model, v.license_plate,
+            u.name AS user_name
+          FROM invoices i
+          JOIN users u ON i.user_id = u.id
+          JOIN van_contracts vc ON vc.user_id = i.user_id
+          JOIN vehicles v ON vc.vehicle_id = v.id
+          WHERE v.rental_company_id = ${rcId}
+          ORDER BY i.id, vc.created_at DESC, i.period_start DESC
         `)
       : await db.execute(sql`
-          SELECT s.*, vc.contract_number, vc.monthly_price, v.maker, v.model, v.license_plate, u.name as user_name
-          FROM settlements s
-          LEFT JOIN van_contracts vc ON s.contract_id = vc.id
-          LEFT JOIN vehicles v ON vc.vehicle_id = v.id
-          LEFT JOIN users u ON vc.user_id = u.id
-          ORDER BY s.period_month DESC
+          SELECT DISTINCT ON (i.id)
+            i.id,
+            to_char(i.period_start, 'YYYY-MM') AS period_month,
+            i.total_amount                     AS user_payment_amount,
+            vc.sin_japan_fee                   AS chat_van_fee,
+            (i.subtotal - COALESCE(vc.sin_japan_fee, 0)) AS rental_company_amount,
+            CASE i.status WHEN 'paid' THEN 'completed' ELSE i.status END AS status,
+            i.due_date                         AS scheduled_date,
+            i.invoice_number,
+            vc.contract_number,
+            vc.monthly_price,
+            v.maker, v.model, v.license_plate,
+            rc.name AS rental_company_name,
+            u.name AS user_name
+          FROM invoices i
+          JOIN users u ON i.user_id = u.id
+          JOIN van_contracts vc ON vc.user_id = i.user_id
+          JOIN vehicles v ON vc.vehicle_id = v.id
+          JOIN rental_companies rc ON v.rental_company_id = rc.id
+          ORDER BY i.id, vc.created_at DESC, i.period_start DESC
         `);
     return res.json(toRows(raw));
   } catch (err) {
