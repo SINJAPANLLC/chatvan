@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Loader2, Save, Building2, User, MapPin, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -106,7 +106,7 @@ export default function CompanySettings() {
             status === 'prospect' ? 'bg-yellow-100 text-yellow-700' :
             'bg-muted text-muted-foreground'
           }`}>
-            {status === 'active' ? '承認済み' : status === 'prospect' ? '審査中' : status}
+            {status === 'active' ? '承認済み' : status === 'prospect' ? '審査中' : status === 'suspended' ? '停止中' : '審査中'}
           </span>
         )}
       </div>

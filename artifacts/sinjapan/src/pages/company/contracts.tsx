@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Loader2, FileText, Calendar, Phone, Mail, MessageSquare, Truck, RotateCcw } from 'lucide-react';
 import { Link } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
+import { format, parseISO, isValid } from 'date-fns';
 
 const API = (path: string) => `${import.meta.env.BASE_URL}api${path}`;
 const token = () => localStorage.getItem('sinjapan_auth_token') ?? '';
@@ -164,7 +165,7 @@ export default function CompanyContracts() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-1.5 text-xs mb-0.5">
                         <Calendar className="h-3 w-3 text-muted-foreground" />
-                        開始: {c.start_date ?? c.startDate ?? '未定'}
+                        {(() => { const d = c.start_date ?? c.startDate; if (!d) return '開始: 未定'; try { const p = parseISO(d); return isValid(p) ? `開始: ${format(p, 'yyyy/MM/dd')}` : `開始: ${d}`; } catch { return `開始: ${d}`; } })()}
                       </div>
                       {c.payment_day && (
                         <div className="text-xs text-muted-foreground ml-4">

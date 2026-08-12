@@ -6,6 +6,7 @@ import {
   Truck, RotateCcw, AlertTriangle, CheckCircle,
   Loader2, Clock,
 } from 'lucide-react';
+import { format, parseISO, isValid } from 'date-fns';
 
 const API = (path: string) => `${import.meta.env.BASE_URL}api${path}`;
 const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem('sinjapan_auth_token') ?? ''}` });
@@ -127,7 +128,7 @@ function NotificationsPanel() {
                 <p className={`font-medium truncate ${n.read ? '' : 'text-foreground'}`}>{n.title}</p>
                 <p className="text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
                 <p className="text-muted-foreground/70 mt-1">
-                  {new Date(n.created_at).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  {(() => { try { const p = parseISO(n.created_at); return isValid(p) ? format(p, 'M月d日 HH:mm') : n.created_at; } catch { return n.created_at; } })()}
                 </p>
               </div>
             </div>

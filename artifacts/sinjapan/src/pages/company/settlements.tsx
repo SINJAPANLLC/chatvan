@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Loader2, RefreshCw, TrendingUp, Receipt } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { format, parseISO, isValid } from 'date-fns';
 
 const API = (p: string) => `${import.meta.env.BASE_URL}api${p}`;
 const tok = () => localStorage.getItem('sinjapan_auth_token') ?? '';
@@ -144,7 +145,7 @@ function DetailTable({ rows }: { rows: any[] }) {
               const st = STATUS[r.status] ?? STATUS.pending;
               return (
                 <tr key={r.id} className="hover:bg-muted/20 transition-colors">
-                  <td className="px-5 py-3.5 font-mono text-xs text-muted-foreground">{r.period_month ?? '—'}</td>
+                  <td className="px-5 py-3.5 text-xs text-muted-foreground">{r.period_month ? (() => { const [y,m] = String(r.period_month).split('-'); return m ? `${y}年${Number(m)}月` : r.period_month; })() : '—'}</td>
                   <td className="px-5 py-3.5">{r.maker && r.model ? `${r.maker} ${r.model}` : '—'}</td>
                   <td className="px-5 py-3.5 text-muted-foreground">{r.user_name ?? '—'}</td>
                   <td className="px-5 py-3.5 text-right">{r.user_payment_amount != null ? yen(Number(r.user_payment_amount)) : '—'}</td>
@@ -153,7 +154,7 @@ function DetailTable({ rows }: { rows: any[] }) {
                   <td className="px-5 py-3.5">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${st.cls}`}>{st.label}</span>
                   </td>
-                  <td className="px-5 py-3.5 text-xs text-muted-foreground">{r.scheduled_date ?? '—'}</td>
+                  <td className="px-5 py-3.5 text-xs text-muted-foreground">{r.scheduled_date ? (() => { try { const p = parseISO(r.scheduled_date); return isValid(p) ? format(p, 'yyyy/MM/dd') : r.scheduled_date; } catch { return r.scheduled_date; } })() : '—'}</td>
                 </tr>
               );
             })}
