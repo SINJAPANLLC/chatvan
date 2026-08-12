@@ -306,14 +306,10 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
                   <DL label="免許種別"     value={kyc.license_type} />
                   <DL label="免許番号"     value={kyc.license_number} />
                   <DL label="免許有効期限" value={fmtD(kyc.license_expiry)} />
-                  <DL label="住所"         value={kyc.address} span2 />
-                  {(kyc.emergency_contact_name || kyc.emergency_contact_phone) && (
-                    <>
-                      <DL label="緊急連絡先（氏名）"   value={kyc.emergency_contact_name} />
-                      <DL label="緊急連絡先（電話）"   value={kyc.emergency_contact_phone ? <a href={`tel:${kyc.emergency_contact_phone}`} className="hover:underline">{kyc.emergency_contact_phone}</a> : null} />
-                      {kyc.emergency_contact_relation && <DL label="続柄" value={kyc.emergency_contact_relation} />}
-                    </>
-                  )}
+                  <DL label="住所"             value={kyc.address} span2 />
+                  <DL label="緊急連絡先（氏名）" value={kyc.emergency_contact_name} />
+                  <DL label="緊急連絡先（電話）" value={kyc.emergency_contact_phone ? <a href={`tel:${kyc.emergency_contact_phone}`} className="hover:underline">{kyc.emergency_contact_phone}</a> : null} />
+                  <DL label="続柄"             value={kyc.emergency_contact_relation} />
                   {kyc.rejection_reason && <DL label="否認理由" value={kyc.rejection_reason} span2 />}
                 </dl>
                 {(kyc.license_front || kyc.license_back || kyc.selfie_photo) && (
