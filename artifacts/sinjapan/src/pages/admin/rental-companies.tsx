@@ -23,10 +23,10 @@ const STATUS_COLOR: Record<string, string> = {
   terminated: 'bg-zinc-100 text-zinc-600',
 };
 
-const TABS = ['全て', '申請中', '審査中', '承認済', '停止中'] as const;
+const TABS = ['全て', '申請中', '承認済', '停止中'] as const;
 type Tab = typeof TABS[number];
 const TAB_STATUS: Record<Tab, string | null> = {
-  '全て': null, '申請中': 'prospect', '審査中': 'reviewing', '承認済': 'active', '停止中': 'suspended',
+  '全て': null, '申請中': 'prospect', '承認済': 'active', '停止中': 'suspended',
 };
 
 export default function AdminRentalCompanies() {
@@ -218,13 +218,7 @@ export default function AdminRentalCompanies() {
                   <td className="px-5 py-4">
                     <div className="flex items-center justify-end gap-1 flex-wrap">
                       {/* ステータス変更 */}
-                      {c.status === 'prospect' && (
-                        <button onClick={() => changeStatus(c.id, 'reviewing')} disabled={changingStatus === c.id}
-                          className="px-2.5 py-1 text-xs bg-amber-100 text-amber-700 rounded-md hover:bg-amber-200 font-medium disabled:opacity-50">
-                          審査開始
-                        </button>
-                      )}
-                      {c.status === 'reviewing' && (<>
+                      {(c.status === 'prospect' || c.status === 'reviewing') && (<>
                         <button onClick={() => changeStatus(c.id, 'active')} disabled={changingStatus === c.id}
                           className="flex items-center gap-1 px-2.5 py-1 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200 font-medium disabled:opacity-50">
                           <CheckCircle className="h-3 w-3" />承認
