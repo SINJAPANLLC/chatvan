@@ -25,6 +25,7 @@ import {
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { requireAuth, requireAdmin, optionalAuth } from "../middlewares/auth";
 import { openai } from "@workspace/integrations-openai-ai-server";
+import { logUserActivity } from "../lib/userLogger";
 import { randomUUID } from "crypto";
 import { squareFetch } from "../lib/square-authorize";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
@@ -95,15 +96,17 @@ ${selfieB64 ? "3枚目: 本人セルフィー（免許証の顔写真と照合�
     if (backB64)  userContent.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${backB64}`,  detail: "high" } });
     if (selfieB64) userContent.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${selfieB64}`, detail: "high" } });
 
+    // eKYCプロンプトをDB優先で取得
+    let ekycSystemPrompt = `あなたは日本の運転免許証と顔写真を審査するeKYCシステムです。\n提出データ・免許証画像・セルフィーを総合的に照合し、以下のJSONのみ返してください:\n{"result": "verified" | "rejected", "reason": "理由（日本語、30文字以内）"}`;
+    try {
+      const [row] = await db.select().from(settingsTable).where(eq(settingsTable.key, "ai_ekyc_prompt")).limit(1);
+      if (row?.value) ekycSystemPrompt = row.value;
+    } catch { /* fallback */ }
+
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        {
-          role: "system",
-          content: `あなたは日本の運転免許証と顔写真を審査するeKYCシステムです。
-提出データ・免許証画像・セルフィーを総合的に照合し、以下のJSONのみ返してください:
-{"result": "verified" | "rejected", "reason": "理由（日本語、30文字以内）"}`
-        },
+        { role: "system", content: ekycSystemPrompt },
         { role: "user", content: userContent }
       ],
       response_format: { type: "json_object" },
@@ -206,21 +209,19 @@ async function runAIScreening(appId: number) {
     const [app] = await db.select().from(vanApplicationsTable).where(eq(vanApplicationsTable.id, appId));
     if (!app || app.status !== "application_received") return;
 
+    // 審査プロンプトをDB優先で取得
+    let screeningSystemPrompt = `あなたは軽バン月額レンタルサービスの申込審査AIです。\n申込データを分析し、以下のJSONのみ返してください:\n{"result": "approved" | "rejected", "reason": "理由（日本語、50文字以内）"}\n\n【審査方針】\n初めて車を借りるユーザーがほとんどのため、保険・黒ナンバー・配送経験は一切審査対象にしない。\n以下の2条件のみで判断する:\n1. 利用目的が明らかに違法（麻薬・密輸・犯罪等）でないこと\n2. 申込内容が明らかな嫌がらせ・テスト・無意味な入力でないこと\n上記に該当しない限り、必ず approved にすること。`;
+    try {
+      const [row] = await db.select().from(settingsTable).where(eq(settingsTable.key, "ai_screening_prompt")).limit(1);
+      if (row?.value) screeningSystemPrompt = row.value;
+    } catch { /* fallback */ }
+
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: `あなたは軽バン月額レンタルサービスの申込審査AIです。
-申込データを分析し、以下のJSONのみ返してください:
-{"result": "approved" | "rejected", "reason": "理由（日本語、50文字以内）"}
-
-【審査方針】
-初めて車を借りるユーザーがほとんどのため、保険・黒ナンバー・配送経験は一切審査対象にしない。
-以下の2条件のみで判断する:
-1. 利用目的が明らかに違法（麻薬・密輸・犯罪等）でないこと
-2. 申込内容が明らかな嫌がらせ・テスト・無意味な入力でないこと
-上記に該当しない限り、必ず approved にすること。`
+          content: screeningSystemPrompt
         },
         {
           role: "user",
@@ -485,6 +486,14 @@ router.post("/van/start", optionalAuth, async (req: Request, res: Response) => {
       }
     }
 
+    logUserActivity({
+      userId: userId ?? null,
+      action: "chat_start",
+      detail: `相談開始: ${message.slice(0, 80)}`,
+      targetId: app.id,
+      targetType: "application",
+      req,
+    }).catch(() => {});
     return res.status(201).json({ applicationId: app.id, conversationId: app.id, aiMessage: cleanText(aiText), options, isComplete: !!inquiry });
   } catch (err) {
     console.error("van/start error:", err);
@@ -550,6 +559,15 @@ router.post("/van/applications/:id/messages", optionalAuth, async (req: Request,
     const inquiry = parseVanInquiry(aiText);
 
     await db.insert(vanMessagesTable).values({ vanApplicationId: appId, role: "assistant", content: aiText });
+
+    logUserActivity({
+      userId: sessionUserId ?? null,
+      action: "chat_message",
+      detail: message.slice(0, 80),
+      targetId: appId,
+      targetType: "application",
+      req,
+    }).catch(() => {});
 
     if (inquiry && app.status === "new") {
       const budget   = (inquiry.monthlyBudget as number) ?? app.monthlyBudget ?? 0;
@@ -2852,6 +2870,76 @@ router.delete("/van/rental-companies/:id", requireAuth, requireAdmin, async (req
     await db.delete(rentalCompaniesTable).where(eq(rentalCompaniesTable.id, id));
     return res.status(204).send();
   } catch (err) {
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── PATCH /van/rental-companies/:id/status ── 管理者ステータス変更 ──────────
+router.patch("/van/rental-companies/:id/status", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(String(req.params.id));
+    const { status, notes } = req.body as { status: string; notes?: string };
+    const valid = ["prospect", "reviewing", "active", "suspended", "terminated"];
+    if (!valid.includes(status)) return res.status(400).json({ error: "無効なステータスです" });
+
+    const [updated] = await db.update(rentalCompaniesTable)
+      .set({ status: status as any, ...(notes !== undefined ? { notes } : {}), updatedAt: new Date() })
+      .where(eq(rentalCompaniesTable.id, id)).returning();
+    if (!updated) return res.status(404).json({ error: "会社が見つかりません" });
+
+    const msgs: Record<string, { title: string; message: string }> = {
+      active:     { title: "審査が通過しました",       message: "Chat VANパートナー審査が通過しました。ポータルへのアクセスが有効になりました。" },
+      reviewing:  { title: "審査中です",              message: "登録申請を受け付けました。審査中ですのでしばらくお待ちください。" },
+      suspended:  { title: "アカウントを停止しました", message: "アカウントが一時停止されました。詳細はSIN JAPANにお問い合わせください。" },
+      terminated: { title: "契約が終了しました",       message: "Chat VANパートナー契約が終了しました。" },
+    };
+    const msg = msgs[status];
+    if (msg) {
+      const raw = await db.execute(sql`SELECT id FROM users WHERE rental_company_id = ${id}`);
+      const rows = (raw as any)?.rows ?? (Array.isArray(raw) ? raw : []);
+      for (const u of rows) {
+        await db.insert(notificationsTable).values({ userId: (u as any).id, title: msg.title, message: msg.message });
+      }
+    }
+    return res.json(updated);
+  } catch (err) {
+    console.error("rental-company status error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── POST /van/vehicles/:id/review ── 管理者が車両を審査 ──────────────────────
+router.post("/van/vehicles/:id/review", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const vehicleId = parseInt(String(req.params.id));
+    const { action, reason } = req.body as { action: "approve" | "reject"; reason?: string };
+    if (action !== "approve" && action !== "reject") {
+      return res.status(400).json({ error: "action は approve または reject のみ有効です" });
+    }
+    const [vehicle] = await db.select().from(vehiclesTable).where(eq(vehiclesTable.id, vehicleId));
+    if (!vehicle) return res.status(404).json({ error: "車両が見つかりません" });
+
+    const newStatus = action === "approve" ? "available" : "unavailable";
+    const [updated] = await db.update(vehiclesTable).set({
+      status: newStatus as any,
+      ...(action === "reject" && reason ? { notes: reason } : {}),
+      updatedAt: new Date(),
+    }).where(eq(vehiclesTable.id, vehicleId)).returning();
+
+    if (vehicle.rentalCompanyId) {
+      const raw = await db.execute(sql`SELECT id FROM users WHERE rental_company_id = ${vehicle.rentalCompanyId}`);
+      const rows = (raw as any)?.rows ?? (Array.isArray(raw) ? raw : []);
+      const title = action === "approve" ? "車両が承認されました" : "車両が却下されました";
+      const message = action === "approve"
+        ? `${vehicle.maker} ${vehicle.model} が承認されました。マッチングに使用されます。`
+        : `${vehicle.maker} ${vehicle.model} が却下されました。理由: ${reason ?? "なし"}`;
+      for (const u of rows) {
+        await db.insert(notificationsTable).values({ userId: (u as any).id, title, message });
+      }
+    }
+    return res.json(updated);
+  } catch (err) {
+    console.error("vehicle review error:", err);
     return res.status(500).json({ error: "Internal error" });
   }
 });

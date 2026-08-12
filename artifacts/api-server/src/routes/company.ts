@@ -4,7 +4,7 @@ import { eq, sql } from "drizzle-orm";
 import { requireAuth, requireRentalCompany } from "../middlewares/auth";
 import {
   vehiclesTable, vanContractsTable, usersTable,
-  rentalCompaniesTable, notificationsTable,
+  rentalCompaniesTable, notificationsTable, settlementsTable,
 } from "@workspace/db";
 
 const router = Router();
@@ -226,6 +226,107 @@ router.get("/company/gps", requireAuth, requireRentalCompany, async (req: Reques
         `);
     return res.json(toRows(raw));
   } catch (err) {
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── POST /company/register ── 公開エンドポイント（認証不要）──────────────────
+router.post("/company/register", async (req: Request, res: Response) => {
+  try {
+    const { companyName, corporateName, contactName, phone, email, address, serviceAreas, fleetSize, notes } = req.body;
+    if (!companyName || !contactName || !phone || !email) {
+      return res.status(400).json({ error: "会社名・担当者名・電話番号・メールアドレスは必須です" });
+    }
+    const [company] = await db.insert(rentalCompaniesTable).values({
+      name: companyName,
+      corporateName: corporateName || null,
+      contactName,
+      phone,
+      email,
+      address: address || null,
+      serviceAreas: serviceAreas || null,
+      fleetSize: fleetSize ? parseInt(String(fleetSize)) : null,
+      notes: notes || null,
+      status: "prospect",
+    } as any).returning();
+    const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
+    for (const admin of admins) {
+      await db.insert(notificationsTable).values({
+        userId: admin.id,
+        title: "協力会社登録申請",
+        message: `${companyName} から登録申請が届きました`,
+      });
+    }
+    return res.json({ ok: true, id: company.id });
+  } catch (err) {
+    console.error("company/register error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── POST /company/vehicles ── 協力会社が車両を登録申請 ──────────────────────
+router.post("/company/vehicles", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
+  try {
+    const rcId = await getMyCompanyId(req.session.userId);
+    if (!rcId) return res.status(403).json({ error: "会社が紐付けられていません" });
+    const { maker, model, year, licensePlate, prefecture, monthlyPrice, notes, insuranceCompany, inspectionExpiryDate } = req.body;
+    if (!maker || !model || !monthlyPrice) {
+      return res.status(400).json({ error: "メーカー・モデル・月額料金は必須です" });
+    }
+    const [vehicle] = await db.insert(vehiclesTable).values({
+      maker,
+      model,
+      year: year ? parseInt(String(year)) : null,
+      licensePlate: licensePlate || null,
+      prefecture: prefecture || null,
+      monthlyPrice: String(monthlyPrice),
+      sinJapanFee: "0",
+      notes: notes || null,
+      insuranceCompany: insuranceCompany || null,
+      inspectionExpiryDate: inspectionExpiryDate || null,
+      rentalCompanyId: rcId,
+      status: "reviewing",
+    } as any).returning();
+    const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
+    for (const admin of admins) {
+      await db.insert(notificationsTable).values({
+        userId: admin.id,
+        title: "車両登録申請",
+        message: `${maker} ${model} の登録申請が届きました（会社ID: ${rcId}）`,
+      });
+    }
+    return res.json(vehicle);
+  } catch (err) {
+    console.error("company/vehicles POST error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── GET /company/settlements ── 支払い明細 ───────────────────────────────────
+router.get("/company/settlements", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
+  try {
+    const rcId = await resolveRcId(req.session.userId, req.session.userRole);
+    const raw = rcId
+      ? await db.execute(sql`
+          SELECT s.*, vc.contract_number, vc.monthly_price, v.maker, v.model, v.license_plate, u.name as user_name
+          FROM settlements s
+          LEFT JOIN van_contracts vc ON s.contract_id = vc.id
+          LEFT JOIN vehicles v ON vc.vehicle_id = v.id
+          LEFT JOIN users u ON vc.user_id = u.id
+          WHERE s.rental_company_id = ${rcId}
+          ORDER BY s.period_month DESC
+        `)
+      : await db.execute(sql`
+          SELECT s.*, vc.contract_number, vc.monthly_price, v.maker, v.model, v.license_plate, u.name as user_name
+          FROM settlements s
+          LEFT JOIN van_contracts vc ON s.contract_id = vc.id
+          LEFT JOIN vehicles v ON vc.vehicle_id = v.id
+          LEFT JOIN users u ON vc.user_id = u.id
+          ORDER BY s.period_month DESC
+        `);
+    return res.json(toRows(raw));
+  } catch (err) {
+    console.error("company/settlements error:", err);
     return res.status(500).json({ error: "Internal error" });
   }
 });

@@ -44,12 +44,14 @@ const AdminPricing          = lazy(() => import('@/pages/admin/pricing'));
 const ContractChat = lazy(() => import('@/pages/contract-chat'));
 
 // 協力会社ポータル
-const CompanyDashboard  = lazy(() => import('@/pages/company/dashboard'));
-const CompanyVehicles   = lazy(() => import('@/pages/company/vehicles'));
-const CompanyContracts  = lazy(() => import('@/pages/company/contracts'));
-const CompanyInsurance  = lazy(() => import('@/pages/company/insurance'));
-const CompanyGps        = lazy(() => import('@/pages/company/gps'));
-const CompanyContact    = lazy(() => import('@/pages/company/contact'));
+const CompanyDashboard   = lazy(() => import('@/pages/company/dashboard'));
+const CompanyVehicles    = lazy(() => import('@/pages/company/vehicles'));
+const CompanyContracts   = lazy(() => import('@/pages/company/contracts'));
+const CompanyInsurance   = lazy(() => import('@/pages/company/insurance'));
+const CompanyGps         = lazy(() => import('@/pages/company/gps'));
+const CompanyContact     = lazy(() => import('@/pages/company/contact'));
+const CompanySettlements = lazy(() => import('@/pages/company/settlements'));
+const CompanyRegister    = lazy(() => import('@/pages/company/register'));
 
 // Chat VAN 固有管理画面
 const AdminInsurance        = lazy(() => import('@/pages/admin/insurance'));
@@ -61,6 +63,8 @@ const AdminScreening        = lazy(() => import('@/pages/admin/screening'));
 const AdminCorporate        = lazy(() => import('@/pages/admin/corporate'));
 const AdminInvoices         = lazy(() => import('@/pages/admin/invoices'));
 const AdminAuditLogs        = lazy(() => import('@/pages/admin/audit-logs'));
+const AdminUserLogs         = lazy(() => import('@/pages/admin/user-logs'));
+const AdminCompanyVehicles  = lazy(() => import('@/pages/admin/company-vehicles'));
 const AdminFinance          = lazy(() => import('@/pages/admin/finance'));
 const AdminBlog             = lazy(() => import('@/pages/admin/blog'));
 const AdminEmailMarketing   = lazy(() => import('@/pages/admin/email-marketing'));
@@ -145,6 +149,12 @@ function Router() {
         <Route path="/admin/audit-logs">
           <AdminLayout><AdminAuditLogs /></AdminLayout>
         </Route>
+        <Route path="/admin/user-logs">
+          <AdminLayout><AdminUserLogs /></AdminLayout>
+        </Route>
+        <Route path="/admin/company-vehicles">
+          <AdminLayout><AdminCompanyVehicles /></AdminLayout>
+        </Route>
         <Route path="/admin/finance">
           <AdminLayout><AdminFinance /></AdminLayout>
         </Route>
@@ -183,6 +193,10 @@ function Router() {
         <Route path="/company/contact">
           <CompanyLayout><CompanyContact /></CompanyLayout>
         </Route>
+        <Route path="/company/settlements">
+          <CompanyLayout><CompanySettlements /></CompanyLayout>
+        </Route>
+        <Route path="/company/register" component={CompanyRegister} />
 
         {/* User Routes */}
         <Route path="/">

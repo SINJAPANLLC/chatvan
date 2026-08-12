@@ -3,13 +3,14 @@ import { Link, useLocation } from 'wouter';
 import { useGetMe, useLogout } from '@workspace/api-client-react';
 import {
   LayoutDashboard, Car, FileText, Shield, MapPin,
-  Loader2, ArrowLeft, Menu, X, MessageSquare,
+  Loader2, ArrowLeft, Menu, X, MessageSquare, Receipt,
 } from 'lucide-react';
 
 const navItems = [
   { href: '/company',           label: 'ダッシュボード',         icon: LayoutDashboard },
   { href: '/company/vehicles',  label: '自社車両',               icon: Car },
-  { href: '/company/contracts', label: '契約・ユーザー',         icon: FileText },
+  { href: '/company/contracts',    label: '契約・ユーザー',   icon: FileText },
+  { href: '/company/settlements',  label: '支払い明細',       icon: Receipt },
   { href: '/company/insurance', label: '保険管理',               icon: Shield },
   { href: '/company/gps',       label: 'GPS確認',                icon: MapPin },
   { href: '/company/contact',   label: 'SIN JAPANへ問い合わせ', icon: MessageSquare },

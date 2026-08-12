@@ -25,6 +25,7 @@ import vanExtrasRouter from "./van-extras";
 import companyRouter from "./company";
 import contractChatRouter from "./contract-chat";
 import storageRouter from "./storage";
+import userLogsRouter from "./user-logs";
 
 const router: IRouter = Router();
 
@@ -54,5 +55,6 @@ router.use(vanExtrasRouter);
 router.use(companyRouter);
 router.use(contractChatRouter);
 router.use(storageRouter);
+router.use(userLogsRouter);
 
 export default router;

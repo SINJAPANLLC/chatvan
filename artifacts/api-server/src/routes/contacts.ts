@@ -3,6 +3,7 @@ import { db, contactsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/auth";
 import { sendEmail, buildEmailHtml, ADMIN_NOTIFY_EMAIL } from "../lib/email";
+import { logUserActivity } from "../lib/userLogger";
 
 const router: IRouter = Router();
 
@@ -41,6 +42,7 @@ router.post("/contact", async (req, res): Promise<void> => {
     ).catch(() => {});
   }
 
+  logUserActivity({ action: "contact_sent", detail: `件名: ${subject}`, targetId: contact.id, targetType: "contact", req }).catch(() => {});
   res.json({ ok: true, id: contact.id });
 });
 

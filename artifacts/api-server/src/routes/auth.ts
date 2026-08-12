@@ -7,6 +7,7 @@ import { LoginBody, RegisterBody } from "@workspace/api-zod";
 import { generateToken, setToken, deleteToken, getToken } from "../lib/tokenStore";
 import { requireAuth } from "../middlewares/auth";
 import { sendEmail, buildEmailHtml } from "../lib/email";
+import { logUserActivity } from "../lib/userLogger";
 
 const router: IRouter = Router();
 
@@ -25,12 +26,14 @@ router.post("/auth/login", async (req, res): Promise<void> => {
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
   if (!user) {
+    logUserActivity({ action: "login_failed", detail: `未登録メール: ${email}`, req }).catch(() => {});
     res.status(401).json({ error: "メールアドレスまたはパスワードが間違っています" });
     return;
   }
 
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) {
+    logUserActivity({ userId: user.id, userName: user.name, userEmail: user.email, action: "login_failed", detail: "パスワード不一致", req }).catch(() => {});
     res.status(401).json({ error: "メールアドレスまたはパスワードが間違っています" });
     return;
   }
@@ -44,6 +47,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
   req.session.userRole = user.role;
   req.session.userEmail = user.email;
 
+  logUserActivity({ userId: user.id, userName: user.name, userEmail: user.email, action: "login", req }).catch(() => {});
   res.json({ user: formatUser(user), token });
 });
 
@@ -77,15 +81,16 @@ router.post("/auth/register", async (req, res): Promise<void> => {
   // ウェルカムメール送信（非同期・失敗しても登録成功）
   sendEmail(
     user.email,
-    '【Chat LOGI】ご登録ありがとうございます',
+    '【Chat VAN】ご登録ありがとうございます',
     buildEmailHtml({
-      subject: '【Chat LOGI】ご登録ありがとうございます',
+      subject: '【Chat VAN】ご登録ありがとうございます',
       recipientName: user.name ?? undefined,
-      body: 'この度はChat LOGIにご登録いただきありがとうございます。\n\nチャットで運びたい荷物を教えていただくだけで、Chat LOGIがすべて手配いたします。\nいつでもお気軽にご利用ください。',
-      ctaText: 'Chat LOGIを使ってみる →',
+      body: 'この度はChat VANにご登録いただきありがとうございます。\n\nチャットで希望条件を伝えるだけで、あなたに合った軽バンをご提案します。\nいつでもお気軽にご相談ください。',
+      ctaText: 'Chat VANを使ってみる →',
     })
   ).catch(() => {});
 
+  logUserActivity({ userId: user.id, userName: user.name, userEmail: user.email, action: "register", req }).catch(() => {});
   res.status(201).json({ user: formatUser(user), token });
 });
 
@@ -98,6 +103,7 @@ router.post("/auth/forgot-password", async (req, res): Promise<void> => {
   // ユーザーが存在しなくても成功を返す（列挙攻撃防止）
   if (!user) { res.json({ ok: true }); return; }
 
+  logUserActivity({ userId: user.id, userName: user.name, userEmail: user.email, action: "password_reset_request", req }).catch(() => {});
   const token = randomUUID();
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1時間有効
 
@@ -156,7 +162,10 @@ router.post("/auth/logout", async (req, res): Promise<void> => {
   if (authHeader?.startsWith("Bearer ")) {
     await deleteToken(authHeader.slice(7));
   }
+  const userId = req.session.userId;
+  const userEmail = req.session.userEmail;
   req.session.destroy(() => {});
+  if (userId) logUserActivity({ userId, userEmail: userEmail ?? null, action: "logout", req }).catch(() => {});
   res.json({ success: true });
 });
 
@@ -219,6 +228,7 @@ router.patch("/auth/me", requireAuth, async (req, res): Promise<void> => {
   }
 
   const [updated] = await db.update(usersTable).set(updates).where(eq(usersTable.id, user.id)).returning();
+  logUserActivity({ userId: user.id, userName: user.name, userEmail: user.email, action: "profile_update", req }).catch(() => {});
   res.json(formatUser(updated));
 });
 

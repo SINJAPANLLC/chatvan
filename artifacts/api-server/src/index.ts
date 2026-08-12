@@ -327,6 +327,14 @@ async function runMigrations() {
       ip_address TEXT, user_agent TEXT,
       created_at TIMESTAMP DEFAULT NOW() NOT NULL
     )`,
+    `CREATE TABLE IF NOT EXISTS user_activity_logs (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER, user_name TEXT, user_email TEXT,
+      action TEXT NOT NULL, label TEXT, detail TEXT,
+      target_id TEXT, target_type TEXT,
+      ip_address TEXT, user_agent TEXT,
+      created_at TIMESTAMP DEFAULT NOW() NOT NULL
+    )`,
     `CREATE TABLE IF NOT EXISTS settlements (
       id SERIAL PRIMARY KEY,
       contract_id INTEGER REFERENCES van_contracts(id) NOT NULL,
@@ -437,6 +445,14 @@ async function runMigrations() {
   try {
     await db.execute(sql`ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS target_type TEXT NOT NULL DEFAULT 'user'`);
     logger.info("migration: blog_posts target_type column ready");
+  } catch (e: any) {
+    logger.warn({ err: e.message }, "migration warning (non-fatal)");
+  }
+
+  // vehicles rejection_reason カラム
+  try {
+    await db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS rejection_reason TEXT`);
+    logger.info("migration: vehicles.rejection_reason column ready");
   } catch (e: any) {
     logger.warn({ err: e.message }, "migration warning (non-fatal)");
   }
