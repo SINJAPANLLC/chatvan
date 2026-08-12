@@ -179,6 +179,7 @@ router.patch("/company/vehicles/:id", requireAuth, requireRentalCompany, async (
     }).filter(([, v]) => v !== undefined)) as any).where(eq(vehiclesTable.id, id)).returning();
     return res.json(updated);
   } catch (err) {
+    console.error("company/vehicles PATCH error:", err);
     return res.status(500).json({ error: "Internal error" });
   }
 });
@@ -377,7 +378,7 @@ router.post("/company/vehicles", requireAuth, requireRentalCompany, async (req: 
       await db.insert(notificationsTable).values({
         userId: admin.id,
         title: "車両登録申請",
-        message: `${maker} ${model} の登録申請が届きました（会社ID: ${rcId}）`,
+        message: `${b.maker} ${b.model} の登録申請が届きました（会社ID: ${rcId}）`,
       });
     }
     return res.json(vehicle);
