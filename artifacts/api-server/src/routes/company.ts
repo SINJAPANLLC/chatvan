@@ -233,10 +233,19 @@ router.get("/company/gps", requireAuth, requireRentalCompany, async (req: Reques
 // ── POST /company/register ── 公開エンドポイント（認証不要）──────────────────
 router.post("/company/register", async (req: Request, res: Response) => {
   try {
-    const { companyName, corporateName, contactName, phone, email, address, serviceAreas, fleetSize, notes } = req.body;
+    const { companyName, corporateName, contactName, phone, email, password, address, serviceAreas, fleetSize, notes } = req.body;
     if (!companyName || !contactName || !phone || !email) {
       return res.status(400).json({ error: "会社名・担当者名・電話番号・メールアドレスは必須です" });
     }
+    if (!password || String(password).length < 6) {
+      return res.status(400).json({ error: "パスワードは6文字以上で入力してください" });
+    }
+    // メール重複チェック
+    const existing = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, email)).limit(1);
+    if (existing.length > 0) {
+      return res.status(409).json({ error: "このメールアドレスは既に登録されています" });
+    }
+    // 会社レコード作成
     const [company] = await db.insert(rentalCompaniesTable).values({
       name: companyName,
       corporateName: corporateName || null,
@@ -249,6 +258,17 @@ router.post("/company/register", async (req: Request, res: Response) => {
       notes: notes || null,
       status: "prospect",
     } as any).returning();
+    // ユーザーアカウント作成
+    const bcrypt = await import("bcryptjs");
+    const passwordHash = await bcrypt.hash(String(password), 10);
+    await db.insert(usersTable).values({
+      email,
+      passwordHash,
+      name: contactName,
+      role: "rental_company",
+      rentalCompanyId: company.id,
+    } as any);
+    // 管理者通知
     const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
     for (const admin of admins) {
       await db.insert(notificationsTable).values({

@@ -6,6 +6,7 @@ const _ = PREFS; // suppress unused warning
 export default function CompanyRegister() {
   const [form, setForm] = useState({
     companyName: '', corporateName: '', contactName: '', phone: '', email: '',
+    password: '', passwordConfirm: '',
     address: '', serviceAreas: '', fleetSize: '', notes: '',
   });
   const [submitting, setSubmitting] = useState(false);
@@ -20,6 +21,8 @@ export default function CompanyRegister() {
     if (!form.companyName || !form.contactName || !form.phone || !form.email) {
       setError('会社名・担当者名・電話番号・メールアドレスは必須です'); return;
     }
+    if (form.password.length < 6) { setError('パスワードは6文字以上で入力してください'); return; }
+    if (form.password !== form.passwordConfirm) { setError('パスワードが一致していません'); return; }
     setSubmitting(true); setError('');
     try {
       const r = await fetch(`${import.meta.env.BASE_URL}api/company/register`, {
@@ -81,6 +84,14 @@ export default function CompanyRegister() {
               <div className="sm:col-span-2 space-y-1.5">
                 <label className="text-sm font-medium">メールアドレス <span className="text-red-500">*</span></label>
                 <input type="email" value={form.email} onChange={set('email')} placeholder="例: info@company.jp" className={ic} required />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">パスワード <span className="text-red-500">*</span></label>
+                <input type="password" value={form.password} onChange={set('password')} placeholder="6文字以上" className={ic} required />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">パスワード（確認） <span className="text-red-500">*</span></label>
+                <input type="password" value={form.passwordConfirm} onChange={set('passwordConfirm')} placeholder="もう一度入力" className={ic} required />
               </div>
               <div className="sm:col-span-2 space-y-1.5">
                 <label className="text-sm font-medium">住所 <span className="text-muted-foreground text-xs font-normal">（任意）</span></label>
