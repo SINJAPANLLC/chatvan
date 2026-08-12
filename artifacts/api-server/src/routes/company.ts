@@ -433,6 +433,28 @@ router.get("/company/settlements", requireAuth, requireRentalCompany, async (req
   }
 });
 
+// ── GET /company/contracts/:id/incidents ── 契約の事故・故障一覧 ──────────────
+router.get("/company/contracts/:id/incidents", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
+  try {
+    const contractId = Number(req.params.id);
+    const rcId = await resolveRcId(req.session.userId, req.session.userRole);
+    // 自社の契約かチェック
+    const raw = await db.execute(sql`
+      SELECT vi.*
+      FROM van_incidents vi
+      JOIN van_contracts vc ON vi.contract_id = vc.id
+      JOIN vehicles v ON vc.vehicle_id = v.id
+      WHERE vi.contract_id = ${contractId}
+        AND (${rcId}::int IS NULL OR v.rental_company_id = ${rcId})
+      ORDER BY vi.created_at DESC
+    `);
+    return res.json(toRows(raw));
+  } catch (err) {
+    console.error("company/contracts/:id/incidents error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
 // ── GET /company/notifications ── ログインユーザーの通知一覧 ─────────────────
 router.get("/company/notifications", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {

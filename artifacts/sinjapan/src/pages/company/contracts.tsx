@@ -74,10 +74,13 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
   const [tab, setTab] = useState<DetailTab>('overview');
   const [related, setRelated] = useState<any>(null);
   const [relLoading, setRelLoading] = useState(false);
+  const [incidents, setIncidents] = useState<any[] | null>(null);
+  const [incLoading, setIncLoading] = useState(false);
   const [confirming, setConfirming] = useState<string | null>(null);
 
-  const RELATED_TABS: DetailTab[] = ['customer', 'vehicle', 'contract', 'incident'];
+  const RELATED_TABS: DetailTab[] = ['customer', 'vehicle', 'contract'];
   const appId = contract.application_id;
+  const contractId = contract.id;
 
   const loadRelated = async () => {
     if (related || relLoading || !appId) return;
@@ -88,7 +91,18 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
     } finally { setRelLoading(false); }
   };
 
+  const loadIncidents = async () => {
+    if (incidents !== null || incLoading || !contractId) return;
+    setIncLoading(true);
+    try {
+      const r = await fetch(API(`/company/contracts/${contractId}/incidents`), { headers: { Authorization: `Bearer ${tok()}` } });
+      if (r.ok) setIncidents(await r.json());
+      else setIncidents([]);
+    } finally { setIncLoading(false); }
+  };
+
   useEffect(() => { if (RELATED_TABS.includes(tab)) loadRelated(); }, [tab]);
+  useEffect(() => { if (tab === 'incident') loadIncidents(); }, [tab]);
 
   const confirmPickup = async () => {
     if (!appId || !confirm('受取確認を行いますか？')) return;
@@ -508,11 +522,11 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
       {/* ════ TAB: 事故・故障 ════ */}
       {tab === 'incident' && (
         <div className="space-y-4">
-          {relLoading ? (
+          {incLoading ? (
             <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-muted-foreground" /></div>
-          ) : !related?.incidents?.length ? (
+          ) : !incidents?.length ? (
             <div className="bg-card border border-border rounded-xl p-12 text-center text-muted-foreground text-sm">事故・故障の報告はありません</div>
-          ) : related.incidents.map((inc: any) => (
+          ) : incidents.map((inc: any) => (
             <Section key={inc.id} title={`#${inc.id} ${inc.incident_type === 'accident' ? '🚨 事故' : inc.incident_type === 'breakdown' ? '🔧 故障' : '報告'}`}>
               <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
                 <DL label="ステータス" value={
