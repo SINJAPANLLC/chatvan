@@ -168,12 +168,10 @@ function DetailTable({ rows, initialMonth }: { rows: any[]; initialMonth: string
 
       {/* サマリーカード */}
       {monthRows.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {[
-            { label: '件数',       value: `${monthRows.length}件` },
-            { label: '完了',       value: `${completedCnt}件` },
-            { label: 'ユーザー入金', value: yen(totalUser) },
-            { label: '受取額合計',  value: yen(totalAmount), bold: true },
+            { label: '件数', value: `${monthRows.length}件` },
+            { label: '月額合計', value: yen(totalUser), bold: true },
           ].map(c => (
             <div key={c.label} className="rounded-xl border border-border bg-card px-4 py-3">
               <div className="text-xs text-muted-foreground mb-1">{c.label}</div>
@@ -192,51 +190,30 @@ function DetailTable({ rows, initialMonth }: { rows: any[]; initialMonth: string
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">契約番号</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">車両</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">ご利用者</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">方式</th>
                 <th className="px-4 py-3 text-right font-medium text-muted-foreground">月額</th>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground">手数料</th>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground">受取額</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">ステータス</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border bg-card">
               {monthRows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-sm text-muted-foreground">
+                  <td colSpan={4} className="py-12 text-center text-sm text-muted-foreground">
                     この月の明細データはありません
                   </td>
                 </tr>
-              ) : monthRows.map(r => {
-                const st = STATUS[r.status] ?? STATUS.pending;
-                const methodLabel = r.payment_method === 'card' ? 'カード' : '請求書';
-                return (
-                  <tr key={r.id} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-3.5 text-xs text-muted-foreground font-mono">{r.contract_number ?? '—'}</td>
-                    <td className="px-4 py-3.5">{r.maker && r.model ? `${r.maker} ${r.model}` : '—'}</td>
-                    <td className="px-4 py-3.5 text-muted-foreground">{r.user_name ?? '—'}</td>
-                    <td className="px-4 py-3.5">
-                      <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${r.payment_method === 'card' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-muted text-muted-foreground border-border'}`}>
-                        {methodLabel}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 text-right">{r.user_payment_amount != null ? yen(Number(r.user_payment_amount)) : '—'}</td>
-                    <td className="px-4 py-3.5 text-right text-muted-foreground">{r.chat_van_fee != null ? yen(Number(r.chat_van_fee)) : '—'}</td>
-                    <td className="px-4 py-3.5 text-right font-semibold">{r.rental_company_amount != null ? yen(Number(r.rental_company_amount)) : '—'}</td>
-                    <td className="px-4 py-3.5">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${st.cls}`}>{st.label}</span>
-                    </td>
-                  </tr>
-                );
-              })}
+              ) : monthRows.map(r => (
+                <tr key={r.id} className="hover:bg-muted/20 transition-colors">
+                  <td className="px-4 py-3.5 text-xs text-muted-foreground font-mono">{r.contract_number ?? '—'}</td>
+                  <td className="px-4 py-3.5">{r.maker && r.model ? `${r.maker} ${r.model}` : '—'}</td>
+                  <td className="px-4 py-3.5 text-muted-foreground">{r.user_name ?? '—'}</td>
+                  <td className="px-4 py-3.5 text-right font-semibold">{r.user_payment_amount != null ? yen(Number(r.user_payment_amount)) : '—'}</td>
+                </tr>
+              ))}
             </tbody>
             {monthRows.length > 0 && (
               <tfoot>
                 <tr className="bg-foreground text-background">
-                  <td colSpan={4} className="px-4 py-3.5 font-bold">合計 {monthRows.length}件</td>
+                  <td colSpan={3} className="px-4 py-3.5 font-bold">合計 {monthRows.length}件</td>
                   <td className="px-4 py-3.5 text-right font-bold">{yen(totalUser)}</td>
-                  <td className="px-4 py-3.5 text-right">{yen(totalFee)}</td>
-                  <td className="px-4 py-3.5 text-right font-bold">{yen(totalAmount)}</td>
-                  <td />
                 </tr>
               </tfoot>
             )}

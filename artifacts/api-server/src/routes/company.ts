@@ -417,9 +417,12 @@ router.get("/company/settlements", requireAuth, requireRentalCompany, async (req
       SELECT
         ('c' || vc.id || '-' || to_char(gs.month, 'YYYYMM')) AS id,
         to_char(gs.month, 'YYYY-MM')       AS period_month,
-        vc.monthly_price                   AS user_payment_amount,
+        -- 初月のみ options_fee（黒ナンバー取得費用など）を加算
+        (vc.monthly_price + CASE WHEN date_trunc('month', gs.month) = date_trunc('month', vc.start_date::date)
+          THEN COALESCE(vc.options_fee, 0) ELSE 0 END) AS user_payment_amount,
         vc.sin_japan_fee                   AS chat_van_fee,
-        (vc.monthly_price - COALESCE(vc.sin_japan_fee, 0)) AS rental_company_amount,
+        ((vc.monthly_price - COALESCE(vc.sin_japan_fee, 0)) + CASE WHEN date_trunc('month', gs.month) = date_trunc('month', vc.start_date::date)
+          THEN COALESCE(vc.options_fee, 0) ELSE 0 END) AS rental_company_amount,
         CASE
           WHEN vc.payment_method = 'card'  THEN 'completed'
           WHEN i.status = 'paid'           THEN 'completed'
