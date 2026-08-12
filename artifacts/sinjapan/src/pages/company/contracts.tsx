@@ -210,7 +210,7 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
 
       {/* ════ TAB: 概要 ════ */}
       {tab === 'overview' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:items-stretch">
           <div className="lg:col-span-2 space-y-5">
             <Section title="契約概要">
               <dl className="grid grid-cols-2 gap-4">
@@ -250,21 +250,27 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
             )}
           </div>
 
-          <div className="space-y-5">
-            <Section title="顧客サマリ">
-              <div className="space-y-2.5 text-sm">
+          <div className="flex flex-col gap-5">
+            <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden flex-1">
+              <div className="px-5 py-3.5 border-b border-border bg-muted/30">
+                <h3 className="text-sm font-semibold">顧客サマリ</h3>
+              </div>
+              <div className="p-5 space-y-2.5 text-sm">
                 <div className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground shrink-0" /><span>{contract.user_name ?? '未入力'}</span></div>
                 {contract.user_phone && <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground shrink-0" /><a href={`tel:${contract.user_phone}`} className="hover:underline">{contract.user_phone}</a></div>}
                 {contract.user_email && <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground shrink-0" /><a href={`mailto:${contract.user_email}`} className="break-all hover:underline">{contract.user_email}</a></div>}
               </div>
-            </Section>
-            <Section title="車両サマリ">
-              <div className="space-y-2.5 text-sm">
+            </div>
+            <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden flex-1">
+              <div className="px-5 py-3.5 border-b border-border bg-muted/30">
+                <h3 className="text-sm font-semibold">車両サマリ</h3>
+              </div>
+              <div className="p-5 space-y-2.5 text-sm">
                 <div className="flex items-center gap-2"><Car className="h-4 w-4 text-muted-foreground shrink-0" /><span className="font-medium">{contract.maker} {contract.model}</span></div>
                 {contract.prefecture && <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-muted-foreground shrink-0" /><span>{contract.prefecture}</span></div>}
                 {contract.license_plate && <div className="flex items-center gap-2"><FileText className="h-4 w-4 text-muted-foreground shrink-0" /><span className="font-mono text-xs">{contract.license_plate}</span></div>}
               </div>
-            </Section>
+            </div>
           </div>
         </div>
       )}
