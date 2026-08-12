@@ -4,9 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Car, FileText, TrendingUp, Bell, Plus,
   Truck, RotateCcw, AlertTriangle, CheckCircle,
-  Loader2, Clock,
+  Loader2, Clock, Calendar, ChevronLeft, ChevronRight,
 } from 'lucide-react';
-import { format, parseISO, isValid } from 'date-fns';
+import { format, parseISO, isValid, startOfMonth, endOfMonth, eachDayOfInterval,
+         getDay, isSameDay, isSameMonth, addMonths, subMonths } from 'date-fns';
 
 const API = (path: string) => `${import.meta.env.BASE_URL}api${path}`;
 const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem('sinjapan_auth_token') ?? ''}` });
@@ -171,6 +172,104 @@ function RecentContractsPanel({ contracts }: { contracts: any[] }) {
   );
 }
 
+// ── カレンダーカード ──────────────────────────────────────────────────────────
+function CalendarCard() {
+  const [contracts, setContracts] = useState<any[]>([]);
+  const [current, setCurrent] = useState(new Date());
+
+  useEffect(() => {
+    fetch(API('/company/contracts'), { headers: authHeader() })
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setContracts(Array.isArray(d) ? d : []));
+  }, []);
+
+  // 契約データからイベント日を収集
+  const events: { date: Date; label: string; type: 'pickup' | 'return' }[] = [];
+  for (const c of contracts) {
+    if (c.pickup_datetime) {
+      try { const d = parseISO(c.pickup_datetime); if (isValid(d)) events.push({ date: d, label: `${c.maker ?? ''} ${c.model ?? ''}`.trim() || '受け取り', type: 'pickup' }); } catch {}
+    }
+    if (c.planned_end_date) {
+      try { const d = parseISO(c.planned_end_date); if (isValid(d)) events.push({ date: d, label: `${c.maker ?? ''} ${c.model ?? ''}`.trim() || '返却', type: 'return' }); } catch {}
+    }
+  }
+
+  const monthStart = startOfMonth(current);
+  const monthEnd   = endOfMonth(current);
+  const days       = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  const startPad   = getDay(monthStart); // 0=Sun
+  const today      = new Date();
+
+  const eventsOnDay = (d: Date) => events.filter(e => isSameDay(e.date, d));
+
+  return (
+    <Card className="border-border shadow-sm flex flex-col">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <Calendar className="h-4 w-4" />
+          カレンダー
+          <div className="ml-auto flex items-center gap-1">
+            <button onClick={() => setCurrent(subMonths(current, 1))}
+              className="p-1 rounded hover:bg-muted transition-colors">
+              <ChevronLeft className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+            <span className="text-xs font-medium w-20 text-center">
+              {format(current, 'yyyy年M月')}
+            </span>
+            <button onClick={() => setCurrent(addMonths(current, 1))}
+              className="p-1 rounded hover:bg-muted transition-colors">
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+          </div>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex-1">
+        {/* 曜日ヘッダー */}
+        <div className="grid grid-cols-7 mb-1">
+          {['日','月','火','水','木','金','土'].map(w => (
+            <div key={w} className="text-center text-[10px] font-medium text-muted-foreground py-1">{w}</div>
+          ))}
+        </div>
+        {/* 日付グリッド */}
+        <div className="grid grid-cols-7 gap-y-1">
+          {Array(startPad).fill(null).map((_, i) => <div key={`pad-${i}`} />)}
+          {days.map(day => {
+            const dayEvents = eventsOnDay(day);
+            const isToday   = isSameDay(day, today);
+            const inMonth   = isSameMonth(day, current);
+            return (
+              <div key={day.toISOString()}
+                className={`relative flex flex-col items-center py-1 rounded-lg group ${dayEvents.length > 0 ? 'cursor-pointer hover:bg-muted/60' : ''}`}
+                title={dayEvents.map(e => `${e.label}（${e.type === 'pickup' ? '受け取り' : '返却'}）`).join('\n')}>
+                <span className={`text-xs w-6 h-6 flex items-center justify-center rounded-full font-medium
+                  ${isToday ? 'bg-foreground text-background' : inMonth ? 'text-foreground' : 'text-muted-foreground'}`}>
+                  {format(day, 'd')}
+                </span>
+                {dayEvents.length > 0 && (
+                  <div className="flex gap-0.5 mt-0.5">
+                    {dayEvents.slice(0, 3).map((e, i) => (
+                      <span key={i} className={`h-1 w-1 rounded-full ${e.type === 'pickup' ? 'bg-blue-500' : 'bg-orange-400'}`} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {/* 凡例 */}
+        <div className="flex gap-4 mt-3 pt-3 border-t border-border/50">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="h-2 w-2 rounded-full bg-blue-500 shrink-0" />受け取り
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="h-2 w-2 rounded-full bg-orange-400 shrink-0" />返却
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── 車両内訳 ──────────────────────────────────────────────────────────────────
 function VehicleBreakdown({ stats }: { stats: any }) {
   const items = [
@@ -262,6 +361,12 @@ export default function CompanyDashboard() {
 
       {/* 車両内訳 */}
       <VehicleBreakdown stats={stats} />
+
+      {/* 通知 & カレンダー */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <NotificationsPanel />
+        <CalendarCard />
+      </div>
 
       {/* 審査中バナー */}
       {me?.status === 'prospect' && (
