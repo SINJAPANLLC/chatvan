@@ -102,11 +102,9 @@ function ImageUploader({ label, value, onChange, facing, cameraOnly }: {
         </div>
       )}
 
-      {/* 隠し input：ファイル選択 */}
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFileChange} />
-      {/* 隠し input：カメラ撮影 */}
-      {facing && (
-        <input ref={cameraRef} type="file" accept="image/*" capture={facing} className="hidden" onChange={onFileChange} />
+      {/* ファイル選択（カメラなしの単体ボタン用） */}
+      {!facing && (
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFileChange} />
       )}
     </div>
   );
