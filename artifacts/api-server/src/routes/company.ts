@@ -6,6 +6,7 @@ import {
   vehiclesTable, vanContractsTable, usersTable,
   rentalCompaniesTable, notificationsTable, settlementsTable,
 } from "@workspace/db";
+import { notifyAdmins } from "../lib/notifyHelpers";
 
 const router = Router();
 
@@ -329,14 +330,7 @@ router.post("/company/register", async (req: Request, res: Response) => {
       rentalCompanyId: company.id,
     } as any);
     // 管理者通知
-    const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
-    for (const admin of admins) {
-      await db.insert(notificationsTable).values({
-        userId: admin.id,
-        title: "協力会社登録申請",
-        message: `${companyName} から登録申請が届きました`,
-      });
-    }
+    await notifyAdmins("協力会社登録申請", `${companyName} から登録申請が届きました`);
     return res.json({ ok: true, id: company.id });
   } catch (err) {
     console.error("company/register error:", err);
@@ -392,14 +386,7 @@ router.post("/company/vehicles", requireAuth, requireRentalCompany, async (req: 
       rentalCompanyId: rcId,
       status: "reviewing",
     } as any).returning();
-    const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
-    for (const admin of admins) {
-      await db.insert(notificationsTable).values({
-        userId: admin.id,
-        title: "車両登録申請",
-        message: `${b.maker} ${b.model} の登録申請が届きました（会社ID: ${rcId}）`,
-      });
-    }
+    await notifyAdmins("車両登録申請", `${b.maker} ${b.model} の登録申請が届きました（会社ID: ${rcId}）`);
     return res.json(vehicle);
   } catch (err) {
     console.error("company/vehicles POST error:", err);
@@ -590,14 +577,7 @@ router.post("/company/notify-admin", requireAuth, requireRentalCompany, async (r
     const rawUser = await db.execute(sql`SELECT name, rental_company_id FROM users WHERE id = ${userId}`);
     const user = toRow(rawUser) as any;
 
-    const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
-    for (const admin of admins) {
-      await db.insert(notificationsTable).values({
-        userId: admin.id,
-        title: `📩 協力会社からの問い合わせ`,
-        message: `${user?.name ?? ''}：${message}`,
-      });
-    }
+    await notifyAdmins(`📩 協力会社からの問い合わせ`, `${user?.name ?? ''}：${message}`);
     return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ error: "Internal error" });

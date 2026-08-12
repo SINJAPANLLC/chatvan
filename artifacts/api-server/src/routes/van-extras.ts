@@ -5,6 +5,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { db, notificationsTable, usersTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
+import { notifyAdmins } from "../lib/notifyHelpers";
 
 const router: IRouter = Router();
 
@@ -102,13 +103,7 @@ router.post("/van/incidents", requireAuth, async (req: Request, res: Response) =
       RETURNING *
     `);
 
-    const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
-    for (const admin of admins) {
-      await db.insert(notificationsTable).values({
-        userId: admin.id, title: '🚨 Chat VAN - 事故報告',
-        message: `事故が報告されました。場所: ${b.location ?? '不明'}`,
-      });
-    }
+    await notifyAdmins('🚨 Chat VAN - 事故報告', `事故が報告されました。場所: ${b.location ?? '不明'}`);
     return res.status(201).json(toRow(raw));
   } catch (err) {
     console.error("create incident error:", err);

@@ -29,25 +29,8 @@ import { logUserActivity } from "../lib/userLogger";
 import { randomUUID } from "crypto";
 import { squareFetch } from "../lib/square-authorize";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
-import { sendEmail, buildEmailHtml } from "../lib/email";
+import { notifyUser, notifyAdmins, notifyRcUsers } from "../lib/notifyHelpers";
 
-/** 協力会社ユーザー全員にアプリ内通知＋メールを送る共通ヘルパー */
-async function notifyRcUsers(
-  rcId: number,
-  title: string,
-  message: string,
-) {
-  const raw = await db.execute(sql`SELECT id, email, name FROM users WHERE rental_company_id = ${rcId}`);
-  const users = (raw as any)?.rows ?? (Array.isArray(raw) ? raw : []);
-  for (const u of users) {
-    await db.insert(notificationsTable).values({ userId: (u as any).id, title, message });
-    const email = (u as any).email;
-    if (email) {
-      const html = buildEmailHtml({ subject: title, body: message, recipientName: (u as any).name ?? undefined });
-      sendEmail(email, `【SIN JAPAN】${title}`, html).catch(() => {});
-    }
-  }
-}
 
 const objectStorage = new ObjectStorageService();
 
@@ -141,13 +124,11 @@ ${selfieB64 ? "3枚目: 本人セルフィー（免許証の顔写真と照合�
     }).where(eq(identityVerificationsTable.id, verificationId));
 
     // ユーザーに通知
-    await db.insert(notificationsTable).values({
-      userId: data.userId,
-      title: result === "verified" ? "Chat VAN - 本人確認完了" : "Chat VAN - 本人確認 要再提出",
-      message: result === "verified"
+    await notifyUser(data.userId,
+      result === "verified" ? "Chat VAN - 本人確認完了" : "Chat VAN - 本人確認 要再提出",
+      result === "verified"
         ? "本人確認（eKYC）が完了しました。審査に進みます。"
-        : `本人確認が確認できませんでした: ${reason}。再度アップロードしてください。`,
-    });
+        : `本人確認が確認できませんでした: ${reason}。再度アップロードしてください。`);
 
     // eKYC verified → AI審査を自動起動（application_received状態のまま審査が未実行の場合）
     if (result === "verified") {
@@ -299,35 +280,23 @@ async function runAIScreening(appId: number) {
                 .set({ status: "contracting", updatedAt: new Date() })
                 .where(eq(vanApplicationsTable.id, appId));
 
-              await db.insert(notificationsTable).values({
-                userId: app.userId!,
-                title: "Chat VAN - 審査通過・契約書が届きました",
-                message: "審査が通過しました！契約書の内容をご確認のうえ、電子署名をお願いします。",
-              });
+              await notifyUser(app.userId!, "Chat VAN - 審査通過・契約書が届きました",
+                "審査が通過しました！契約書の内容をご確認のうえ、電子署名をお願いします。");
             }
           }
         } else {
           // 提案なしの場合はシンプル通知
-          await db.insert(notificationsTable).values({
-            userId: app.userId!,
-            title: "Chat VAN - 審査通過",
-            message: "審査が通過しました！担当者が契約書を準備しています。",
-          });
+          await notifyUser(app.userId!, "Chat VAN - 審査通過",
+            "審査が通過しました！担当者が契約書を準備しています。");
         }
       } catch (contractErr) {
         console.error("[AI Screening] 契約自動生成エラー:", contractErr);
-        await db.insert(notificationsTable).values({
-          userId: app.userId!,
-          title: "Chat VAN - 審査通過",
-          message: "審査が通過しました！担当者が契約書を準備しています。",
-        });
+        await notifyUser(app.userId!, "Chat VAN - 審査通過",
+          "審査が通過しました！担当者が契約書を準備しています。");
       }
     } else {
-      await db.insert(notificationsTable).values({
-        userId: app.userId!,
-        title: "Chat VAN - 審査結果",
-        message: `審査の結果、今回はお断りとさせていただきました。${reason}`,
-      });
+      await notifyUser(app.userId!, "Chat VAN - 審査結果",
+        `審査の結果、今回はお断りとさせていただきました。${reason}`);
     }
   } catch (err) {
     console.error("[AI Screening] エラー:", err);
@@ -495,14 +464,8 @@ router.post("/van/start", optionalAuth, async (req: Request, res: Response) => {
         updatedAt: new Date(),
       }).where(eq(vanApplicationsTable.id, app.id));
 
-      const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
-      for (const admin of admins) {
-        await db.insert(notificationsTable).values({
-          userId: admin.id,
-          message: `新しい軽バン相談が届きました（ID: ${app.id} / ${inquiry.area} / ¥${(inquiry.monthlyBudget as number)?.toLocaleString()}/月）`,
-          title: 'Chat VAN相談',
-        });
-      }
+      await notifyAdmins('Chat VAN相談',
+        `新しい軽バン相談が届きました（ID: ${app.id} / ${inquiry.area} / ¥${(inquiry.monthlyBudget as number)?.toLocaleString()}/月）`);
     }
 
     logUserActivity({
@@ -660,11 +623,8 @@ router.post("/van/applications/:id/messages", optionalAuth, async (req: Request,
 
         // ユーザーへ通知
         if (app.userId) {
-          await db.insert(notificationsTable).values({
-            userId: app.userId,
-            title: "Chat VAN - 車両提案",
-            message: "条件に合う車両をご提案しました。チャット画面をご確認ください。",
-          });
+          await notifyUser(app.userId, "Chat VAN - 車両提案",
+            "条件に合う車両をご提案しました。チャット画面をご確認ください。");
         }
 
         // チャット内に提案メッセージを追加
@@ -857,11 +817,8 @@ router.post("/van/applications/:id/propose", requireAuth, requireAdmin, async (r
       .where(eq(vanApplicationsTable.id, appId)).returning();
 
     if (app?.userId) {
-      await db.insert(notificationsTable).values({
-        userId: app.userId,
-        message: "Chat VANから軽バンのご提案が届きました。チャットをご確認ください。",
-        title: 'Chat VAN - 車両提案',
-      });
+      await notifyUser(app.userId, "Chat VAN - 車両提案",
+        "Chat VANから軽バンのご提案が届きました。チャットをご確認ください。");
     }
 
     const vehicles = await db.select().from(vehiclesTable).where(inArray(vehiclesTable.id, vehicleIds));
@@ -889,14 +846,7 @@ router.post("/van/applications/:id/accept", requireAuth, async (req: Request, re
       .where(eq(vanApplicationsTable.id, appId)).returning();
     if (!app) return res.status(404).json({ error: "Not found" });
 
-    const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
-    for (const admin of admins) {
-      await db.insert(notificationsTable).values({
-        userId: admin.id,
-        message: `申込みを受け付けました（ID: ${appId}）`,
-        title: 'Chat VAN - 申込受付',
-      });
-    }
+    await notifyAdmins('Chat VAN - 申込受付', `申込みを受け付けました（ID: ${appId}）`);
     // 既にeKYC済みのユーザーはAI審査を即時実行
     if (app.userId) {
       const existingKyc = await db.execute(sql`
@@ -1239,11 +1189,8 @@ router.patch("/van/contracts/:id/pickup", requireAuth, requireAdmin, async (req:
         const dtStr = pickupDatetime
           ? new Date(pickupDatetime).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
           : '日時未定';
-        await db.insert(notificationsTable).values({
-          userId,
-          title: '【Chat VAN】車両受け取り日時・場所のご案内',
-          message: `受け取り日時: ${dtStr}\n受け取り場所: ${pickupAddress || '未定'}\n\nご不明な点はチャットよりお問い合わせください。`,
-        });
+        await notifyUser(userId, '【Chat VAN】車両受け取り日時・場所のご案内',
+          `受け取り日時: ${dtStr}\n受け取り場所: ${pickupAddress || '未定'}\n\nご不明な点はチャットよりお問い合わせください。`);
       }
     }
 
@@ -1269,11 +1216,8 @@ router.post("/van/contracts", requireAuth, requireAdmin, async (req: Request, re
 
     // Notify user
     if (body.userId) {
-      await db.insert(notificationsTable).values({
-        userId: body.userId,
-        message: "契約書が作成されました。内容をご確認ください。",
-        title: 'Chat VAN - 契約書',
-      });
+      await notifyUser(body.userId, 'Chat VAN - 契約書',
+        "契約書が作成されました。内容をご確認ください。");
     }
 
     return res.status(201).json(contract);
@@ -1337,13 +1281,8 @@ router.post("/van/contracts/:id/agree-platform", requireAuth, async (req: Reques
       await db.update(vanContractsTable).set({ status: "pending_payment", termsAgreedAt: new Date(), updatedAt: new Date() })
         .where(eq(vanContractsTable.id, id));
       // Notify admin
-      const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
-      for (const admin of admins) {
-        await db.insert(notificationsTable).values({
-          userId: admin.id, title: 'Chat VAN - 契約同意完了',
-          message: `契約書への同意が完了しました（契約ID: ${id}）。決済手続きをお願いします。`,
-        });
-      }
+      await notifyAdmins('Chat VAN - 契約同意完了',
+        `契約書への同意が完了しました（契約ID: ${id}）。決済手続きをお願いします。`);
     }
     return res.json(updated);
   } catch (err) {
@@ -1431,35 +1370,20 @@ router.post("/van/contracts/:id/sign", requireAuth, async (req: Request, res: Re
     }
 
     // 管理者・ユーザーに通知
-    const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
-    for (const admin of admins) {
-      await db.insert(notificationsTable).values({
-        userId: admin.id,
-        title: "Chat VAN - 契約署名完了",
-        message: `契約書への電子署名が完了しました（契約ID: ${id}）。`,
-      });
-      // 黒ナンバー代理取得の申請通知
-      if (blackNumberRequested) {
-        await db.insert(notificationsTable).values({
-          userId: admin.id,
-          title: "🚗 黒ナンバー代理取得の依頼",
-          message: `契約ID: ${id} のユーザーが黒ナンバー代理取得を希望しています。手続きを進めてください。`,
-        });
-      }
-      // 保険紹介の申請通知
-      if (insuranceReferralRequested) {
-        await db.insert(notificationsTable).values({
-          userId: admin.id,
-          title: "🛡️ 保険紹介の依頼",
-          message: `契約ID: ${id} のユーザーが保険紹介を希望しています。担当者から連絡してください。`,
-        });
-      }
+    await notifyAdmins("Chat VAN - 契約署名完了",
+      `契約書への電子署名が完了しました（契約ID: ${id}）。`);
+    // 黒ナンバー代理取得の申請通知
+    if (blackNumberRequested) {
+      await notifyAdmins("🚗 黒ナンバー代理取得の依頼",
+        `契約ID: ${id} のユーザーが黒ナンバー代理取得を希望しています。手続きを進めてください。`);
     }
-    await db.insert(notificationsTable).values({
-      userId: userId!,
-      title: "Chat VAN - 署名受付完了",
-      message: "電子署名を受け付けました。次はお支払い手続きへお進みください。",
-    });
+    // 保険紹介の申請通知
+    if (insuranceReferralRequested) {
+      await notifyAdmins("🛡️ 保険紹介の依頼",
+        `契約ID: ${id} のユーザーが保険紹介を希望しています。担当者から連絡してください。`);
+    }
+    await notifyUser(userId!, "Chat VAN - 署名受付完了",
+      "電子署名を受け付けました。次はお支払い手続きへお進みください。");
 
     return res.json({ ok: true, contract: updated });
   } catch (err) {
@@ -1571,11 +1495,8 @@ router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request
       `);
     }
 
-    await db.insert(notificationsTable).values({
-      userId: contract.userId,
-      title: "Chat VAN - 決済完了・ご利用開始",
-      message: `カード決済が完了しました（¥${totalAmount.toLocaleString()}）。レンタル会社から受け取り案内が届きます。`,
-    });
+    await notifyUser(contract.userId, "Chat VAN - 決済完了・ご利用開始",
+      `カード決済が完了しました（¥${totalAmount.toLocaleString()}）。レンタル会社から受け取り案内が届きます。`);
 
     // 協力会社へ通知（受け取り準備）
     if (contract.vehicleId) {
@@ -1648,11 +1569,8 @@ router.post("/van/payment-retries/:id/retry", requireAuth, requireAdmin, async (
         WHERE id = ${id}
       `);
       if (pr.user_id) {
-        await db.insert(notificationsTable).values({
-          userId: pr.user_id,
-          title: "Chat VAN - 月額料金のお支払いが完了しました",
-          message: `${pr.period_month ?? ''}分の月額料金（¥${amount.toLocaleString()}）のお支払いが完了しました。`,
-        });
+        await notifyUser(pr.user_id, "Chat VAN - 月額料金のお支払いが完了しました",
+          `${pr.period_month ?? ''}分の月額料金（¥${amount.toLocaleString()}）のお支払いが完了しました。`);
       }
       return res.json({ ok: true, method: 'card' });
 
@@ -1666,11 +1584,8 @@ router.post("/van/payment-retries/:id/retry", requireAuth, requireAdmin, async (
         WHERE id = ${id}
       `);
       if (pr.user_id) {
-        await db.insert(notificationsTable).values({
-          userId: pr.user_id,
-          title: "Chat VAN - お支払いを確認しました",
-          message: `${pr.period_month ?? ''}分のお支払いを確認しました（¥${amount.toLocaleString()}）。`,
-        });
+        await notifyUser(pr.user_id, "Chat VAN - お支払いを確認しました",
+          `${pr.period_month ?? ''}分のお支払いを確認しました（¥${amount.toLocaleString()}）。`);
       }
       return res.json({ ok: true, method: 'manual' });
     }
@@ -1725,11 +1640,8 @@ router.post("/van/contracts/:id/additional-charge", requireAuth, requireAdmin, a
         VALUES (${contractId}, ${contract.userId}, ${chargeAmount}, ${description}, 'success', ${data.payment?.id ?? null}, NULL, NOW())
       `);
       if (contract.userId) {
-        await db.insert(notificationsTable).values({
-          userId: contract.userId,
-          title: "Chat VAN - 追加決済が完了しました",
-          message: `${description}（¥${chargeAmount.toLocaleString()}）の決済が完了しました。`,
-        });
+        await notifyUser(contract.userId, "Chat VAN - 追加決済が完了しました",
+          `${description}（¥${chargeAmount.toLocaleString()}）の決済が完了しました。`);
       }
       return res.json({ ok: true, method: 'card' });
 
@@ -1826,23 +1738,14 @@ router.post("/van/contracts/:id/pay", requireAuth, async (req: Request, res: Res
     }
 
     // ユーザー通知
-    await db.insert(notificationsTable).values({
-      userId: contract.userId,
-      title: "Chat VAN - 受け取り準備完了",
-      message: method === 'invoice'
+    await notifyUser(contract.userId, "Chat VAN - 受け取り準備完了",
+      method === 'invoice'
         ? "法人請求書払いの申請を受け付けました。担当者より審査結果をご連絡します。受け取り日時はレンタル会社へお電話ください。"
-        : "お支払いが完了しました。レンタル会社へ連絡して車両を受け取ってください。",
-    });
+        : "お支払いが完了しました。レンタル会社へ連絡して車両を受け取ってください。");
 
     // 管理者通知
-    const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
-    for (const admin of admins) {
-      await db.insert(notificationsTable).values({
-        userId: admin.id,
-        title: "Chat VAN - 決済完了・受け取り待ち",
-        message: `決済完了（契約ID: ${id} / 支払方法: ${method === 'invoice' ? '法人請求書' : 'カード'}）。車両受け取り待ちです。`,
-      });
-    }
+    await notifyAdmins("Chat VAN - 決済完了・受け取り待ち",
+      `決済完了（契約ID: ${id} / 支払方法: ${method === 'invoice' ? '法人請求書' : 'カード'}）。車両受け取り待ちです。`);
 
     // 協力会社へ通知（受け取り準備）
     if (contract.vehicleId) {
@@ -1916,20 +1819,11 @@ router.post("/van/applications/:id/confirm-pickup", requireAuth, async (req: Req
       }
     }
 
-    await db.insert(notificationsTable).values({
-      userId: app.userId,
-      title: "Chat VAN - 受け取り完了",
-      message: "車両の受け取りが完了しました。ご利用開始です。毎月の自動決済が設定された支払日に実行されます。",
-    });
+    await notifyUser(app.userId, "Chat VAN - 受け取り完了",
+      "車両の受け取りが完了しました。ご利用開始です。毎月の自動決済が設定された支払日に実行されます。");
 
-    const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
-    for (const admin of admins) {
-      await db.insert(notificationsTable).values({
-        userId: admin.id,
-        title: "Chat VAN - 受け取り完了",
-        message: `申込ID: ${appId} の車両受け取りが完了しました。`,
-      });
-    }
+    await notifyAdmins("Chat VAN - 受け取り完了",
+      `申込ID: ${appId} の車両受け取りが完了しました。`);
 
     // 協力会社へ通知（自社車両の貸出開始）
     if (contract?.vehicleId) {
@@ -2369,13 +2263,8 @@ router.post("/van/applications/:id/identity-verification", requireAuth, async (r
     }
 
     // Notify admin
-    const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
-    for (const admin of admins) {
-      await db.insert(notificationsTable).values({
-        userId: admin.id, title: 'Chat VAN - 免許証提出',
-        message: `免許証の確認依頼が届きました（相談ID: ${appId}）`,
-      });
-    }
+    await notifyAdmins('Chat VAN - 免許証提出',
+      `免許証の確認依頼が届きました（相談ID: ${appId}）`);
 
     // eKYC AI自動判定をバックグラウンドで実行
     setImmediate(() => runAIeKYC(result.id, {
@@ -2659,13 +2548,8 @@ router.post("/van/breakdowns", requireAuth, async (req: Request, res: Response) 
         breakdownId = bd?.id;
 
         // Notify admin
-        const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
-        for (const admin of admins) {
-          await db.insert(notificationsTable).values({
-            userId: admin.id, title: '⚠️ Chat VAN - 故障報告',
-            message: `故障が報告されました。症状: ${info.symptom}`,
-          });
-        }
+        await notifyAdmins('⚠️ Chat VAN - 故障報告',
+          `故障が報告されました。症状: ${info.symptom}`);
       } catch {}
     }
 
@@ -2715,10 +2599,8 @@ router.post("/van/payments/failure", requireAuth, requireAdmin, async (req: Requ
 
     // ユーザーへ通知
     if (contract?.userId) {
-      await db.insert(notificationsTable).values({
-        userId: contract.userId, title: '⚠️ 決済エラー',
-        message: `${periodMonth}分の月額料金の決済に失敗しました。お支払い方法をご確認ください。`,
-      });
+      await notifyUser(contract.userId, '⚠️ 決済エラー',
+        `${periodMonth}分の月額料金の決済に失敗しました。お支払い方法をご確認ください。`);
     }
 
     return res.json({ success: true });
@@ -3310,30 +3192,18 @@ cron.schedule("0 0 * * *", async () => {
                 .set({ status: "payment_issue", updatedAt: new Date() })
                 .where(eq(vanApplicationsTable.id, contract.applicationId));
             }
-            await db.insert(notificationsTable).values({
-              userId: contract.userId,
-              title: "Chat VAN - 月額決済に失敗しました",
-              message: `月額料金（¥${amount.toLocaleString()}）の決済に失敗しました。お支払い情報をご確認ください。`,
-            });
+            await notifyUser(contract.userId, "Chat VAN - 月額決済に失敗しました",
+              `月額料金（¥${amount.toLocaleString()}）の決済に失敗しました。お支払い情報をご確認ください。`);
           } else {
             console.log(`[月額決済] カード成功 contract=${contract.id} ¥${amount}`);
-            await db.insert(notificationsTable).values({
-              userId: contract.userId,
-              title: "Chat VAN - 月額料金のお支払いが完了しました",
-              message: `月額料金（¥${amount.toLocaleString()}）のお支払いが完了しました。`,
-            });
+            await notifyUser(contract.userId, "Chat VAN - 月額料金のお支払いが完了しました",
+              `月額料金（¥${amount.toLocaleString()}）のお支払いが完了しました。`);
           }
         } else {
           // カード情報未登録 → 管理者通知
           console.warn(`[月額決済] カード情報なし contract=${contract.id}`);
-          const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
-          for (const admin of admins) {
-            await db.insert(notificationsTable).values({
-              userId: admin.id,
-              title: "Chat VAN - カード情報未登録の契約があります",
-              message: `契約ID: ${contract.id} のユーザーがカード情報を登録していません。確認してください。`,
-            });
-          }
+          await notifyAdmins("Chat VAN - カード情報未登録の契約があります",
+            `契約ID: ${contract.id} のユーザーがカード情報を登録していません。確認してください。`);
         }
       } catch (e) {
         console.error(`[月額決済] カードエラー contract=${contract.id}:`, e);
@@ -3404,14 +3274,8 @@ cron.schedule("0 0 * * *", async () => {
           ON CONFLICT DO NOTHING
         `);
 
-        const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
-        for (const admin of admins) {
-          await db.insert(notificationsTable).values({
-            userId: admin.id,
-            title: "Chat VAN - 月次請求書を発行してください",
-            message: `契約ID: ${contract.id} / ${invoiceNumber}${billingNote}\n税抜: ¥${subtotal.toLocaleString()} 消費税: ¥${tax.toLocaleString()} 合計: ¥${totalAmount.toLocaleString()}\n支払期限: ${dueDate}`,
-          });
-        }
+        await notifyAdmins("Chat VAN - 月次請求書を発行してください",
+          `契約ID: ${contract.id} / ${invoiceNumber}${billingNote}\n税抜: ¥${subtotal.toLocaleString()} 消費税: ¥${tax.toLocaleString()} 合計: ¥${totalAmount.toLocaleString()}\n支払期限: ${dueDate}`);
         console.log(`[月次請求書] 発行 contract=${contract.id} ${invoiceNumber} ¥${totalAmount} 期限:${dueDate}${billingNote}`);
       } catch (e) {
         console.error(`[月次請求書] エラー contract=${contract.id}:`, e);
