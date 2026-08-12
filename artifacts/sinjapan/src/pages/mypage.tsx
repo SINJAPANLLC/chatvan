@@ -272,8 +272,8 @@ export default function MyPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           {(contract as any).paymentMethod === 'invoice'
-                            ? <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800 border border-amber-200"><FileText className="h-3 w-3" />請求書払い</span>
-                            : <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800 border border-blue-200"><CreditCard className="h-3 w-3" />カード払い</span>
+                            ? <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-foreground text-background"><FileText className="h-3 w-3" />請求書払い</span>
+                            : <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-foreground text-background"><CreditCard className="h-3 w-3" />カード払い</span>
                           }
                           <span className={`inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full ${st.color}`}>
                             {st.label}
