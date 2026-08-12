@@ -18,9 +18,23 @@ function toRow(raw: unknown): unknown | null {
 }
 
 // 自分に紐付いた rental_company_id を取得するヘルパー
+// rental_company_id が NULL の場合はメール照合でフォールバック修正する
 async function getMyCompanyId(userId: number): Promise<number | null> {
-  const raw = await db.execute(sql`SELECT rental_company_id FROM users WHERE id = ${userId}`);
-  return (toRow(raw) as any)?.rental_company_id ?? null;
+  const raw = await db.execute(sql`SELECT rental_company_id, email FROM users WHERE id = ${userId}`);
+  const user = toRow(raw) as any;
+  if (!user) return null;
+  if (user.rental_company_id) return user.rental_company_id;
+
+  // フォールバック: メールが一致する rental_companies を探して自動修正
+  if (user.email) {
+    const rcRaw = await db.execute(sql`SELECT id FROM rental_companies WHERE email = ${user.email} LIMIT 1`);
+    const rc = toRow(rcRaw) as any;
+    if (rc?.id) {
+      await db.execute(sql`UPDATE users SET rental_company_id = ${rc.id} WHERE id = ${userId}`);
+      return rc.id;
+    }
+  }
+  return null;
 }
 
 // ── GET /company/me ─────────────────────────────────────────────────────────
