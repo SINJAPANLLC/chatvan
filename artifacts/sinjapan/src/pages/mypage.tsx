@@ -381,7 +381,7 @@ export default function MyPage() {
         const invoiceContracts = activeContracts.filter(c => (c as any).paymentMethod === 'invoice');
         if (invoiceContracts.length === 0) return null;
         const usedAmount = invoiceContracts.reduce((sum, c) => sum + totalWithTax(c), 0);
-        const creditLimit = (user as any)?.invoiceCreditLimit ?? null;
+        const creditLimit = (user as any)?.creditLimit != null ? Number((user as any).creditLimit) : null;
         return (
           <section>
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -416,7 +416,7 @@ export default function MyPage() {
                         {c.vehicle?.year ? <span className="text-muted-foreground font-normal ml-1">{c.vehicle.year}年式</span> : null}
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        月額 {formatPrice(totalWithTax(c))} / 毎月{c.paymentDay}日請求
+                        月額 {formatPrice(totalWithTax(c))} / 末締め翌月末払い
                       </p>
                     </div>
                     <span className="text-xs bg-muted px-2.5 py-1 rounded-full whitespace-nowrap">請求書払い中</span>
