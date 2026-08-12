@@ -1492,7 +1492,7 @@ router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request
     // 決済成功 → contract/application/vehicle をアクティブに
     await db.execute(sql`UPDATE van_contracts SET status = 'active', payment_method = 'card', updated_at = NOW() WHERE id = ${id}`);
     if (contract.applicationId) {
-      await db.update(vanApplicationsTable).set({ status: "active", updatedAt: new Date() }).where(eq(vanApplicationsTable.id, contract.applicationId));
+      await db.update(vanApplicationsTable).set({ status: "delivery_pending", updatedAt: new Date() }).where(eq(vanApplicationsTable.id, contract.applicationId));
     }
     await db.update(vehiclesTable).set({ status: "rented", updatedAt: new Date() }).where(eq(vehiclesTable.id, contract.vehicleId));
 
