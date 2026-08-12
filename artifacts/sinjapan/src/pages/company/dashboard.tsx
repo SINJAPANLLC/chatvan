@@ -5,6 +5,7 @@ import {
   Car, FileText, TrendingUp, Bell, Plus,
   Truck, RotateCcw, AlertTriangle, CheckCircle,
   Loader2, Clock, Calendar, ChevronLeft, ChevronRight,
+  ListChecks, CircleCheck, Circle,
 } from 'lucide-react';
 import { format, parseISO, isValid, startOfMonth, endOfMonth, eachDayOfInterval,
          getDay, isSameDay, isSameMonth, addMonths, subMonths } from 'date-fns';
@@ -172,6 +173,53 @@ function RecentContractsPanel({ contracts }: { contracts: any[] }) {
   );
 }
 
+// ── セットアップチェックリスト ────────────────────────────────────────────────
+function SetupChecklist({ me, stats }: { me: any; stats: any }) {
+  const bank = (() => { try { return me?.bank_information ? JSON.parse(me.bank_information) : {}; } catch { return {}; } })();
+
+  const items = [
+    { label: '電話番号を設定する',   done: !!me?.company_phone || !!me?.phone,   href: '/company/settings' },
+    { label: '住所を設定する',       done: !!me?.address,                         href: '/company/settings' },
+    { label: '営業時間を設定する',   done: !!me?.business_hours,                  href: '/company/settings' },
+    { label: '振込先口座を登録する', done: !!bank.bankName,                        href: '/company/settings' },
+    { label: '車両を1台以上登録する', done: (stats.total_vehicles ?? 0) > 0,      href: '/company/vehicles' },
+  ];
+
+  const doneCount = items.filter(i => i.done).length;
+  const allDone = doneCount === items.length;
+  if (allDone) return null;
+
+  return (
+    <Card className="border-border shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <ListChecks className="h-4 w-4" />
+          はじめにやること
+          <span className="ml-auto text-xs font-medium px-2 py-0.5 bg-muted text-muted-foreground rounded-full">
+            {doneCount}/{items.length}
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {items.map(item => (
+            <Link key={item.label} href={item.href}>
+              <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors cursor-pointer
+                ${item.done ? 'text-muted-foreground hover:bg-muted/30' : 'hover:bg-muted/50'}`}>
+                {item.done
+                  ? <CircleCheck className="h-4 w-4 text-green-500 shrink-0" />
+                  : <Circle className="h-4 w-4 text-muted-foreground/40 shrink-0" />}
+                <span className={`text-xs flex-1 ${item.done ? 'line-through' : 'font-medium'}`}>{item.label}</span>
+                {!item.done && <span className="text-xs text-muted-foreground">設定する →</span>}
+              </div>
+            </Link>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── カレンダーカード ──────────────────────────────────────────────────────────
 function CalendarCard() {
   const [contracts, setContracts] = useState<any[]>([]);
@@ -183,14 +231,16 @@ function CalendarCard() {
       .then(d => setContracts(Array.isArray(d) ? d : []));
   }, []);
 
-  // 契約データからイベント日を収集
+  // 契約データからイベント日を収集（start_date = 受け取り日、planned_end_date = 返却日）
   const events: { date: Date; label: string; type: 'pickup' | 'return' }[] = [];
   for (const c of contracts) {
-    if (c.pickup_datetime) {
-      try { const d = parseISO(c.pickup_datetime); if (isValid(d)) events.push({ date: d, label: `${c.maker ?? ''} ${c.model ?? ''}`.trim() || '受け取り', type: 'pickup' }); } catch {}
+    const pickupRaw = c.start_date ?? c.pickup_datetime ?? c.pickupDatetime;
+    if (pickupRaw) {
+      try { const d = parseISO(pickupRaw); if (isValid(d)) events.push({ date: d, label: `${c.maker ?? ''} ${c.model ?? ''}`.trim() || '受け取り', type: 'pickup' }); } catch {}
     }
-    if (c.planned_end_date) {
-      try { const d = parseISO(c.planned_end_date); if (isValid(d)) events.push({ date: d, label: `${c.maker ?? ''} ${c.model ?? ''}`.trim() || '返却', type: 'return' }); } catch {}
+    const returnRaw = c.planned_end_date ?? c.plannedEndDate;
+    if (returnRaw) {
+      try { const d = parseISO(returnRaw); if (isValid(d)) events.push({ date: d, label: `${c.maker ?? ''} ${c.model ?? ''}`.trim() || '返却', type: 'return' }); } catch {}
     }
   }
 
@@ -358,6 +408,9 @@ export default function CompanyDashboard() {
         <KpiCard icon={<FileText  className="h-3.5 w-3.5" />} label="契約中"   value={stats.active_contracts ?? 0} sub={`返却予定 ${stats.return_pending ?? 0} 件`} />
         <KpiCard icon={<TrendingUp className="h-3.5 w-3.5" />} label="今月の売上" value={monthlyRevenue > 0 ? fmt(monthlyRevenue) : '—'} sub="確定済み金額" dark />
       </div>
+
+      {/* やることリスト */}
+      <SetupChecklist me={me} stats={stats} />
 
       {/* 車両内訳 */}
       <VehicleBreakdown stats={stats} />
