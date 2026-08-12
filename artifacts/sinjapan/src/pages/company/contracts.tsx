@@ -254,10 +254,10 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
           </Section>
         )}
 
-        {related && (rc?.black_number_requested || rc?.insurance_referral_requested) && (
+        {(contract.black_number_requested || contract.insurance_referral_requested) && (
           <Section title="オプション申請">
             <div className="space-y-3">
-              {rc?.black_number_requested && (
+              {contract.black_number_requested && (
                 <div className="flex items-center justify-between py-3 px-4 bg-muted/50 rounded-lg border border-border">
                   <div className="flex items-center gap-2.5">
                     <BadgeCheck className="h-4 w-4 text-foreground shrink-0" />
@@ -269,7 +269,7 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
                   <span className="text-sm font-semibold">¥10,000</span>
                 </div>
               )}
-              {rc?.insurance_referral_requested && (
+              {contract.insurance_referral_requested && (
                 <div className="flex items-center gap-2.5 py-3 px-4 bg-muted/50 rounded-lg border border-border">
                   <Shield className="h-4 w-4 text-foreground shrink-0" />
                   <p className="text-sm font-medium">保険紹介申請あり</p>
