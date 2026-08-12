@@ -41,7 +41,7 @@ function PhotoGallery({ photos, alt, compact = false }: { photos: string[]; alt:
         <img
           src={photos[current]}
           alt={alt}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain"
         />
         {photos.length > 1 && (
           <>
