@@ -549,7 +549,7 @@ router.patch("/company/settings", requireAuth, requireRentalCompany, async (req:
     const rcId = await getMyCompanyId(req.session.userId);
     if (!rcId) return res.status(403).json({ error: "会社が紐付けられていません" });
     const { name, corporateName, contactName, phone, email, address, serviceAreas, fleetSize, notes,
-            bankName, bankBranch, bankAccount, bankHolder } = req.body;
+            bankName, bankBranch, bankType, bankAccount, bankHolder } = req.body;
 
     // 既存の銀行情報を取得してマージ
     const existingRow = await db.execute(sql`SELECT bank_information FROM rental_companies WHERE id = ${rcId} LIMIT 1`);
@@ -560,6 +560,7 @@ router.patch("/company/settings", requireAuth, requireRentalCompany, async (req:
       ...existingBank,
       ...(bankName    !== undefined ? { bankName }    : {}),
       ...(bankBranch  !== undefined ? { bankBranch }  : {}),
+      ...(bankType    !== undefined ? { bankType }    : {}),
       ...(bankAccount !== undefined ? { bankAccount } : {}),
       ...(bankHolder  !== undefined ? { bankHolder }  : {}),
     };

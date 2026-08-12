@@ -65,6 +65,7 @@ export default function CompanySettings() {
           fleetSize:     j.fleet_size     ?? j.fleetSize       ?? '',
           bankName:      bank.bankName    ?? '',
           bankBranch:    bank.bankBranch  ?? '',
+          bankType:      bank.bankType    ?? '普通',
           bankAccount:   bank.bankAccount ?? '',
           bankHolder:    bank.bankHolder  ?? '',
           notes:         j.notes          ?? '',
@@ -161,10 +162,16 @@ export default function CompanySettings() {
               <Field label="支店名">
                 <input type="text" value={form.bankBranch ?? ''} onChange={set('bankBranch')} placeholder="例: 渋谷支店" className={inp} />
               </Field>
+              <Field label="口座種別">
+                <select value={form.bankType ?? '普通'} onChange={set('bankType')} className={sel}>
+                  <option value="普通">普通</option>
+                  <option value="当座">当座</option>
+                </select>
+              </Field>
               <Field label="口座番号">
                 <input type="text" value={form.bankAccount ?? ''} onChange={set('bankAccount')} placeholder="例: 1234567" className={inp} />
               </Field>
-              <Field label="口座名義">
+              <Field label="口座名義" full>
                 <input type="text" value={form.bankHolder ?? ''} onChange={set('bankHolder')} placeholder="例: カ）○○" className={inp} />
               </Field>
             </div>
