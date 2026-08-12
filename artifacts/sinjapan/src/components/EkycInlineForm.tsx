@@ -7,12 +7,14 @@ const token = () => localStorage.getItem('sinjapan_auth_token') ?? '';
 
 interface UploadedImage { path: string; preview: string }
 
-function ImageUploader({ label, value, onChange, facing }: {
+function ImageUploader({ label, value, onChange, facing, cameraOnly }: {
   label: string;
   value: UploadedImage | null;
   onChange: (v: UploadedImage | null) => void;
   /** 'user' = インカメラ（セルフィー）, 'environment' = アウトカメラ（書類撮影）, undefined = カメラボタンなし */
   facing?: 'user' | 'environment';
+  /** true のときカメラ撮影のみ（ファイル選択なし） */
+  cameraOnly?: boolean;
 }) {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -66,6 +68,17 @@ function ImageUploader({ label, value, onChange, facing }: {
             </>
           )}
         </div>
+      ) : facing && cameraOnly ? (
+        /* カメラのみ：1ボタン */
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={() => cameraRef.current?.click()}
+          className="w-full flex flex-col items-center justify-center gap-1 border-2 border-dashed border-border rounded-xl py-4 text-xs text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+        >
+          {uploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Camera className="h-6 w-6" />}
+          <span>カメラで撮影</span>
+        </button>
       ) : facing ? (
         /* カメラあり：2ボタンレイアウト */
         <div className="grid grid-cols-2 gap-2">
@@ -224,7 +237,7 @@ export default function EkycInlineForm({ applicationId, rejectionReason, onSubmi
         <p className="text-sm font-semibold">顔写真（セルフィー）</p>
         <p className="text-xs text-muted-foreground">正面・帽子なし・明るい場所で撮影。免許証の顔写真と照合します。</p>
         <div className="max-w-xs">
-          <ImageUploader label="顔写真 *" value={selfieImage} onChange={setSelfieImage} facing="user" />
+          <ImageUploader label="顔写真 *" value={selfieImage} onChange={setSelfieImage} facing="user" cameraOnly />
         </div>
       </div>
 
