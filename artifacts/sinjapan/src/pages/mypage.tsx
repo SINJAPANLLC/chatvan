@@ -249,28 +249,31 @@ export default function MyPage() {
                 <Card key={contract.id} className="overflow-hidden border-border shadow-sm">
                   <div className="flex flex-col sm:flex-row">
                     {/* 左: 車両サムネイル */}
-                    <div className="sm:w-1/3 bg-muted flex flex-col justify-center items-center border-b sm:border-b-0 sm:border-r border-border/50 overflow-hidden relative min-h-[160px]">
+                    <div className="sm:w-1/3 bg-muted flex items-center justify-center border-b sm:border-b-0 sm:border-r border-border/50 overflow-hidden min-h-[160px]">
                       {(() => {
                         const photos = JSON.parse((contract.vehicle as any)?.photos || '[]');
                         return photos[0]
-                          ? <img src={`${import.meta.env.BASE_URL}api/storage${photos[0]}`} alt="車両写真" className="w-full h-full object-cover absolute inset-0" />
+                          ? <img src={`${import.meta.env.BASE_URL}api/storage${photos[0]}`} alt="車両写真" className="w-full h-full object-contain p-2" />
                           : <Car className="h-12 w-12 text-muted-foreground/50" />;
                       })()}
-                      <div className="relative z-10 flex flex-col items-center p-4 bg-gradient-to-t from-black/60 via-transparent to-transparent w-full mt-auto">
-                        <span className="font-bold text-base text-center text-white drop-shadow">
-                          {contract.vehicle?.maker} {contract.vehicle?.model}
-                        </span>
-                        {contract.vehicle?.year && (
-                          <span className="text-xs text-white/80 mt-0.5">{contract.vehicle.year}年式</span>
-                        )}
-                        <span className={`inline-block mt-2 px-2.5 py-0.5 text-xs font-semibold rounded-full ${st.color}`}>
-                          {st.label}
-                        </span>
-                      </div>
                     </div>
 
                     {/* 右: 契約情報 */}
                     <div className="sm:w-2/3 p-6 flex flex-col justify-between gap-5">
+                      {/* 車名 + ステータス */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-bold text-base leading-tight">
+                            {contract.vehicle?.maker} {contract.vehicle?.model}
+                          </p>
+                          {contract.vehicle?.year && (
+                            <p className="text-xs text-muted-foreground mt-0.5">{contract.vehicle.year}年式</p>
+                          )}
+                        </div>
+                        <span className={`inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full ${st.color}`}>
+                          {st.label}
+                        </span>
+                      </div>
                       <div className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
                         <div>
                           <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
