@@ -41,9 +41,9 @@ export default function CompanyRegister() {
   if (success) return (
     <div className="min-h-[100dvh] flex items-center justify-center bg-muted/20 px-4">
       <div className="bg-card border border-border rounded-2xl shadow-sm p-8 max-w-md w-full text-center space-y-4">
-        <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-          <svg className="w-7 h-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        <div className="w-14 h-14 bg-black rounded-full flex items-center justify-center mx-auto">
+          <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
           </svg>
         </div>
         <h2 className="text-xl font-bold">申請を受け付けました</h2>
