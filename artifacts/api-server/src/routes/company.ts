@@ -104,8 +104,11 @@ router.get("/company/dashboard", requireAuth, requireRentalCompany, async (req: 
 
 // rcId を解決するヘルパー（admin は null = 全件）
 async function resolveRcId(userId: number, userRole: string): Promise<number | null> {
-  if (userRole === "admin") return null;
-  return getMyCompanyId(userId);
+  // admin でも rental_company_id が設定されていれば自社フィルタを適用する
+  const companyId = await getMyCompanyId(userId);
+  if (companyId) return companyId;
+  if (userRole === "admin") return null; // 全社データを見る純粋 admin
+  return null;
 }
 
 // ── GET /company/vehicles ───────────────────────────────────────────────────
@@ -413,7 +416,7 @@ router.get("/company/settlements", requireAuth, requireRentalCompany, async (req
       ? await db.execute(sql`
           SELECT DISTINCT ON (i.id)
             i.id,
-            to_char(i.period_start, 'YYYY-MM') AS period_month,
+            to_char(i.period_start::date, 'YYYY-MM') AS period_month,
             i.total_amount                     AS user_payment_amount,
             vc.sin_japan_fee                   AS chat_van_fee,
             (i.subtotal - COALESCE(vc.sin_japan_fee, 0)) AS rental_company_amount,
@@ -429,12 +432,12 @@ router.get("/company/settlements", requireAuth, requireRentalCompany, async (req
           JOIN van_contracts vc ON vc.user_id = i.user_id
           JOIN vehicles v ON vc.vehicle_id = v.id
           WHERE v.rental_company_id = ${rcId}
-          ORDER BY i.id, vc.created_at DESC, i.period_start DESC
+          ORDER BY i.id, vc.created_at DESC, i.period_start::date DESC
         `)
       : await db.execute(sql`
           SELECT DISTINCT ON (i.id)
             i.id,
-            to_char(i.period_start, 'YYYY-MM') AS period_month,
+            to_char(i.period_start::date, 'YYYY-MM') AS period_month,
             i.total_amount                     AS user_payment_amount,
             vc.sin_japan_fee                   AS chat_van_fee,
             (i.subtotal - COALESCE(vc.sin_japan_fee, 0)) AS rental_company_amount,
@@ -451,7 +454,7 @@ router.get("/company/settlements", requireAuth, requireRentalCompany, async (req
           JOIN van_contracts vc ON vc.user_id = i.user_id
           JOIN vehicles v ON vc.vehicle_id = v.id
           JOIN rental_companies rc ON v.rental_company_id = rc.id
-          ORDER BY i.id, vc.created_at DESC, i.period_start DESC
+          ORDER BY i.id, vc.created_at DESC, i.period_start::date DESC
         `);
     return res.json(toRows(raw));
   } catch (err) {
@@ -500,7 +503,7 @@ router.get("/company/contracts/:id/incidents", requireAuth, requireRentalCompany
 router.get("/company/notifications", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
     const raw = await db.execute(sql`
-      SELECT id, title, message, read, created_at
+      SELECT id, title, message, read_status as read, created_at
       FROM notifications
       WHERE user_id = ${req.session.userId}
       ORDER BY created_at DESC
@@ -517,7 +520,7 @@ router.get("/company/notifications", requireAuth, requireRentalCompany, async (r
 router.patch("/company/notifications/:id/read", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
     const id = parseInt(String(req.params.id));
-    await db.execute(sql`UPDATE notifications SET read = true WHERE id = ${id} AND user_id = ${req.session.userId}`);
+    await db.execute(sql`UPDATE notifications SET read_status = true WHERE id = ${id} AND user_id = ${req.session.userId}`);
     return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ error: "Internal error" });
@@ -527,7 +530,7 @@ router.patch("/company/notifications/:id/read", requireAuth, requireRentalCompan
 // ── PATCH /company/notifications/read-all ────────────────────────────────────
 router.patch("/company/notifications/read-all", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
-    await db.execute(sql`UPDATE notifications SET read = true WHERE user_id = ${req.session.userId}`);
+    await db.execute(sql`UPDATE notifications SET read_status = true WHERE user_id = ${req.session.userId}`);
     return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ error: "Internal error" });
