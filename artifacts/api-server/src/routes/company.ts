@@ -28,8 +28,9 @@ router.get("/company/me", requireAuth, requireRentalCompany, async (req: Request
     const userId = req.session.userId;
     const raw = await db.execute(sql`
       SELECT u.id, u.email, u.name, u.phone, u.role, u.rental_company_id,
-        rc.name as company_name, rc.contact_name, rc.phone as company_phone,
-        rc.address, rc.service_areas, rc.notes
+        rc.name as company_name, rc.corporate_name, rc.contact_name, rc.phone as company_phone,
+        rc.email as company_email, rc.address, rc.service_areas, rc.notes,
+        rc.bank_information, rc.payment_info
       FROM users u
       LEFT JOIN rental_companies rc ON rc.id = u.rental_company_id
       WHERE u.id = ${userId}
