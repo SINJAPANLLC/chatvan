@@ -412,55 +412,47 @@ router.get("/company/settlements", requireAuth, requireRentalCompany, async (req
     const rcId = await resolveRcId(req.session.userId, req.session.userRole);
     if (!rcId && req.session.userRole !== "admin") return res.json([]);
 
+    // 全アクティブ契約を月ごとに展開し、invoiceがあれば紐づける
     const buildQuery = (rcFilter: any) => sql`
-      SELECT * FROM (
-        SELECT DISTINCT ON (i.id)
-          ('inv-' || i.id)                   AS id,
-          to_char(i.period_start::date, 'YYYY-MM') AS period_month,
-          i.total_amount                     AS user_payment_amount,
-          vc.sin_japan_fee                   AS chat_van_fee,
-          (i.subtotal - COALESCE(vc.sin_japan_fee, 0)) AS rental_company_amount,
-          CASE i.status WHEN 'paid' THEN 'completed' ELSE i.status END AS status,
-          i.due_date                         AS scheduled_date,
-          i.invoice_number,
-          vc.contract_number,
-          vc.monthly_price,
-          v.maker, v.model, v.license_plate,
-          u.name AS user_name,
-          'invoice'::text AS payment_method
-        FROM invoices i
-        JOIN users u ON i.user_id = u.id
-        JOIN van_contracts vc ON vc.user_id = i.user_id
-        JOIN vehicles v ON vc.vehicle_id = v.id
-        WHERE ${rcFilter}
-        ORDER BY i.id, vc.created_at DESC, i.period_start::date DESC
-      ) inv_rows
-      UNION ALL
       SELECT
-        ('card-' || vc.id || '-' || to_char(gs.month, 'YYYYMM')) AS id,
+        ('c' || vc.id || '-' || to_char(gs.month, 'YYYYMM')) AS id,
         to_char(gs.month, 'YYYY-MM')       AS period_month,
         vc.monthly_price                   AS user_payment_amount,
         vc.sin_japan_fee                   AS chat_van_fee,
         (vc.monthly_price - COALESCE(vc.sin_japan_fee, 0)) AS rental_company_amount,
-        'completed'::text                  AS status,
-        NULL::text                         AS scheduled_date,
-        NULL::text                         AS invoice_number,
+        CASE
+          WHEN vc.payment_method = 'card'  THEN 'completed'
+          WHEN i.status = 'paid'           THEN 'completed'
+          WHEN i.id IS NOT NULL            THEN i.status
+          ELSE 'pending'
+        END                                AS status,
+        COALESCE(i.due_date::text, NULL)   AS scheduled_date,
+        i.invoice_number,
         vc.contract_number,
         vc.monthly_price,
         v.maker, v.model, v.license_plate,
-        u.name AS user_name,
-        'card'::text AS payment_method
+        u.name                             AS user_name,
+        COALESCE(vc.payment_method, 'invoice')::text AS payment_method
       FROM van_contracts vc
-      JOIN vehicles v ON vc.vehicle_id = v.id
-      JOIN users u ON vc.user_id = u.id
+      JOIN vehicles v  ON vc.vehicle_id = v.id
+      JOIN users u     ON vc.user_id    = u.id
       JOIN LATERAL generate_series(
         date_trunc('month', vc.start_date::date),
         date_trunc('month', COALESCE(vc.end_date::date, CURRENT_DATE)),
         '1 month'::interval
       ) AS gs(month) ON true
-      WHERE vc.payment_method = 'card'
+      LEFT JOIN LATERAL (
+        SELECT id, status, due_date, invoice_number
+        FROM invoices
+        WHERE user_id = vc.user_id
+          AND period_start::date >= gs.month::date
+          AND period_start::date <  (gs.month + interval '1 month')::date
+        ORDER BY id DESC
+        LIMIT 1
+      ) i ON true
+      WHERE vc.status IN ('active', 'completed')
         AND ${rcFilter}
-      ORDER BY period_month DESC
+      ORDER BY period_month DESC, vc.id
     `;
     const raw = rcId
       ? await db.execute(buildQuery(sql`v.rental_company_id = ${rcId}`))
