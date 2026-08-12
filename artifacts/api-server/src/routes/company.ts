@@ -138,37 +138,45 @@ router.patch("/company/vehicles/:id", requireAuth, requireRentalCompany, async (
       }
     }
 
-    const {
-      notes, monthlyPrice, prefecture, features,
-      photos, shakenCertPath, kensakushoCertPath, jibaisekiCertPath, ninniHokenCertPath,
-      maker, model, year, licensePlate, mileage, inspectionExpiryDate,
-      insuranceCompany, insurancePolicyNumber, insuranceContact, insuranceExpiry,
-      color, engineDisplacement, fuelType, transmission, minPeriodMonths, smokingPolicy,
-    } = req.body;
-    const [updated] = await db.update(vehiclesTable).set({
-      notes, monthlyPrice, prefecture, features, updatedAt: new Date(),
-      ...(photos !== undefined ? { photos } : {}),
-      ...(shakenCertPath !== undefined ? { shakenCertPath } : {}),
-      ...(kensakushoCertPath !== undefined ? { kensakushoCertPath } : {}),
-      ...(jibaisekiCertPath !== undefined ? { jibaisekiCertPath } : {}),
-      ...(ninniHokenCertPath !== undefined ? { ninniHokenCertPath } : {}),
-      ...(maker !== undefined ? { maker } : {}),
-      ...(model !== undefined ? { model } : {}),
-      ...(year !== undefined ? { year: year ? parseInt(String(year)) : null } : {}),
-      ...(licensePlate !== undefined ? { licensePlate } : {}),
-      ...(mileage !== undefined ? { mileage } : {}),
-      ...(inspectionExpiryDate !== undefined ? { inspectionExpiryDate } : {}),
-      ...(insuranceCompany !== undefined ? { insuranceCompany } : {}),
-      ...(insurancePolicyNumber !== undefined ? { insurancePolicyNumber } : {}),
-      ...(insuranceContact !== undefined ? { insuranceContact } : {}),
-      ...(insuranceExpiry !== undefined ? { insuranceExpiry } : {}),
-      ...(color !== undefined ? { color } : {}),
-      ...(engineDisplacement !== undefined ? { engineDisplacement } : {}),
-      ...(fuelType !== undefined ? { fuelType } : {}),
-      ...(transmission !== undefined ? { transmission } : {}),
-      ...(minPeriodMonths !== undefined ? { minPeriodMonths } : {}),
-      ...(smokingPolicy !== undefined ? { smokingPolicy } : {}),
-    } as any).where(eq(vehiclesTable.id, id)).returning();
+    const b = req.body;
+    const pick = (v: any) => v !== undefined ? v : undefined;
+    const [updated] = await db.update(vehiclesTable).set(Object.fromEntries(Object.entries({
+      updatedAt: new Date(),
+      maker:                     pick(b.maker),
+      model:                     pick(b.model),
+      grade:                     pick(b.grade),
+      year:                      b.year !== undefined ? (b.year ? parseInt(String(b.year)) : null) : undefined,
+      color:                     pick(b.color),
+      vin:                       pick(b.vin),
+      licensePlate:              pick(b.licensePlate),
+      transmission:              pick(b.transmission),
+      fuelType:                  pick(b.fuelType),
+      engineDisplacement:        pick(b.engineDisplacement),
+      smokingPolicy:             pick(b.smokingPolicy),
+      mileage:                   b.mileage !== undefined ? (b.mileage ? parseInt(String(b.mileage)) : null) : undefined,
+      inspectionExpiry:          pick(b.inspectionExpiry),
+      compulsoryInsuranceExpiry: pick(b.compulsoryInsuranceExpiry),
+      inspectionCertificateOwner: pick(b.inspectionCertificateOwner),
+      inspectionCertificateUser:  pick(b.inspectionCertificateUser),
+      insuranceCompany:          pick(b.insuranceCompany),
+      insurancePolicyNumber:     pick(b.insurancePolicyNumber),
+      insuranceContact:          pick(b.insuranceContact),
+      insuranceExpiry:           pick(b.insuranceExpiry),
+      prefecture:                pick(b.prefecture),
+      locationDetail:            pick(b.locationDetail),
+      monthlyPrice:              b.monthlyPrice !== undefined ? String(b.monthlyPrice) : undefined,
+      minPeriodMonths:           b.minPeriodMonths !== undefined ? parseInt(String(b.minPeriodMonths)) : undefined,
+      availableFrom:             pick(b.availableFrom),
+      hasEtc:                    b.hasEtc !== undefined ? !!b.hasEtc : undefined,
+      hasDashcam:                b.hasDashcam !== undefined ? !!b.hasDashcam : undefined,
+      hasBackupCam:              b.hasBackupCam !== undefined ? !!b.hasBackupCam : undefined,
+      notes:                     pick(b.notes),
+      photos:                    pick(b.photos),
+      shakenCertPath:            pick(b.shakenCertPath),
+      kensakushoCertPath:        pick(b.kensakushoCertPath),
+      jibaisekiCertPath:         pick(b.jibaisekiCertPath),
+      ninniHokenCertPath:        pick(b.ninniHokenCertPath),
+    }).filter(([, v]) => v !== undefined)) as any).where(eq(vehiclesTable.id, id)).returning();
     return res.json(updated);
   } catch (err) {
     return res.status(500).json({ error: "Internal error" });
@@ -321,31 +329,48 @@ router.post("/company/vehicles", requireAuth, requireRentalCompany, async (req: 
   try {
     const rcId = await getMyCompanyId(req.session.userId);
     if (!rcId) return res.status(403).json({ error: "会社が紐付けられていません" });
-    const { maker, model, year, licensePlate, prefecture, monthlyPrice, notes, insuranceCompany, inspectionExpiryDate } = req.body;
-    if (!maker || !model || !monthlyPrice) {
+    const b = req.body;
+    if (!b.maker || !b.model || !b.monthlyPrice) {
       return res.status(400).json({ error: "メーカー・モデル・月額料金は必須です" });
     }
-    const {
-      photos, shakenCertPath, kensakushoCertPath, jibaisekiCertPath, ninniHokenCertPath,
-    } = req.body;
     const [vehicle] = await db.insert(vehiclesTable).values({
-      maker,
-      model,
-      year: year ? parseInt(String(year)) : null,
-      licensePlate: licensePlate || null,
-      prefecture: prefecture || null,
-      monthlyPrice: String(monthlyPrice),
+      maker: b.maker,
+      model: b.model,
+      grade: b.grade || null,
+      year: b.year ? parseInt(String(b.year)) : null,
+      color: b.color || null,
+      vin: b.vin || null,
+      licensePlate: b.licensePlate || null,
+      transmission: b.transmission || null,
+      fuelType: b.fuelType || null,
+      engineDisplacement: b.engineDisplacement || null,
+      smokingPolicy: b.smokingPolicy || 'no_smoking',
+      mileage: b.mileage ? parseInt(String(b.mileage)) : null,
+      inspectionExpiry: b.inspectionExpiry || null,
+      compulsoryInsuranceExpiry: b.compulsoryInsuranceExpiry || null,
+      inspectionCertificateOwner: b.inspectionCertificateOwner || null,
+      inspectionCertificateUser: b.inspectionCertificateUser || null,
+      insuranceCompany: b.insuranceCompany || null,
+      insurancePolicyNumber: b.insurancePolicyNumber || null,
+      insuranceContact: b.insuranceContact || null,
+      insuranceExpiry: b.insuranceExpiry || null,
+      prefecture: b.prefecture || null,
+      locationDetail: b.locationDetail || null,
+      monthlyPrice: String(b.monthlyPrice),
+      minPeriodMonths: b.minPeriodMonths ? parseInt(String(b.minPeriodMonths)) : 1,
+      availableFrom: b.availableFrom || null,
+      hasEtc: !!b.hasEtc,
+      hasDashcam: !!b.hasDashcam,
+      hasBackupCam: !!b.hasBackupCam,
+      notes: b.notes || null,
+      photos: b.photos || '[]',
+      shakenCertPath: b.shakenCertPath || null,
+      kensakushoCertPath: b.kensakushoCertPath || null,
+      jibaisekiCertPath: b.jibaisekiCertPath || null,
+      ninniHokenCertPath: b.ninniHokenCertPath || null,
       sinJapanFee: "0",
-      notes: notes || null,
-      insuranceCompany: insuranceCompany || null,
-      inspectionExpiryDate: inspectionExpiryDate || null,
       rentalCompanyId: rcId,
       status: "reviewing",
-      photos: photos || '[]',
-      shakenCertPath: shakenCertPath || null,
-      kensakushoCertPath: kensakushoCertPath || null,
-      jibaisekiCertPath: jibaisekiCertPath || null,
-      ninniHokenCertPath: ninniHokenCertPath || null,
     } as any).returning();
     const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
     for (const admin of admins) {
