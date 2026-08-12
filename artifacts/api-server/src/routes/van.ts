@@ -2195,6 +2195,11 @@ router.get("/van/applications/:id/identity-verification", requireAuth, async (re
         LIMIT 1
       `);
       result = ((rows as any)?.rows ?? rows)[0] ?? null;
+
+      // 既存 verified 記録でスキップ且つ application_received のまま → AI 審査を起動
+      if (result && app.status === "application_received") {
+        setImmediate(() => runAIScreening(appId));
+      }
     }
     return res.json(result ?? null);
   } catch (err) {
