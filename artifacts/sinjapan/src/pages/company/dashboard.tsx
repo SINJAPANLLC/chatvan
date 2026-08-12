@@ -76,13 +76,6 @@ export default function CompanyDashboard() {
       icon: TrendingUp,
       href: '/company/settlements',
     },
-    {
-      label: '未払い',
-      value: stats.payment_issues ?? 0,
-      sub: '対応が必要',
-      icon: AlertTriangle,
-      href: '/company/contracts',
-    },
   ];
 
   return (
