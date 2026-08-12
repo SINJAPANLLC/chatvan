@@ -438,15 +438,15 @@ router.get("/company/contracts/:id/incidents", requireAuth, requireRentalCompany
   try {
     const contractId = Number(req.params.id);
     const rcId = await resolveRcId(req.session.userId, req.session.userRole);
-    // 自社の契約かチェック
     const raw = await db.execute(sql`
-      SELECT vi.*
-      FROM van_incidents vi
-      JOIN van_contracts vc ON vi.contract_id = vc.id
+      SELECT b.*, u.name as user_name
+      FROM breakdowns b
+      LEFT JOIN users u ON b.user_id = u.id
+      JOIN van_contracts vc ON b.contract_id = vc.id
       JOIN vehicles v ON vc.vehicle_id = v.id
-      WHERE vi.contract_id = ${contractId}
+      WHERE b.contract_id = ${contractId}
         AND (${rcId}::int IS NULL OR v.rental_company_id = ${rcId})
-      ORDER BY vi.created_at DESC
+      ORDER BY b.created_at DESC
     `);
     return res.json(toRows(raw));
   } catch (err) {
