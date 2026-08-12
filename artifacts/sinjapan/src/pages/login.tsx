@@ -104,7 +104,7 @@ export default function Login() {
           </Form>
         </div>
 
-        <div className="text-center text-sm text-muted-foreground space-y-1">
+        <div className="text-center text-sm text-muted-foreground space-y-3">
           <div>
             <Link href="/forgot-password" className="font-medium text-primary hover:underline">
               パスワードをお忘れの方
