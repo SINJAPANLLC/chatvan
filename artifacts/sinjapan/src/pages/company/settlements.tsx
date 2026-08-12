@@ -233,18 +233,10 @@ function DetailTable({ rows, initialMonth }: { rows: any[]; initialMonth: string
   );
 }
 
-// ─── メインページ ──────────────────────────────────────────────────────────────
-const TABS = [
-  { key: 'monthly', label: '月次売上' },
-  { key: 'detail',  label: '明細'     },
-];
-
 export default function CompanySettlements() {
   const { toast } = useToast();
-  const [tab, setTab]               = useState('monthly');
-  const [rows, setRows]             = useState<any[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [jumpMonth, setJumpMonth]   = useState('');
+  const [rows, setRows]       = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -257,14 +249,8 @@ export default function CompanySettlements() {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleMonthClick = (key: string) => {
-    setJumpMonth(key);
-    setTab('detail');
-  };
-
   return (
     <div className="space-y-6">
-      {/* ヘッダー */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">売上</h1>
@@ -275,25 +261,12 @@ export default function CompanySettlements() {
         </button>
       </div>
 
-      {/* タブ */}
-      <div className="flex gap-1 border-b border-border">
-        {TABS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={`px-4 py-2.5 text-sm font-medium transition-colors ${tab === t.key ? 'text-foreground border-b-2 border-foreground -mb-px' : 'text-muted-foreground hover:text-foreground'}`}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-
       {loading ? (
         <div className="flex justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <>
-          {tab === 'monthly' && <MonthlyTable rows={rows} onMonthClick={handleMonthClick} />}
-          {tab === 'detail'  && <DetailTable  rows={rows} initialMonth={jumpMonth} />}
-        </>
+        <DetailTable rows={rows} initialMonth="" />
       )}
     </div>
   );
