@@ -270,9 +270,15 @@ export default function MyPage() {
                             <p className="text-xs text-muted-foreground mt-0.5">{contract.vehicle.year}年式</p>
                           )}
                         </div>
-                        <span className={`inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full ${st.color}`}>
-                          {st.label}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {(contract as any).paymentMethod === 'invoice'
+                            ? <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800 border border-amber-200"><FileText className="h-3 w-3" />請求書払い</span>
+                            : <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800 border border-blue-200"><CreditCard className="h-3 w-3" />カード払い</span>
+                          }
+                          <span className={`inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full ${st.color}`}>
+                            {st.label}
+                          </span>
+                        </div>
                       </div>
                       <div className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
                         <div>
@@ -293,7 +299,10 @@ export default function MyPage() {
                           <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
                             <CreditCard className="h-3.5 w-3.5" />次回支払日
                           </p>
-                          <p className="font-medium">毎月 {contract.paymentDay}日</p>
+                          {(contract as any).paymentMethod === 'invoice'
+                            ? <p className="font-medium">末締め翌月末払い</p>
+                            : <p className="font-medium">毎月 {contract.paymentDay}日</p>
+                          }
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
