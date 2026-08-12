@@ -77,6 +77,7 @@ export default function CompanyVehicles() {
   const { toast } = useToast();
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasCompany, setHasCompany] = useState<boolean | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState<Record<string, any>>({});
@@ -109,10 +110,15 @@ export default function CompanyVehicles() {
   // ─── Load vehicles ────────────────────────────────────────────────────────
   const load = () => {
     setIsLoading(true);
-    fetch(API('/company/vehicles'), { headers: { Authorization: `Bearer ${tok()}` } })
-      .then(r => r.ok ? r.json() : [])
-      .then(j => setVehicles(Array.isArray(j) ? j : []))
-      .finally(() => setIsLoading(false));
+    Promise.all([
+      fetch(API('/company/vehicles'), { headers: { Authorization: `Bearer ${tok()}` } })
+        .then(r => r.ok ? r.json() : []),
+      fetch(API('/company/me'), { headers: { Authorization: `Bearer ${tok()}` } })
+        .then(r => r.ok ? r.json() : null),
+    ]).then(([vehicles, me]) => {
+      setVehicles(Array.isArray(vehicles) ? vehicles : []);
+      setHasCompany(!!me?.rental_company_id);
+    }).finally(() => setIsLoading(false));
   };
   useEffect(() => { load(); }, []);
 
@@ -191,6 +197,10 @@ export default function CompanyVehicles() {
   };
 
   const handleOpenCreate = () => {
+    if (hasCompany === false) {
+      toast({ variant: 'destructive', title: '会社が紐付けられていません', description: '管理者アカウントでは車両登録できません。協力会社アカウントでログインしてください。' });
+      return;
+    }
     setEditingId(null);
     setFormData({
       maker: '', model: '', grade: '', year: new Date().getFullYear(),

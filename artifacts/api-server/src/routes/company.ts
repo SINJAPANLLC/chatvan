@@ -342,7 +342,14 @@ router.post("/company/register", async (req: Request, res: Response) => {
 router.post("/company/vehicles", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
     const rcId = await getMyCompanyId(req.session.userId);
-    if (!rcId) return res.status(403).json({ error: "会社が紐付けられていません" });
+    if (!rcId) {
+      const isAdmin = req.session.userRole === "admin";
+      return res.status(403).json({
+        error: isAdmin
+          ? "管理者アカウントでは車両登録できません。協力会社アカウントでログインしてください。"
+          : "アカウントに会社が紐付けられていません。管理者にお問い合わせください。",
+      });
+    }
     const b = req.body;
     if (!b.maker || !b.model || !b.monthlyPrice) {
       return res.status(400).json({ error: "メーカー・モデル・月額料金は必須です" });
