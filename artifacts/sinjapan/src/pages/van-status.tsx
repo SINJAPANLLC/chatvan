@@ -308,6 +308,8 @@ export default function VanStatus() {
 
   const monthlyBase = contract ? Number(contract.monthlyPrice) + Number(contract.sinJapanFee ?? 0) : 0;
   const monthlyTotal = Math.floor(monthlyBase * 1.1);
+  const optionsFee = contract ? Number((contract as any).optionsFee ?? 0) : 0;
+  const firstPaymentTotal = monthlyTotal + optionsFee;
   const fmt = (n: number) => `¥${Math.floor(n).toLocaleString()}`;
 
   return (
@@ -850,7 +852,12 @@ export default function VanStatus() {
                 <div className="w-14 h-14 rounded-full bg-muted border-2 border-border flex items-center justify-center mx-auto mb-4"><CreditCard className="h-7 w-7 text-foreground" /></div>
                 <h2 className="text-lg font-bold mb-2">最初のお支払い</h2>
                 <p className="text-sm text-muted-foreground mb-2">契約書へのご同意ありがとうございます。<br />最初の月額料金をお支払いください。</p>
-                {contract && <p className="text-2xl font-bold mb-6">{fmt(monthlyTotal)}<span className="text-sm font-normal text-muted-foreground ml-1">/月（税込）</span></p>}
+                {contract && (
+                  <div className="mb-6">
+                    <p className="text-2xl font-bold">{fmt(firstPaymentTotal)}<span className="text-sm font-normal text-muted-foreground ml-1">（初回・税込）</span></p>
+                    {optionsFee > 0 && <p className="text-xs text-muted-foreground mt-1">月額 {fmt(monthlyTotal)} + 黒ナンバー代理取得 {fmt(optionsFee)}</p>}
+                  </div>
+                )}
                 <button onClick={() => setLocation(`/van/${applicationId}/payment`)}
                   className="px-8 py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity">
                   お支払いへ進む
