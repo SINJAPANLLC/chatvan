@@ -351,6 +351,81 @@ router.get("/company/settlements", requireAuth, requireRentalCompany, async (req
   }
 });
 
+// ── GET /company/notifications ── ログインユーザーの通知一覧 ─────────────────
+router.get("/company/notifications", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
+  try {
+    const raw = await db.execute(sql`
+      SELECT id, title, message, read, created_at
+      FROM notifications
+      WHERE user_id = ${req.session.userId}
+      ORDER BY created_at DESC
+      LIMIT 100
+    `);
+    return res.json(toRows(raw));
+  } catch (err) {
+    console.error("company/notifications error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── PATCH /company/notifications/:id/read ────────────────────────────────────
+router.patch("/company/notifications/:id/read", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(String(req.params.id));
+    await db.execute(sql`UPDATE notifications SET read = true WHERE id = ${id} AND user_id = ${req.session.userId}`);
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── PATCH /company/notifications/read-all ────────────────────────────────────
+router.patch("/company/notifications/read-all", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
+  try {
+    await db.execute(sql`UPDATE notifications SET read = true WHERE user_id = ${req.session.userId}`);
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── GET /company/settings ── 会社プロフィール取得 ────────────────────────────
+router.get("/company/settings", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
+  try {
+    const rcId = await getMyCompanyId(req.session.userId);
+    if (!rcId) return res.status(403).json({ error: "会社が紐付けられていません" });
+    const [company] = await db.select().from(rentalCompaniesTable).where(eq(rentalCompaniesTable.id, rcId));
+    return company ? res.json(company) : res.status(404).json({ error: "Not found" });
+  } catch (err) {
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── PATCH /company/settings ── 会社プロフィール更新 ─────────────────────────
+router.patch("/company/settings", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
+  try {
+    const rcId = await getMyCompanyId(req.session.userId);
+    if (!rcId) return res.status(403).json({ error: "会社が紐付けられていません" });
+    const { name, corporateName, contactName, phone, email, address, serviceAreas, fleetSize, notes } = req.body;
+    const [updated] = await db.update(rentalCompaniesTable).set({
+      ...(name ? { name } : {}),
+      ...(corporateName !== undefined ? { corporateName } : {}),
+      ...(contactName ? { contactName } : {}),
+      ...(phone ? { phone } : {}),
+      ...(email ? { email } : {}),
+      ...(address !== undefined ? { address } : {}),
+      ...(serviceAreas !== undefined ? { serviceAreas } : {}),
+      ...(fleetSize !== undefined ? { fleetSize: fleetSize ? parseInt(String(fleetSize)) : null } : {}),
+      ...(notes !== undefined ? { notes } : {}),
+      updatedAt: new Date(),
+    } as any).where(eq(rentalCompaniesTable.id, rcId)).returning();
+    return res.json(updated);
+  } catch (err) {
+    console.error("company/settings PATCH error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
 // ── POST /company/notify-admin ───────────────────────────────────────────────
 // 協力会社 → Admin への問い合わせ通知
 router.post("/company/notify-admin", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {

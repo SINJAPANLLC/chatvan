@@ -50,8 +50,10 @@ const CompanyContracts   = lazy(() => import('@/pages/company/contracts'));
 const CompanyInsurance   = lazy(() => import('@/pages/company/insurance'));
 const CompanyGps         = lazy(() => import('@/pages/company/gps'));
 const CompanyContact     = lazy(() => import('@/pages/company/contact'));
-const CompanySettlements = lazy(() => import('@/pages/company/settlements'));
-const CompanyRegister    = lazy(() => import('@/pages/company/register'));
+const CompanySettlements    = lazy(() => import('@/pages/company/settlements'));
+const CompanyRegister       = lazy(() => import('@/pages/company/register'));
+const CompanyNotifications  = lazy(() => import('@/pages/company/notifications'));
+const CompanySettings       = lazy(() => import('@/pages/company/settings'));
 
 // Chat VAN 固有管理画面
 const AdminInsurance        = lazy(() => import('@/pages/admin/insurance'));
@@ -195,6 +197,12 @@ function Router() {
         </Route>
         <Route path="/company/settlements">
           <CompanyLayout><CompanySettlements /></CompanyLayout>
+        </Route>
+        <Route path="/company/notifications">
+          <CompanyLayout><CompanyNotifications /></CompanyLayout>
+        </Route>
+        <Route path="/company/settings">
+          <CompanyLayout><CompanySettings /></CompanyLayout>
         </Route>
         <Route path="/company/register" component={CompanyRegister} />
 
