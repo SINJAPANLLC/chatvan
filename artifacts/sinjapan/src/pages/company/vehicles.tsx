@@ -145,8 +145,8 @@ export default function CompanyVehicles() {
   };
 
   const handleShakenOcr = async (file: File) => {
-    if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
-      toast({ variant: 'destructive', title: '画像またはPDFを選択してください' }); return;
+    if (!file.type.startsWith('image/')) {
+      toast({ variant: 'destructive', title: 'OCRは画像ファイル（JPEG/PNG/WebP）のみ対応しています。PDFは書類欄からアップロードしてください。' }); return;
     }
     setShakenParsing(true);
     try {

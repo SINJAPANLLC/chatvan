@@ -2830,10 +2830,14 @@ router.post("/users", requireAuth, requireAdmin, async (req: Request, res: Respo
 });
 
 // POST /van/vehicles/parse-shaken  車検証 OCR → 車両情報を抽出
-router.post("/van/vehicles/parse-shaken", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+router.post("/van/vehicles/parse-shaken", requireAuth, async (req: Request, res: Response) => {
   try {
     const { imageBase64, mimeType = "image/jpeg" } = req.body;
     if (!imageBase64) return res.status(400).json({ error: "imageBase64 is required" });
+    const allowed = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"]);
+    if (!allowed.has(mimeType)) {
+      return res.status(400).json({ error: "画像ファイル（JPEG/PNG/WebP）でOCRしてください。PDFは非対応です。" });
+    }
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
