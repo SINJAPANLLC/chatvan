@@ -40,7 +40,8 @@ export function CompanyLayout({ children }: { children: React.ReactNode }) {
 
   const handleLogout = () => {
     localStorage.removeItem('sinjapan_auth_token');
-    logout.mutate(undefined, { onSuccess: () => setLocation('/login') });
+    logout.mutate(undefined);
+    setLocation('/login');
     setMobileOpen(false);
   };
 
