@@ -112,6 +112,8 @@ async function resolveRcId(userId: number, userRole: string): Promise<number | n
 router.get("/company/vehicles", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
     const rcId = await resolveRcId(req.session.userId, req.session.userRole);
+    // admin以外で rcId が取れない場合は空配列（他社の車両を見せない）
+    if (!rcId && req.session.userRole !== "admin") return res.json([]);
     const raw = rcId
       ? await db.execute(sql`SELECT * FROM vehicles WHERE rental_company_id = ${rcId} ORDER BY created_at DESC`)
       : await db.execute(sql`SELECT * FROM vehicles ORDER BY created_at DESC`);
@@ -150,6 +152,7 @@ router.patch("/company/vehicles/:id", requireAuth, requireRentalCompany, async (
 router.get("/company/contracts", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
     const rcId = await resolveRcId(req.session.userId, req.session.userRole);
+    if (!rcId && req.session.userRole !== "admin") return res.json([]);
     const raw = rcId
       ? await db.execute(sql`
           SELECT vc.*, u.name as user_name, u.phone as user_phone, u.email as user_email,
@@ -182,6 +185,7 @@ router.get("/company/contracts", requireAuth, requireRentalCompany, async (req: 
 router.get("/company/insurance", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
     const rcId = await resolveRcId(req.session.userId, req.session.userRole);
+    if (!rcId && req.session.userRole !== "admin") return res.json([]);
     const raw = rcId
       ? await db.execute(sql`
           SELECT ip.*, v.maker, v.model, v.license_plate
@@ -206,6 +210,7 @@ router.get("/company/insurance", requireAuth, requireRentalCompany, async (req: 
 router.get("/company/gps", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
     const rcId = await resolveRcId(req.session.userId, req.session.userRole);
+    if (!rcId && req.session.userRole !== "admin") return res.json([]);
     const raw = rcId
       ? await db.execute(sql`
           SELECT gd.*, v.maker, v.model, v.license_plate,
@@ -326,6 +331,7 @@ router.post("/company/vehicles", requireAuth, requireRentalCompany, async (req: 
 router.get("/company/settlements", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
     const rcId = await resolveRcId(req.session.userId, req.session.userRole);
+    if (!rcId && req.session.userRole !== "admin") return res.json([]);
     const raw = rcId
       ? await db.execute(sql`
           SELECT s.*, vc.contract_number, vc.monthly_price, v.maker, v.model, v.license_plate, u.name as user_name
