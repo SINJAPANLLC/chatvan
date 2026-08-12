@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import 'leaflet/dist/leaflet.css';
 import {
   Loader2, ChevronLeft, FileText, Calendar, Phone, Mail, Filter,
-  User, Car, ScrollText, Wallet, MapPinned, AlertTriangle,
+  User, Car, ScrollText, AlertTriangle,
   ClipboardList, Truck, RotateCcw, MapPin, Shield, BadgeCheck,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -36,48 +36,16 @@ const FILTERS = [
   { key: 'completed',        label: '完了'     },
 ];
 
-type DetailTab = 'overview' | 'customer' | 'vehicle' | 'contract' | 'payment' | 'gps' | 'incident';
+type DetailTab = 'overview' | 'customer' | 'vehicle' | 'contract' | 'incident';
 const TABS: { id: DetailTab; label: string; icon: React.ComponentType<any> }[] = [
   { id: 'overview',  label: '概要',     icon: ClipboardList  },
   { id: 'customer',  label: '顧客',     icon: User           },
   { id: 'vehicle',   label: '車両',     icon: Car            },
   { id: 'contract',  label: '契約',     icon: ScrollText     },
-  { id: 'payment',   label: '決済',     icon: Wallet         },
-  { id: 'gps',       label: 'GPS',      icon: MapPinned      },
   { id: 'incident',  label: '事故・故障', icon: AlertTriangle },
 ];
 
 // ─── GPS マップ ───────────────────────────────────────────────────────────────
-const GpsMap: React.FC<{ locs: any[] }> = ({ locs }) => {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const mapInst = useRef<any>(null);
-  useEffect(() => {
-    if (!mapRef.current || locs.length === 0) return;
-    import('leaflet').then(L => {
-      delete (L.Icon.Default.prototype as any)._getIconUrl;
-      L.Icon.Default.mergeOptions({
-        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-      });
-      if (mapInst.current) { mapInst.current.remove(); mapInst.current = null; }
-      const latest = locs[0];
-      const center: [number, number] = [Number(latest.latitude), Number(latest.longitude)];
-      const map = L.map(mapRef.current!).setView(center, 15);
-      mapInst.current = map;
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
-      const coords: [number, number][] = [...locs].reverse().map(l => [Number(l.latitude), Number(l.longitude)]);
-      L.polyline(coords, { color: '#000', weight: 2, opacity: 0.6 }).addTo(map);
-      L.marker(center).addTo(map).bindPopup(`<b>最新位置</b><br>${fmtDT(latest.recorded_at)}`).openPopup();
-      locs.slice(1).forEach(l => {
-        L.circleMarker([Number(l.latitude), Number(l.longitude)], { radius: 3, color: '#666', fillColor: '#999', fillOpacity: 0.7, weight: 1 }).addTo(map);
-      });
-    });
-    return () => { if (mapInst.current) { mapInst.current.remove(); mapInst.current = null; } };
-  }, [locs]);
-  if (locs.length === 0) return <p className="text-sm text-muted-foreground py-4 text-center">位置情報はまだ送信されていません。</p>;
-  return <div ref={mapRef} style={{ height: 400, borderRadius: 8 }} />;
-};
 
 // ─── Section / DL ────────────────────────────────────────────────────────────
 function Section({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
@@ -108,7 +76,7 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
   const [relLoading, setRelLoading] = useState(false);
   const [confirming, setConfirming] = useState<string | null>(null);
 
-  const RELATED_TABS: DetailTab[] = ['customer', 'vehicle', 'contract', 'payment', 'gps', 'incident'];
+  const RELATED_TABS: DetailTab[] = ['customer', 'vehicle', 'contract', 'incident'];
   const appId = contract.application_id;
 
   const loadRelated = async () => {
@@ -543,122 +511,6 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
         </div>
       )}
 
-      {/* ════ TAB: 決済 ════ */}
-      {tab === 'payment' && (
-        <div className="space-y-5">
-          {relLoading ? (
-            <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-muted-foreground" /></div>
-          ) : (
-            <>
-              <Section title={`カード決済履歴（${related?.payments?.length ?? 0}件）`}>
-                {!related?.payments?.length ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">カード決済履歴はありません</p>
-                ) : (
-                  <table className="w-full text-sm">
-                    <thead><tr className="text-xs text-muted-foreground border-b border-border">
-                      <th className="pb-2 text-left">対象月</th>
-                      <th className="pb-2 text-left">金額</th>
-                      <th className="pb-2 text-left">結果</th>
-                      <th className="pb-2 text-left">試行日</th>
-                    </tr></thead>
-                    <tbody className="divide-y divide-border">
-                      {related.payments.map((p: any) => (
-                        <tr key={p.id}>
-                          <td className="py-2.5 font-mono text-xs">{p.period_month}</td>
-                          <td className="py-2.5">¥{Number(p.amount).toLocaleString()}</td>
-                          <td className="py-2.5">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${p.result === 'success' ? 'bg-muted border-border text-foreground' : 'bg-muted border-border text-muted-foreground'}`}>
-                              {{ success: '成功', failed: '失敗' }[p.result as string] ?? p.result ?? '—'}
-                            </span>
-                          </td>
-                          <td className="py-2.5 text-xs text-muted-foreground">{p.attempted_at ? format(new Date(p.attempted_at), 'MM/dd HH:mm') : '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </Section>
-
-              <Section title={`請求書払い履歴（${related?.invoices?.length ?? 0}件）`}>
-                {!related?.invoices?.length ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">請求書はありません</p>
-                ) : (
-                  <table className="w-full text-sm">
-                    <thead><tr className="text-xs text-muted-foreground border-b border-border">
-                      <th className="pb-2 text-left">請求書番号</th>
-                      <th className="pb-2 text-left">対象期間</th>
-                      <th className="pb-2 text-left">金額（税込）</th>
-                      <th className="pb-2 text-left">ステータス</th>
-                      <th className="pb-2 text-left">支払期限</th>
-                    </tr></thead>
-                    <tbody className="divide-y divide-border">
-                      {related.invoices.map((inv: any) => {
-                        const INV_STATUS: Record<string,string> = { paid: '入金済み', pending: '未払い', overdue: '延滞', cancelled: 'キャンセル' };
-                        return (
-                          <tr key={inv.id}>
-                            <td className="py-2.5 font-mono text-xs">{inv.invoice_number}</td>
-                            <td className="py-2.5 text-xs text-muted-foreground">
-                              {inv.period_start ? format(new Date(inv.period_start), 'yyyy/MM/dd') : '—'} 〜 {inv.period_end ? format(new Date(inv.period_end), 'MM/dd') : '—'}
-                            </td>
-                            <td className="py-2.5 font-medium">¥{Number(inv.total_amount).toLocaleString()}</td>
-                            <td className="py-2.5">
-                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium border border-border bg-muted ${inv.status === 'paid' ? 'text-foreground' : 'text-muted-foreground'}`}>
-                                {INV_STATUS[inv.status] ?? inv.status}
-                              </span>
-                            </td>
-                            <td className="py-2.5 text-xs text-muted-foreground">{fmtD(inv.due_date)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
-              </Section>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ════ TAB: GPS ════ */}
-      {tab === 'gps' && (
-        <div className="space-y-5">
-          {relLoading ? (
-            <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-muted-foreground" /></div>
-          ) : (() => {
-            const locs: any[] = related?.userLocations ?? [];
-            const latest = locs[0];
-            return (
-              <Section title={`位置情報（${locs.length}件）`}>
-                {latest && (
-                  <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-muted-foreground mb-3 pb-3 border-b border-border">
-                    <span>最終更新: <span className="text-foreground font-medium">{fmtDT(latest.recorded_at)}</span></span>
-                    <span>精度: <span className="text-foreground">±{Math.round(Number(latest.accuracy ?? 0))}m</span></span>
-                    <a href={`https://maps.google.com/?q=${latest.latitude},${latest.longitude}`} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-2.5 py-1 border border-border rounded-lg hover:bg-muted ml-auto">
-                      <MapPinned className="h-3 w-3" />Googleマップで開く
-                    </a>
-                  </div>
-                )}
-                <GpsMap locs={locs} />
-                {locs.length > 0 && (
-                  <div className="mt-3 border-t border-border pt-3">
-                    <p className="text-xs font-medium mb-2">直近の記録</p>
-                    <div className="space-y-0.5 max-h-36 overflow-y-auto">
-                      {locs.slice(0, 30).map((l: any) => (
-                        <div key={l.id} className="flex items-center justify-between px-2 py-1 rounded hover:bg-muted text-xs gap-3">
-                          <span className="text-muted-foreground tabular-nums">{l.recorded_at ? format(new Date(l.recorded_at), 'MM/dd HH:mm:ss') : '—'}</span>
-                          <span className="font-mono text-muted-foreground">{Number(l.latitude).toFixed(5)}, {Number(l.longitude).toFixed(5)}</span>
-                          {l.accuracy != null && <span className="text-muted-foreground">±{Math.round(Number(l.accuracy))}m</span>}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </Section>
-            );
-          })()}
-        </div>
-      )}
 
       {/* ════ TAB: 事故・故障 ════ */}
       {tab === 'incident' && (
