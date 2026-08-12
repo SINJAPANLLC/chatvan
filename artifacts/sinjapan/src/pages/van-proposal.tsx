@@ -102,12 +102,14 @@ export default function VanProposal() {
 
   const acceptProposal = useAcceptVanProposal();
 
+  const vehicles = application?.proposedVehicles || [];
+
   useEffect(() => {
     if (!application) return;
-    if (application.status === 'proposed') return;
-    const timer = setInterval(() => refetch(), 30000);
+    if (vehicles.length > 0) return; // 車両が来たら停止
+    const timer = setInterval(() => refetch(), 3000);
     return () => clearInterval(timer);
-  }, [application?.status, refetch]);
+  }, [application, vehicles.length, refetch]);
 
   if (isLoading) {
     return (
@@ -125,8 +127,6 @@ export default function VanProposal() {
       </div>
     );
   }
-
-  const vehicles = application.proposedVehicles || [];
 
   const handleAccept = async (vehicleId: number) => {
     try {
