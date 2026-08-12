@@ -2923,7 +2923,7 @@ router.post("/van/vehicles/parse-shaken", requireAuth, async (req: Request, res:
 }` }
         ]
       }],
-      max_tokens: 800,
+      max_completion_tokens: 800,
     });
 
     const text = completion.choices[0]?.message?.content ?? "";
