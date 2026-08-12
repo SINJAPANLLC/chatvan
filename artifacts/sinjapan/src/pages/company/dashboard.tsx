@@ -234,14 +234,6 @@ export default function CompanyDashboard() {
     .filter((s: any) => (s.period_month ?? '').startsWith(thisMonth))
     .reduce((sum: number, s: any) => sum + Number(s.rental_company_amount ?? s.company_amount ?? 0), 0);
 
-  // 対応一覧用の追加stats
-  const actionStats = {
-    delivery_pending:   contracts.filter((c: any) => c.application_status === 'delivery_pending').length,
-    return_pending:     contracts.filter((c: any) => c.application_status === 'return_pending').length,
-    pending_payment:    contracts.filter((c: any) => c.status === 'pending_payment').length,
-    reviewing_vehicles: stats.reviewing_vehicles ?? 0,
-  };
-
   return (
     <div className="space-y-6">
       {/* ヘッダー */}
@@ -270,13 +262,6 @@ export default function CompanyDashboard() {
 
       {/* 車両内訳 */}
       <VehicleBreakdown stats={stats} />
-
-      {/* 3パネル行 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <ActionPanel stats={actionStats} />
-        <NotificationsPanel />
-        <RecentContractsPanel contracts={contracts} />
-      </div>
 
       {/* 審査中バナー */}
       {me?.status === 'prospect' && (
