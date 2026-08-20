@@ -890,7 +890,7 @@ router.get("/van/dashboard", requireAuth, requireAdmin, async (req: Request, res
     let cardRevenue = 0, invoiceRevenue = 0, blackNumberRevenue = 0, blackNumberCount = 0, insuranceCount = 0;
     let thisMonthRevenue = 0, thisMonthGrossProfit = 0, totalRevenue = 0;
 
-    await Promise.allSettled([
+    const revenueMetricResults = await Promise.allSettled([
       // 今月の売上見込 (アクティブ契約 税込: (monthly_price + sin_japan_fee) × 1.1)
       db.execute(sql`
         SELECT
@@ -908,10 +908,12 @@ router.get("/van/dashboard", requireAuth, requireAdmin, async (req: Request, res
       // 請求書売上 (invoices 支払済 — total_amount は税込で保存済み)
       db.execute(sql`SELECT COALESCE(SUM(total_amount),0) AS total FROM invoices WHERE status = 'paid'`)
         .then((r: any) => { invoiceRevenue = Number((r?.rows ?? r)?.[0]?.total ?? 0); }),
-      // 黒ナンバー売上・件数 (税込: options_fee × 1.1)
+       // 黒ナンバー売上・件数（利用中・完了済み契約のみ。税込: options_fee × 1.1）
       db.execute(sql`
         SELECT COUNT(*) AS cnt, COALESCE(SUM(ROUND(COALESCE(options_fee,0) * 1.1)),0) AS total
-        FROM van_contracts WHERE black_number_requested = true
+         FROM van_contracts
+         WHERE black_number_requested = true
+           AND status IN ('active', 'completed')
       `).then((r: any) => {
         const d = (r?.rows ?? r)?.[0] ?? {};
         blackNumberRevenue = Number(d.total ?? 0);
@@ -926,11 +928,16 @@ router.get("/van/dashboard", requireAuth, requireAdmin, async (req: Request, res
         .catch(() => db.execute(sql`SELECT COALESCE(SUM(amount),0) AS total FROM payment_retries WHERE result = 'success'`)
           .then((r: any) => { totalRevenue = Number((r?.rows ?? r)?.[0]?.total ?? 0); })),
     ]);
+    for (const result of revenueMetricResults) {
+      if (result.status === "rejected") {
+        console.error("dashboard revenue metric failed:", result.reason);
+      }
+    }
 
     // リスク指標
     let openIncidents = 0, paymentFailures7d = 0, openBreakdowns = 0, pendingReturns = 0, insuranceAlerts = 0;
-    await Promise.allSettled([
-      db.execute(sql`SELECT COUNT(*) AS c FROM van_incidents WHERE status = 'reported'`)
+    const riskMetricResults = await Promise.allSettled([
+       db.execute(sql`SELECT COUNT(*) AS c FROM van_incidents WHERE status = '報告受付'`)
         .then((r: any) => { openIncidents = Number((r?.rows ?? r)?.[0]?.c ?? 0); }),
       db.select({ count: sql<number>`count(*)` }).from(paymentRetriesTable)
         .where(and(eq(paymentRetriesTable.result, 'failed'), sql`attempted_at > NOW() - INTERVAL '7 days'`))
@@ -943,6 +950,11 @@ router.get("/van/dashboard", requireAuth, requireAdmin, async (req: Request, res
         .where(and(eq(insurancePoliciesTable.status, 'active' as any), sql`expiry_date <= to_char(NOW() + INTERVAL '30 days', 'YYYY-MM-DD')`))
         .then(([r]) => { insuranceAlerts = Number(r?.count ?? 0); }),
     ]);
+    for (const result of riskMetricResults) {
+      if (result.status === "rejected") {
+        console.error("dashboard risk metric failed:", result.reason);
+      }
+    }
 
     return res.json({
       // KPI
@@ -1020,7 +1032,7 @@ router.get("/van/dashboard/calendar", requireAuth, requireAdmin, async (_req: Re
       SELECT i.id, COALESCE(i.occurred_at, to_char(i.created_at, 'YYYY-MM-DD')) AS date, u.name AS user_name
       FROM van_incidents i
       LEFT JOIN users u ON i.user_id = u.id
-      WHERE i.status = 'reported'
+       WHERE i.status = '報告受付'
     `).catch(() => [] as any);
     for (const r of ((incidentRows as any).rows ?? incidentRows)) {
       if (r.date) events.push({ date: String(r.date).slice(0, 10), type: 'incident', label: `事故報告: ${r.user_name ?? '—'}`, id: r.id });

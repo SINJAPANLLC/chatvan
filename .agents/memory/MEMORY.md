@@ -1,3 +1,4 @@
 - [Chat VAN migration](chat-van-migration.md) — Chat LOGI → Chat VAN へのリメイク。zod v3/v4 codegen 注意点あり。
 - [db.execute pattern](db-execute-pattern.md) — node-pg アダプタでは QueryResult → .rows 必須。ORM 優先。
 - [URL pattern for manual fetch](url-pattern.md) — 手動 fetch の API URL は BASE_URL をそのまま使う。replace(/\/$/, '') は禁止。
+- [Dashboard metric failures](dashboard-metric-failures.md) — 部分集計の失敗を0件として隠さず、必ずサーバーログに残す。

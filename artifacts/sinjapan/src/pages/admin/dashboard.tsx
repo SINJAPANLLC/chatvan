@@ -55,7 +55,7 @@ function UnresolvedPanel({ stats }: { stats: any }) {
     { label: '決済失敗（7日以内）',  count: stats.paymentFailures7d ?? 0, icon: <AlertTriangle className="h-4 w-4 text-muted-foreground" />, href: '/admin/contracts', urgent: false },
     { label: '車両故障報告',          count: stats.openBreakdowns   ?? 0, icon: <Wrench       className="h-4 w-4 text-muted-foreground" />, href: '/admin/contracts', urgent: false },
     { label: '返却申請（未対応）',   count: stats.pendingReturns   ?? 0, icon: <RotateCcw    className="h-4 w-4 text-muted-foreground" />, href: '/admin/contracts', urgent: false },
-    { label: '保険期限30日以内',     count: stats.insuranceAlerts  ?? 0, icon: <AlertTriangle className="h-4 w-4 text-muted-foreground" />, href: '/admin/contracts', urgent: false },
+    { label: '保険期限切れ・30日以内', count: stats.insuranceAlerts ?? 0, icon: <AlertTriangle className="h-4 w-4 text-muted-foreground" />, href: '/admin/contracts', urgent: false },
   ];
   const total = items.reduce((s, i) => s + i.count, 0);
 
@@ -100,7 +100,7 @@ function NotificationsPanel() {
   useEffect(() => {
     fetch(API('/notifications'), { headers: authHeader() })
       .then(r => r.ok ? r.json() : [])
-      .then(d => setNotifications(Array.isArray(d) ? d.slice(0, 30) : []))
+      .then(d => setNotifications(Array.isArray(d) ? d : []))
       .finally(() => setLoading(false));
   }, []);
 
@@ -127,7 +127,7 @@ function NotificationsPanel() {
           <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : notifications.length === 0 ? (
           <p className="text-xs text-muted-foreground text-center py-8">通知はありません</p>
-        ) : notifications.map(n => (
+        ) : notifications.slice(0, 30).map(n => (
           <div
             key={n.id}
             onClick={() => !n.readStatus && markRead(n.id)}
@@ -145,6 +145,9 @@ function NotificationsPanel() {
             </div>
           </div>
         ))}
+        {notifications.length > 30 && (
+          <p className="text-center text-xs text-muted-foreground pt-2">最新30件を表示</p>
+        )}
       </CardContent>
     </Card>
   );
@@ -280,7 +283,7 @@ function RevenueBreakdown({ stats, fmt }: { stats: any; fmt: (v: number) => stri
     {
       label: '黒ナンバー売上',
       value: fmt(stats.blackNumberRevenue ?? 0),
-      sub: `${stats.blackNumberCount ?? 0}件`,
+      sub: `利用中・完了 ${stats.blackNumberCount ?? 0}件`,
       icon: <Car className="h-4 w-4" />,
     },
     {
@@ -345,7 +348,7 @@ export default function Dashboard() {
       {/* ── Row 1: KPI ─────────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-4">
         <KpiCard icon={<FileText className="h-3.5 w-3.5" />}    label="新規相談" value={stats.newConsultations} sub="対応が必要な相談" />
-        <KpiCard icon={<CheckCircle2 className="h-3.5 w-3.5" />} label="契約中"   value={stats.activeContracts}  sub="稼働中の車両" />
+        <KpiCard icon={<CheckCircle2 className="h-3.5 w-3.5" />} label="契約中"   value={stats.activeContracts}  sub="利用中の契約" />
         <KpiCard icon={<Car className="h-3.5 w-3.5" />}          label="空き車両" value={`${stats.availableVehicles} / ${stats.totalVehicles}`} sub="提案可能な車両" />
       </div>
 
