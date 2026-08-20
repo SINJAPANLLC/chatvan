@@ -175,14 +175,17 @@ function RecentContractsPanel({ contracts }: { contracts: any[] }) {
 
 // ── セットアップチェックリスト ────────────────────────────────────────────────
 function SetupChecklist({ me, stats }: { me: any; stats: any }) {
-  const bank = (() => { try { return me?.bank_information ? JSON.parse(me.bank_information) : {}; } catch { return {}; } })();
-
   const items = [
-    { label: '電話番号を設定する',    done: !!me?.company_phone || !!me?.phone, href: '/company/settings' },
-    { label: '住所を設定する',        done: !!me?.address,                       href: '/company/settings' },
-    { label: '営業時間を設定する',    done: !!me?.business_hours,                href: '/company/settings' },
-    { label: '振込先口座を登録する',  done: !!bank.bankName,                     href: '/company/settings' },
-    { label: '車両を1台以上登録する', done: (stats.total_vehicles ?? 0) > 0,    href: '/company/vehicles' },
+    {
+      label: '会社情報・連絡先・対応エリアを設定する',
+      done: !!me?.company_name && !!(me?.company_phone || me?.phone) && !!me?.address && !!me?.service_areas,
+      href: '/company/settings',
+    },
+    {
+      label: '車両を1台以上登録する',
+      done: (stats.total_vehicles ?? 0) > 0,
+      href: '/company/vehicles',
+    },
   ];
 
   const doneCount = items.filter(i => i.done).length;
