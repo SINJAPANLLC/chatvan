@@ -178,44 +178,48 @@ function SetupChecklist({ me, stats }: { me: any; stats: any }) {
   const bank = (() => { try { return me?.bank_information ? JSON.parse(me.bank_information) : {}; } catch { return {}; } })();
 
   const items = [
-    { label: '電話番号を設定する',   done: !!me?.company_phone || !!me?.phone,   href: '/company/settings' },
-    { label: '住所を設定する',       done: !!me?.address,                         href: '/company/settings' },
-    { label: '営業時間を設定する',   done: !!me?.business_hours,                  href: '/company/settings' },
-    { label: '振込先口座を登録する', done: !!bank.bankName,                        href: '/company/settings' },
-    { label: '車両を1台以上登録する', done: (stats.total_vehicles ?? 0) > 0,      href: '/company/vehicles' },
+    { label: '電話番号を設定する',    done: !!me?.company_phone || !!me?.phone, href: '/company/settings' },
+    { label: '住所を設定する',        done: !!me?.address,                       href: '/company/settings' },
+    { label: '営業時間を設定する',    done: !!me?.business_hours,                href: '/company/settings' },
+    { label: '振込先口座を登録する',  done: !!bank.bankName,                     href: '/company/settings' },
+    { label: '車両を1台以上登録する', done: (stats.total_vehicles ?? 0) > 0,    href: '/company/vehicles' },
   ];
 
   const doneCount = items.filter(i => i.done).length;
   const allDone = doneCount === items.length;
-  if (allDone) return null;
+  const [open, setOpen] = React.useState(!allDone);
 
   return (
     <Card className="border-border shadow-sm">
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-3 cursor-pointer select-none" onClick={() => setOpen(o => !o)}>
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
           <ListChecks className="h-4 w-4" />
           はじめにやること
-          <span className="ml-auto text-xs font-medium px-2 py-0.5 bg-muted text-muted-foreground rounded-full">
-            {doneCount}/{items.length}
-          </span>
+          {allDone
+            ? <span className="ml-auto text-xs font-medium px-2 py-0.5 bg-green-100 text-green-700 rounded-full">完了 ✓</span>
+            : <span className="ml-auto text-xs font-medium px-2 py-0.5 bg-muted text-muted-foreground rounded-full">{doneCount}/{items.length}</span>
+          }
+          <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`} />
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          {items.map(item => (
-            <Link key={item.label} href={item.href}>
-              <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors cursor-pointer
-                ${item.done ? 'text-muted-foreground hover:bg-muted/30' : 'hover:bg-muted/50'}`}>
-                {item.done
-                  ? <CircleCheck className="h-4 w-4 text-green-500 shrink-0" />
-                  : <Circle className="h-4 w-4 text-muted-foreground/40 shrink-0" />}
-                <span className={`text-xs flex-1 ${item.done ? 'line-through' : 'font-medium'}`}>{item.label}</span>
-                {!item.done && <span className="text-xs text-muted-foreground">設定する →</span>}
-              </div>
-            </Link>
-          ))}
-        </div>
-      </CardContent>
+      {open && (
+        <CardContent>
+          <div className="space-y-2">
+            {items.map(item => (
+              <Link key={item.label} href={item.href}>
+                <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors cursor-pointer
+                  ${item.done ? 'text-muted-foreground hover:bg-muted/30' : 'hover:bg-muted/50'}`}>
+                  {item.done
+                    ? <CircleCheck className="h-4 w-4 text-green-500 shrink-0" />
+                    : <Circle className="h-4 w-4 text-muted-foreground/40 shrink-0" />}
+                  <span className={`text-xs flex-1 ${item.done ? 'line-through' : 'font-medium'}`}>{item.label}</span>
+                  {!item.done && <span className="text-xs text-muted-foreground">設定する →</span>}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </CardContent>
+      )}
     </Card>
   );
 }
