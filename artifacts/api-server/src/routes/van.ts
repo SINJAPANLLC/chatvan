@@ -1446,6 +1446,18 @@ router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request
 
     // 決済成功 → contract/application/vehicle をアクティブに
     await db.execute(sql`UPDATE van_contracts SET status = 'active', payment_method = 'card', updated_at = NOW() WHERE id = ${id}`);
+    // 初回カード決済も売上台帳に残す（ダッシュボード・PLのカード売上集計元）
+    const initialPeriodMonth = contract.startDate?.slice(0, 7) ?? new Date().toISOString().slice(0, 7);
+    await db.execute(sql`
+      INSERT INTO payment_retries (
+        contract_id, user_id, amount, period_month, result,
+        square_payment_id, failure_reason, attempted_at
+      )
+      VALUES (
+        ${id}, ${contract.userId}, ${totalAmount}, ${initialPeriodMonth}, 'success',
+        ${data.payment?.id ?? null}, NULL, NOW()
+      )
+    `);
     if (contract.applicationId) {
       await db.update(vanApplicationsTable).set({ status: "delivery_pending", updatedAt: new Date() }).where(eq(vanApplicationsTable.id, contract.applicationId));
     }
