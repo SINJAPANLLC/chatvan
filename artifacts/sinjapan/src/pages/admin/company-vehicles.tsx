@@ -119,7 +119,9 @@ export default function AdminCompanyVehicles() {
                     {v.year && <div className="text-xs text-muted-foreground">{v.year}年式</div>}
                   </td>
                   <td className="px-5 py-3 font-mono text-xs">{v.license_plate || v.licensePlate || '—'}</td>
-                  <td className="px-5 py-3 text-xs">{v.rental_company_name || (v.rentalCompanyId ? `会社ID: ${v.rentalCompanyId}` : '—')}</td>
+                    <td className="px-5 py-3 text-xs">
+                      {v.rental_company_name || v.rentalCompany?.name || (v.rentalCompanyId ? `会社ID: ${v.rentalCompanyId}` : '—')}
+                    </td>
                   <td className="px-5 py-3 text-xs">{v.prefecture || '—'}</td>
                   <td className="px-5 py-3 text-xs">
                     {(v.monthly_price || v.monthlyPrice)
@@ -132,7 +134,7 @@ export default function AdminCompanyVehicles() {
                     </span>
                   </td>
                   <td className="px-5 py-3 text-xs text-muted-foreground">
-                    {v.created_at ? new Date(v.created_at).toLocaleDateString('ja-JP') : '—'}
+                    {(v.created_at || v.createdAt) ? new Date(v.created_at || v.createdAt).toLocaleDateString('ja-JP') : '—'}
                   </td>
                   <td className="px-5 py-3">
                     {v.status === 'reviewing' && (
