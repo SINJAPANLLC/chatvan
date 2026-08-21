@@ -411,6 +411,15 @@ export default function AdminApplicationDetail() {
   const [related, setRelated] = useState<any>(null);
   const [relatedLoading, setRelatedLoading] = useState(false);
   const RELATED_TABS: Tab[] = ['overview', 'contract', 'payment', 'gps', 'incident'];
+  const invoicePaymentContractIds = new Set(
+    (related?.contracts ?? [])
+      .filter((contract: any) => contract.payment_method === 'invoice')
+      .map((contract: any) => Number(contract.id)),
+  );
+  const invoicePaymentInvoices = (related?.invoices ?? []).filter((invoice: any) =>
+    invoicePaymentContractIds.has(Number(invoice.contract_id)),
+  );
+  const hasInvoicePaymentContract = invoicePaymentContractIds.size > 0;
 
   const loadRelated = async (force = false) => {
     if ((!force && related) || relatedLoading) return;
@@ -1405,6 +1414,32 @@ export default function AdminApplicationDetail() {
 
           {relatedLoading ? <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-muted-foreground" /></div> : (
             <>
+            {hasInvoicePaymentContract && (
+              <Section title="掛け払い・請求書発行状況">
+                <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                  <div>
+                    <p className="text-xs text-muted-foreground">支払方法</p>
+                    <p className="font-medium">請求書払い（掛け払い）</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">請求書発行状況</p>
+                    <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${
+                      invoicePaymentInvoices.length > 0
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {invoicePaymentInvoices.length > 0 ? `発行済み（${invoicePaymentInvoices.length}件）` : '未発行'}
+                    </span>
+                  </div>
+                </div>
+                {invoicePaymentInvoices.length === 0 && (
+                  <p className="mt-3 pt-3 border-t border-border text-xs text-muted-foreground">
+                    請求書が発行されると、下の請求書発行履歴に追加されます。
+                  </p>
+                )}
+              </Section>
+            )}
+
             {/* カード決済履歴 */}
             <Section title={`カード決済履歴（${related?.payments?.length ?? 0}件）`}>
               {!related?.payments?.length ? (
@@ -1461,10 +1496,15 @@ export default function AdminApplicationDetail() {
               )}
             </Section>
 
-            {/* 請求書払い履歴 */}
-            <Section title={`請求書払い履歴（${related?.invoices?.length ?? 0}件）`}>
-              {!related?.invoices?.length ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">請求書はありません</p>
+            {/* 請求書発行履歴 */}
+            <Section title={`請求書発行履歴（${invoicePaymentInvoices.length}件）`}>
+              {!invoicePaymentInvoices.length ? (
+                <div className="py-4 text-center">
+                  <p className="text-sm text-muted-foreground">発行された請求書はありません</p>
+                  {hasInvoicePaymentContract && (
+                    <p className="text-xs text-amber-700 mt-1">発行状況：未発行</p>
+                  )}
+                </div>
               ) : (
                 <table className="w-full text-sm">
                   <thead><tr className="text-xs text-muted-foreground border-b border-border">
@@ -1476,7 +1516,7 @@ export default function AdminApplicationDetail() {
                     <th className="pb-2 text-left">入金日</th>
                   </tr></thead>
                   <tbody className="divide-y divide-border">
-                    {related.invoices.map((inv: any) => {
+                    {invoicePaymentInvoices.map((inv: any) => {
                       const isUpdating = invoiceUpdating === inv.id;
                       const STATUS_LABEL: Record<string,string> = { paid: '入金済み', pending: '未払い', overdue: '延滞', cancelled: 'キャンセル' };
                       return (
