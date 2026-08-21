@@ -407,7 +407,7 @@ function CardReconcile() {
                     {p.paidAt ? format(new Date(p.paidAt), 'yyyy/MM/dd') : '—'}
                   </td>
                   <td className="px-5 py-3.5">
-                    {p.paymentStatus !== '消し込み済み' && (
+                    {!isDone(p) && (
                       <Button size="sm" disabled={isAct} onClick={() => reconcile(p.id)} className="gap-1 text-xs">
                         {isAct ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
                         消し込み
