@@ -16,12 +16,12 @@ const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem('sinja
 interface Notification { id: number; title: string; message: string; readStatus: boolean; createdAt: string; }
 interface CalEvent { date: string; type: 'return' | 'delivery' | 'insurance' | 'incident'; label: string; id: number; }
 
-// カレンダードット：モノクロでサイズ差で区別
+// カレンダードット：予定の種類を色で区別
 const EVENT_DOT: Record<string, string> = {
-  return:    'bg-foreground/80',
-  delivery:  'bg-foreground',
-  insurance: 'bg-foreground/40',
-  incident:  'bg-foreground',
+  return:    'bg-orange-500',
+  delivery:  'bg-sky-500',
+  insurance: 'bg-amber-500',
+  incident:  'bg-rose-500',
 };
 const EVENT_ICON: Record<string, React.ReactNode> = {
   return:    <RotateCcw className="h-3 w-3" />,
