@@ -32,3 +32,4 @@ export * from "./audit_logs";
 export * from "./settlements";
 export * from "./payment_retries";
 export * from "./user_activity_logs";
+export * from "./email_send_logs";

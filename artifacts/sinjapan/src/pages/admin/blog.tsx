@@ -75,7 +75,7 @@ function ArticleEditor({
 
   const autoSlug = (title: string) =>
     title.toLowerCase()
-      .replace(/[^\w\s-]/g, '')
+      .replace(/[^\p{L}\p{N}\s-]/gu, '')
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
       .slice(0, 60);
@@ -369,7 +369,7 @@ function AutoGenPanel({ mode, onRefresh }: { mode: BlogMode; onRefresh: () => vo
 }
 
 // ── モード定義 ─────────────────────────────────────────────────────────────────
-const MODES: { key: BlogMode; label: string; icon: React.ElementType; desc: string; blogUrl: string }[] = [
+const MODES: { key: BlogMode; label: string; icon: React.ElementType; desc: string; blogUrl?: string }[] = [
   {
     key: 'user',
     label: 'ユーザー向けブログ',
@@ -382,7 +382,6 @@ const MODES: { key: BlogMode; label: string; icon: React.ElementType; desc: stri
     label: 'レンタル会社向けブログ',
     icon: Truck,
     desc: '車両を提供いただけるレンタル会社向けのSEO記事',
-    blogUrl: '/blog/rental',
   },
 ];
 
@@ -553,11 +552,17 @@ export default function AdminBlog() {
       {/* ブログURL案内 */}
       <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 border border-border rounded-xl text-sm text-muted-foreground">
         <Globe className="h-4 w-4 flex-shrink-0" />
-        <span>公開ブログ URL：</span>
-        <a href={currentMode.blogUrl} target="_blank" rel="noopener noreferrer"
-          className="text-foreground font-medium hover:underline flex items-center gap-1">
-          {currentMode.blogUrl} <ExternalLink className="h-3.5 w-3.5" />
-        </a>
+        {currentMode.blogUrl ? (
+          <>
+            <span>公開ブログ URL：</span>
+            <a href={currentMode.blogUrl} target="_blank" rel="noopener noreferrer"
+              className="text-foreground font-medium hover:underline flex items-center gap-1">
+              {currentMode.blogUrl} <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </>
+        ) : (
+          <span>レンタル会社向け記事は現在、公開前の管理用コンテンツとして扱われます。</span>
+        )}
       </div>
 
       {/* エディタ */}

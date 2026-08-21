@@ -118,6 +118,11 @@ type Prospect = {
   sentAt?: string; createdAt: string; prospectType?: string;
 };
 
+type EmailHistory = {
+  id: number; prospectId?: number; email: string; companyName?: string;
+  subject: string; sent: boolean; reason?: string; sentAt: string;
+};
+
 // ── 自動クロールパネル ─────────────────────────────────────────────────────────
 function AutoCrawlPanel({ onRefresh }: { onRefresh: () => void }) {
   const { toast } = useToast();
@@ -197,8 +202,34 @@ function ProspectList({ mode, onSelectForSend }: { mode: ProspectType; onSelectF
   };
   useEffect(() => { load(); setSelected([]); }, [mode]);
 
-  const toggleAll = () => setSelected(selected.length === prospects.length ? [] : prospects.map(p => p.id));
+  const sendableProspects = prospects.filter(p => p.status === 'unsent');
+  const toggleAll = () => setSelected(selected.length === sendableProspects.length ? [] : sendableProspects.map(p => p.id));
   const toggle = (id: number) => setSelected(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
+
+  const handleApprove = async (id: number) => {
+    try {
+      await apiFetch(`/api/admin/prospects/${id}/approve`, { method: 'PATCH' });
+      toast({ title: '確認済みにしました。送信対象に追加されています。' });
+      load();
+    } catch (e: any) { toast({ title: e.message, variant: 'destructive' }); }
+  };
+
+  const handleResolveSending = async (id: number, outcome: 'sent' | 'retry') => {
+    const message = outcome === 'sent'
+      ? 'このメールが送信済みであることを確認しましたか？'
+      : 'メールが未送信であることを確認しましたか？ 再送対象に戻すと、次回送信時にメールが送られます。';
+    if (!confirm(message)) return;
+    try {
+      await apiFetch(`/api/admin/prospects/${id}/resolve-sending`, {
+        method: 'PATCH',
+        body: JSON.stringify({ outcome }),
+      });
+      toast({ title: outcome === 'sent' ? '送信済みに確定しました' : '再送対象に戻しました' });
+      load();
+    } catch (e: any) {
+      toast({ title: e.message, variant: 'destructive' });
+    }
+  };
 
   const handleAdd = async () => {
     if (!addForm.companyName || !addForm.email) { toast({ title: '会社名とメールアドレスは必須です', variant: 'destructive' }); return; }
@@ -243,20 +274,25 @@ function ProspectList({ mode, onSelectForSend }: { mode: ProspectType; onSelectF
     } catch (e: any) { toast({ title: e.message, variant: 'destructive' }); }
   };
 
-  const total = prospects.length, unsent = prospects.filter(p => p.status === 'unsent').length, sent = prospects.filter(p => p.status === 'sent').length;
+  const total = prospects.length, unsent = sendableProspects.length, sent = prospects.filter(p => p.status === 'sent').length, needsReview = prospects.filter(p => p.status === 'needs_review').length;
 
   return (
     <div className="space-y-4">
       {mode === 'user' && <AutoCrawlPanel onRefresh={load} />}
 
-      <div className="grid grid-cols-3 gap-3">
-        {[['総数', total, ''], ['未送信', unsent, 'text-amber-600'], ['送信済', sent, 'text-green-600']].map(([label, val, cls]) => (
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[['総数', total, ''], ['要確認', needsReview, 'text-violet-600'], ['未送信', unsent, 'text-amber-600'], ['送信済', sent, 'text-green-600']].map(([label, val, cls]) => (
           <div key={label as string} className="rounded-xl border border-border bg-card px-4 py-3 text-center">
             <p className="text-xs text-muted-foreground mb-0.5">{label}</p>
             <p className={`text-2xl font-bold ${cls}`}>{val}</p>
           </div>
         ))}
       </div>
+      {needsReview > 0 && (
+        <p className="text-xs text-violet-700 bg-violet-50 border border-violet-100 rounded-lg px-3 py-2">
+          「要確認」はAI生成の架空データです。実在する連絡先であることを確認してからクリックし、送信対象に追加してください。
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-2 items-center">
         <Button onClick={() => setShowAddDialog(true)} className="bg-black text-white hover:bg-black/90 gap-1.5">
@@ -292,7 +328,7 @@ function ProspectList({ mode, onSelectForSend }: { mode: ProspectType; onSelectF
             <thead>
               <tr className="bg-muted/40 border-b border-border">
                 <th className="px-3 py-3 w-10">
-                  <input type="checkbox" checked={selected.length === prospects.length} onChange={toggleAll} className="accent-foreground" />
+                  <input type="checkbox" checked={sendableProspects.length > 0 && selected.length === sendableProspects.length} onChange={toggleAll} disabled={sendableProspects.length === 0} className="accent-foreground" />
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">会社名</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">担当者</th>
@@ -306,7 +342,7 @@ function ProspectList({ mode, onSelectForSend }: { mode: ProspectType; onSelectF
               {prospects.map(p => (
                 <tr key={p.id} className={`hover:bg-muted/20 transition-colors ${selected.includes(p.id) ? 'bg-blue-50/50' : ''}`}>
                   <td className="px-3 py-3 text-center">
-                    <input type="checkbox" checked={selected.includes(p.id)} onChange={() => toggle(p.id)} className="accent-foreground" />
+                    <input type="checkbox" checked={selected.includes(p.id)} onChange={() => toggle(p.id)} disabled={p.status !== 'unsent'} className="accent-foreground disabled:opacity-30" />
                   </td>
                   <td className="px-4 py-3 font-medium max-w-[200px]">
                     <div className="flex items-center gap-1.5 truncate">
@@ -325,7 +361,19 @@ function ProspectList({ mode, onSelectForSend }: { mode: ProspectType; onSelectF
                   <td className="px-4 py-3 text-center">
                     {p.status === 'sent'
                       ? <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full"><Check className="h-3 w-3" />送信済</span>
-                      : <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">未送信</span>
+                      : p.status === 'needs_review'
+                        ? <button onClick={() => handleApprove(p.id)} className="inline-flex items-center gap-1 text-xs font-medium text-violet-700 bg-violet-50 px-2 py-0.5 rounded-full hover:bg-violet-100">
+                            <AlertCircle className="h-3 w-3" />要確認
+                          </button>
+                        : p.status === 'sending'
+                          ? <div className="flex flex-col items-center gap-1">
+                              <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full"><Loader2 className="h-3 w-3 animate-spin" />送信確認中</span>
+                              <span className="flex gap-1">
+                                <button onClick={() => handleResolveSending(p.id, 'sent')} className="text-[10px] text-blue-700 hover:underline">送信済みに確定</button>
+                                <button onClick={() => handleResolveSending(p.id, 'retry')} className="text-[10px] text-amber-700 hover:underline">再送対象へ戻す</button>
+                              </span>
+                            </div>
+                        : <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">未送信</span>
                     }
                   </td>
                 </tr>
@@ -391,7 +439,7 @@ function SendTab({ mode, preselectedIds, prospects, onSent }: {
     if (targetIds.length === 0) { toast({ title: '送信先がありません', variant: 'destructive' }); return; }
     setSending(true);
     try {
-      const r = await apiFetch('/api/admin/prospects/send', { method: 'POST', body: JSON.stringify({ ids: targetIds, subject, bodyText: body, ctaText }) });
+      const r = await apiFetch('/api/admin/prospects/send', { method: 'POST', body: JSON.stringify({ ids: targetIds, subject, bodyText: body, ctaText, prospectType: mode }) });
       toast({ title: r.message }); onSent();
     } catch (e: any) { toast({ title: e.message, variant: 'destructive' }); }
     finally { setSending(false); }
@@ -467,11 +515,21 @@ function SendTab({ mode, preselectedIds, prospects, onSent }: {
 }
 
 // ── 送信履歴タブ ──────────────────────────────────────────────────────────────
-function HistoryTab({ prospects }: { prospects: Prospect[] }) {
-  const sent = prospects.filter(p => p.status === 'sent').sort((a, b) =>
-    (b.sentAt ?? b.createdAt) > (a.sentAt ?? a.createdAt) ? 1 : -1
-  );
-  if (sent.length === 0) return (
+function HistoryTab({ mode }: { mode: ProspectType }) {
+  const { toast } = useToast();
+  const [history, setHistory] = useState<EmailHistory[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    apiFetch(`/api/admin/prospects/send-history?type=${mode}`)
+      .then(setHistory)
+      .catch(() => toast({ title: '送信履歴の取得に失敗しました', variant: 'destructive' }))
+      .finally(() => setLoading(false));
+  }, [mode, toast]);
+
+  if (loading) return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  if (history.length === 0) return (
     <div className="text-center py-16 text-muted-foreground text-sm border border-dashed rounded-xl">
       <History className="h-8 w-8 mx-auto mb-3 opacity-30" />
       <p>送信履歴はありません</p>
@@ -484,18 +542,24 @@ function HistoryTab({ prospects }: { prospects: Prospect[] }) {
           <tr className="bg-muted/40 border-b border-border">
             <th className="px-5 py-3 text-left font-medium text-muted-foreground">会社名</th>
             <th className="px-5 py-3 text-left font-medium text-muted-foreground">メールアドレス</th>
-            <th className="px-5 py-3 text-left font-medium text-muted-foreground">業種</th>
+            <th className="px-5 py-3 text-left font-medium text-muted-foreground">件名</th>
+            <th className="px-5 py-3 text-left font-medium text-muted-foreground">結果</th>
             <th className="px-5 py-3 text-left font-medium text-muted-foreground">送信日時</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border bg-card">
-          {sent.map(p => (
-            <tr key={p.id} className="hover:bg-muted/20 transition-colors">
-              <td className="px-5 py-3 font-medium">{p.companyName}</td>
-              <td className="px-5 py-3 text-xs text-muted-foreground">{p.email}</td>
-              <td className="px-5 py-3 text-xs text-muted-foreground">{p.industry ?? '—'}</td>
+          {history.map(item => (
+            <tr key={item.id} className="hover:bg-muted/20 transition-colors">
+              <td className="px-5 py-3 font-medium">{item.companyName ?? '—'}</td>
+              <td className="px-5 py-3 text-xs text-muted-foreground">{item.email}</td>
+              <td className="px-5 py-3 text-xs text-muted-foreground max-w-[240px] truncate">{item.subject}</td>
+              <td className="px-5 py-3 text-xs">
+                {item.sent
+                  ? <span className="text-green-700">送信済み</span>
+                  : <span className="text-amber-700">{item.reason ?? '送信確認中'}</span>}
+              </td>
               <td className="px-5 py-3 text-xs text-muted-foreground">
-                {p.sentAt ? format(new Date(p.sentAt), 'yyyy/MM/dd HH:mm') : '—'}
+                {format(new Date(item.sentAt), 'yyyy/MM/dd HH:mm')}
               </td>
             </tr>
           ))}
@@ -574,7 +638,7 @@ export default function EmailMarketing() {
 
       {tab === 'list'    && <ProspectList mode={mode} onSelectForSend={handleSelectForSend} />}
       {tab === 'send'    && <SendTab mode={mode} preselectedIds={sendTargetIds} prospects={prospects} onSent={() => { loadProspects(); setTab('history'); }} />}
-      {tab === 'history' && <HistoryTab prospects={prospects} />}
+      {tab === 'history' && <HistoryTab mode={mode} />}
     </div>
   );
 }

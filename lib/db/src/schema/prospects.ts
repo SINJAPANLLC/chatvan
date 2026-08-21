@@ -8,7 +8,7 @@ export const prospectsTable = pgTable("prospects", {
   phone:       text("phone"),
   industry:    text("industry"),
   prefecture:  text("prefecture"),
-  /** unsent | sent */
+  /** unsent | sending | sent | needs_review */
   status:      text("status").notNull().default("unsent"),
   notes:       text("notes"),
   sentAt:      timestamp("sent_at"),

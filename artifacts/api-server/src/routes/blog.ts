@@ -35,9 +35,13 @@ router.get("/blog", async (_req, res): Promise<void> => {
 // 公開記事詳細
 router.get("/blog/:slug", async (req, res): Promise<void> => {
   const [post] = await db.select().from(blogPostsTable)
-    .where(eq(blogPostsTable.slug, req.params.slug))
+    .where(and(
+      eq(blogPostsTable.slug, req.params.slug),
+      eq(blogPostsTable.published, true),
+      drizzleSql`${blogPostsTable}.target_type = 'user'`
+    ))
     .limit(1);
-  if (!post || !post.published) { res.status(404).json({ error: "記事が見つかりません" }); return; }
+  if (!post) { res.status(404).json({ error: "記事が見つかりません" }); return; }
   res.json(fmt(post));
 });
 
@@ -55,6 +59,9 @@ router.get("/admin/blog", requireAdmin, async (req, res): Promise<void> => {
 router.post("/admin/blog", requireAdmin, async (req, res): Promise<void> => {
   const { slug, title, excerpt, content, category, tags, metaTitle, metaDescription, published, targetType } = req.body;
   if (!slug || !title || !content) { res.status(400).json({ error: "slug・title・contentは必須です" }); return; }
+  const duplicateResult = await db.execute(drizzleSql`SELECT id FROM blog_posts WHERE slug = ${slug} LIMIT 1`);
+  const duplicate = ((duplicateResult as any)?.rows ?? duplicateResult ?? [])[0];
+  if (duplicate) { res.status(409).json({ error: "同じスラッグの記事がすでにあります" }); return; }
   const type = targetType ?? "user";
   const [post] = await db.execute(drizzleSql`
     INSERT INTO blog_posts (slug, title, excerpt, content, category, tags, meta_title, meta_description, published, published_at, target_type)
@@ -74,11 +81,22 @@ router.post("/admin/blog", requireAdmin, async (req, res): Promise<void> => {
 // 更新
 router.patch("/admin/blog/:id", requireAdmin, async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
-  const { title, excerpt, content, category, tags, metaTitle, metaDescription, published } = req.body;
+  const { slug, title, excerpt, content, category, tags, metaTitle, metaDescription, published } = req.body;
   const [current] = await db.select().from(blogPostsTable).where(eq(blogPostsTable.id, id)).limit(1);
   if (!current) { res.status(404).json({ error: "記事が見つかりません" }); return; }
+  if (slug !== undefined && !String(slug).trim()) {
+    res.status(400).json({ error: "スラッグは空にできません" }); return;
+  }
+  if (slug && slug !== current.slug) {
+    const duplicateResult = await db.execute(drizzleSql`
+      SELECT id FROM blog_posts WHERE slug = ${slug} AND id <> ${id} LIMIT 1
+    `);
+    const duplicate = ((duplicateResult as any)?.rows ?? duplicateResult ?? [])[0];
+    if (duplicate) { res.status(409).json({ error: "同じスラッグの記事がすでにあります" }); return; }
+  }
 
   const [post] = await db.update(blogPostsTable).set({
+    slug: slug ?? current.slug,
     title: title ?? current.title,
     excerpt: excerpt ?? current.excerpt,
     content: content ?? current.content,

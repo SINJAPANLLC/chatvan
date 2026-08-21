@@ -379,6 +379,19 @@ async function runMigrations() {
       next_retry_at TIMESTAMP, notification_sent_at TIMESTAMP,
       created_at TIMESTAMP DEFAULT NOW() NOT NULL
     )`,
+    `CREATE TABLE IF NOT EXISTS email_send_logs (
+      id SERIAL PRIMARY KEY,
+      prospect_id INTEGER,
+      prospect_type TEXT NOT NULL DEFAULT 'user',
+      attempt_key TEXT,
+      email TEXT NOT NULL,
+      company_name TEXT,
+      subject TEXT NOT NULL,
+      body_text TEXT,
+      sent BOOLEAN NOT NULL DEFAULT FALSE,
+      reason TEXT,
+      sent_at TIMESTAMP DEFAULT NOW() NOT NULL
+    )`,
     `CREATE TABLE IF NOT EXISTS vehicle_images (
       id SERIAL PRIMARY KEY,
       vehicle_id INTEGER REFERENCES vehicles(id) NOT NULL,
@@ -453,6 +466,12 @@ async function runMigrations() {
   }
 
   logger.info("migration: all Chat VAN tables ready");
+  await db.execute(sql`ALTER TABLE email_send_logs ADD COLUMN IF NOT EXISTS attempt_key TEXT`);
+  await db.execute(sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS email_send_logs_attempt_key_unique
+    ON email_send_logs (attempt_key)
+    WHERE attempt_key IS NOT NULL
+  `);
   // 決済経路は入金台帳の一意制約がない状態で開始させない。
   // payment_retries の作成後、HTTP・スケジューラー開始前に必ず完了させる。
   await db.execute(sql`
@@ -474,6 +493,18 @@ async function runMigrations() {
   } catch (e: any) {
     logger.warn({ err: e.message }, "migration warning (non-fatal)");
   }
+  // 送信履歴テーブル導入前の送信済み見込み顧客も、件名不明の既存履歴として一度だけ表示する。
+  await db.execute(sql`
+    INSERT INTO email_send_logs (prospect_id, prospect_type, email, company_name, subject, sent, sent_at)
+    SELECT p.id, p.prospect_type, p.email, p.company_name, '[既存履歴]', TRUE, COALESCE(p.sent_at, p.created_at)
+    FROM prospects p
+    WHERE p.status = 'sent'
+      AND NOT EXISTS (
+        SELECT 1 FROM email_send_logs l
+        WHERE l.prospect_id = p.id AND l.subject = '[既存履歴]'
+      )
+  `);
+  logger.info("migration: email send history ready");
 
   // blog_posts target_type カラム
   try {

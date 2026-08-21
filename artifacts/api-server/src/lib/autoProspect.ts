@@ -6,11 +6,11 @@
  */
 import cron from "node-cron";
 import { db, prospectsTable, settingsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq, sql as drizzleSql } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
-import { sendEmail, buildSalesEmailHtml } from "./email";
 import { logger } from "./logger";
 import { PROMPT_DEFAULTS } from "../routes/ai-settings";
+import { sendProspectOutreach } from "./outreachSender";
 
 // ── ローテーション候補 ──────────────────────────────────────────────────────────
 const INDUSTRIES = [
@@ -268,26 +268,25 @@ export async function runAutoProspect(): Promise<AutoProspectLog> {
   let sent = 0;
   const targets = await db.select()
     .from(prospectsTable)
-    .where(eq(prospectsTable.status, "unsent"))
+    .where(and(
+      eq(prospectsTable.status, "unsent"),
+      drizzleSql`${prospectsTable}.prospect_type = 'user'`,
+    ))
     .limit(5);
 
   for (const t of targets) {
     try {
       const { subject, body } = await aiGenerateEmail(t.companyName, t.industry ?? industry);
-      const html = buildSalesEmailHtml({
+      const result = await sendProspectOutreach({
+        prospectId: t.id,
+        prospectType: "user",
         subject,
         bodyText: body,
-        companyName: t.companyName,
-        contactName: t.contactName ?? undefined,
         ctaText: "Chat VANの詳細を見る →",
       });
-      const result = await sendEmail(t.email, subject, html);
       if (result.sent) {
-        await db.update(prospectsTable)
-          .set({ status: "sent", sentAt: new Date() })
-          .where(eq(prospectsTable.id, t.id));
         sent++;
-      } else {
+      } else if (!result.reason?.includes("スキップ")) {
         errors.push(`送信失敗 ${t.email}: ${result.reason}`);
       }
     } catch (e: any) {
