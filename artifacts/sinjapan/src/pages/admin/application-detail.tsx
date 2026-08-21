@@ -170,9 +170,15 @@ const GpsMap: React.FC<{ locs: any[] }> = ({ locs }) => {
   const mapInstanceRef = useRef<any>(null);
 
   useEffect(() => {
-    if (!mapRef.current || locs.length === 0) return;
+    const container = mapRef.current;
+    if (!container || locs.length === 0) return;
+    let disposed = false;
 
     import('leaflet').then(L => {
+      // タブ切替などでコンポーネントが破棄された後に、非同期読み込みが
+      // 完了しても地図を初期化しない。
+      if (disposed || !container.isConnected) return;
+
       // Fix default icon
       delete (L.Icon.Default.prototype as any)._getIconUrl;
       L.Icon.Default.mergeOptions({
@@ -188,7 +194,7 @@ const GpsMap: React.FC<{ locs: any[] }> = ({ locs }) => {
 
       const latest = locs[0];
       const center: [number, number] = [Number(latest.latitude), Number(latest.longitude)];
-      const map = L.map(mapRef.current!).setView(center, 15);
+      const map = L.map(container).setView(center, 15);
       mapInstanceRef.current = map;
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -215,9 +221,10 @@ const GpsMap: React.FC<{ locs: any[] }> = ({ locs }) => {
           l.recorded_at ? new Date(l.recorded_at).toLocaleString('ja-JP') : '-'
         );
       });
-    });
+    }).catch(error => console.error('GPS地図の初期化に失敗しました:', error));
 
     return () => {
+      disposed = true;
       if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
     };
   }, [locs]);
@@ -669,6 +676,14 @@ export default function AdminApplicationDetail() {
 
   React.useEffect(() => {
     if (RELATED_TABS.includes(tab as Tab)) loadRelated();
+  }, [tab]);
+
+  // GPSタブを開いている間は、利用者端末や車載GPSから届いた最新位置を更新する。
+  React.useEffect(() => {
+    if (tab !== 'gps') return;
+    loadRelated(true);
+    const timer = window.setInterval(() => loadRelated(true), 15_000);
+    return () => window.clearInterval(timer);
   }, [tab]);
 
   // 契約データからpickup情報を初期化
@@ -1351,7 +1366,7 @@ export default function AdminApplicationDetail() {
               <CreateContractForm
                 applicationId={id}
                 userId={application.userId!}
-                vehicles={vehiclesData?.vehicles ?? []}
+                vehicles={vehiclesData ?? []}
                 onCreated={() => { loadRelated(true); }}
               />
             )}

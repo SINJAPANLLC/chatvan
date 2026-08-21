@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useGetMe, useLogout } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -11,6 +11,106 @@ const BASE = import.meta.env.BASE_URL;
 const apiUrl = (p: string) => `${BASE}api${p}`;
 
 type VanApp = { id: number; status: string; area: string | null; createdAt: string };
+
+function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const radius = 6_371_000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return radius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/** 利用中かつ位置情報同意済みの契約だけ、利用者アプリを開いている間に追跡する。 */
+function ActiveContractLocationTracker({ enabled }: { enabled: boolean }) {
+  const lastSentAt = useRef(0);
+  const lastSentPosition = useRef<{ latitude: number; longitude: number } | null>(null);
+
+  useEffect(() => {
+    if (!enabled || !navigator.geolocation) return;
+
+    let disposed = false;
+    let activeContractId: number | null = null;
+    let watchId: number | null = null;
+    let heartbeatId: number | null = null;
+    const token = localStorage.getItem('sinjapan_auth_token');
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+    const stopTracking = () => {
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      if (heartbeatId !== null) window.clearInterval(heartbeatId);
+      watchId = null;
+      heartbeatId = null;
+      lastSentAt.current = 0;
+      lastSentPosition.current = null;
+    };
+
+    const startTracking = (contractId: number) => {
+      const sendLocation = (position: GeolocationPosition, force = false) => {
+        if (disposed || activeContractId !== contractId) return;
+        const { latitude, longitude, accuracy } = position.coords;
+        const now = Date.now();
+        const previous = lastSentPosition.current;
+        const moved = previous
+          ? distanceMeters(previous.latitude, previous.longitude, latitude, longitude) >= 100
+          : true;
+        const dueForHeartbeat = now - lastSentAt.current >= 5 * 60 * 1000;
+        if (!force && !moved && !dueForHeartbeat) return;
+
+        lastSentAt.current = now;
+        lastSentPosition.current = { latitude, longitude };
+        fetch(apiUrl('/van/location'), {
+          method: 'POST',
+          credentials: 'include',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ latitude, longitude, accuracy, contractId }),
+        }).catch(() => {});
+      };
+
+      watchId = navigator.geolocation.watchPosition(
+        sendLocation,
+        () => {},
+        { enableHighAccuracy: true, maximumAge: 30_000, timeout: 10_000 },
+      );
+      heartbeatId = window.setInterval(() => {
+        navigator.geolocation.getCurrentPosition(
+          position => sendLocation(position, true),
+          () => {},
+          { enableHighAccuracy: true, maximumAge: 30_000, timeout: 10_000 },
+        );
+      }, 5 * 60 * 1000);
+    };
+
+    const refreshActiveContract = async () => {
+      const response = await fetch(apiUrl('/van/location/active-contract'), {
+        credentials: 'include',
+        headers,
+      });
+      if (!response.ok || disposed) return;
+
+      const data = await response.json();
+      const nextContractId = Number(data.contractId) || null;
+      if (nextContractId === activeContractId) return;
+
+      stopTracking();
+      activeContractId = nextContractId;
+      if (nextContractId) startTracking(nextContractId);
+    };
+
+    refreshActiveContract().catch(() => {});
+    const contractPollId = window.setInterval(() => {
+      refreshActiveContract().catch(() => {});
+    }, 60_000);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(contractPollId);
+      stopTracking();
+    };
+  }, [enabled]);
+
+  return null;
+}
 
 function appLink(app: VanApp): string {
   const { id, status } = app;
@@ -189,6 +289,7 @@ export function UserLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-[100dvh] flex bg-background font-sans text-foreground">
+      <ActiveContractLocationTracker enabled={user?.role === 'user'} />
       {isLoggedIn && (
         <aside
           className={`hidden md:flex flex-col border-r border-border shrink-0 sticky top-0 h-[100dvh] overflow-hidden transition-all duration-200 ease-in-out ${

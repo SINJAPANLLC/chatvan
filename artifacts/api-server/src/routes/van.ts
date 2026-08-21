@@ -2396,14 +2396,16 @@ router.get("/van/applications/:id/related", requireAuth, requireAdmin, async (re
       `) : { rows: [] },
     ]);
 
-    // ユーザー位置情報（最新50件）
-    const userLocations = await db.execute(sql`
+    // 利用者のブラウザ位置情報は、この相談に紐づく契約だけを対象にする。
+    // 同じ利用者の別契約の履歴を相談詳細へ混在させない。
+    const userLocations = contractIds.length ? await db.execute(sql`
       SELECT id, latitude, longitude, accuracy, contract_id, recorded_at
       FROM user_locations
       WHERE user_id = ${userId}
+        AND contract_id = ANY(ARRAY[${sql.raw(contractIds.join(','))}]::int[])
       ORDER BY recorded_at DESC
       LIMIT 50
-    `);
+    `) : { rows: [] };
 
     const toR = (r: any) => r?.rows ?? (Array.isArray(r) ? r : []);
 
@@ -2712,27 +2714,60 @@ router.patch("/van/insurance-policies/:id", requireAuth, requireAdmin, async (re
 router.post("/van/location", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId: number | undefined = (req.session as any)?.userId;
-    const { latitude, longitude, accuracy, contractId } = req.body as {
-      latitude: number; longitude: number; accuracy?: number; contractId?: number;
+    const { latitude, longitude, accuracy, contractId: rawContractId } = req.body as {
+      latitude: number; longitude: number; accuracy?: number; contractId?: number | string;
     };
     if (latitude == null || longitude == null) return res.status(400).json({ error: "latitude/longitude required" });
+    const contractId = Number(rawContractId);
+    if (!Number.isInteger(contractId) || contractId <= 0) {
+      return res.status(400).json({ error: "有効な契約IDが必要です" });
+    }
 
-    // gps_consent 確認
-    if (contractId) {
-      const consentRow = await db.execute(sql`
-        SELECT gps_consent FROM van_contracts WHERE id = ${contractId} AND user_id = ${userId} LIMIT 1
-      `);
-      const row = ((consentRow as any)?.rows ?? consentRow)[0];
-      if (!row?.gps_consent) return res.status(403).json({ error: "GPS consent not granted" });
+    // 契約の所有者・利用中状態・GPS同意を、保存直前にまとめて確認する。
+    const contractRows = await db.execute(sql`
+      SELECT id
+      FROM van_contracts
+      WHERE id = ${contractId}
+        AND user_id = ${userId}
+        AND status = 'active'
+        AND gps_consent = true
+      LIMIT 1
+    `);
+    const contract = ((contractRows as any)?.rows ?? contractRows)[0];
+    if (!contract) {
+      return res.status(403).json({ error: "GPS位置情報を送信できる利用中の契約がありません" });
     }
 
     await db.execute(sql`
       INSERT INTO user_locations (user_id, contract_id, latitude, longitude, accuracy, recorded_at)
-      VALUES (${userId}, ${contractId ?? null}, ${String(latitude)}, ${String(longitude)}, ${accuracy ?? null}, NOW())
+      VALUES (${userId}, ${contractId}, ${String(latitude)}, ${String(longitude)}, ${accuracy ?? null}, NOW())
     `);
     return res.json({ ok: true });
   } catch (err) {
     console.error("location post error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ── 利用者アプリの位置送信対象 ──────────────────────────────────────────────
+router.get("/van/location/active-contract", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId: number | undefined = (req.session as any)?.userId;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const result = await db.execute(sql`
+      SELECT id
+      FROM van_contracts
+      WHERE user_id = ${userId}
+        AND status = 'active'
+        AND gps_consent = true
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `);
+    const contract = ((result as any)?.rows ?? result)[0];
+    return res.json({ contractId: contract?.id ?? null });
+  } catch (err) {
+    console.error("active location contract error:", err);
     return res.status(500).json({ error: "Internal error" });
   }
 });
@@ -3447,6 +3482,7 @@ db.execute(sql`
   )
 `).catch(() => {});
 db.execute(sql`CREATE INDEX IF NOT EXISTS user_locations_user_id_idx ON user_locations(user_id, recorded_at DESC)`).catch(() => {});
+db.execute(sql`CREATE INDEX IF NOT EXISTS user_locations_contract_id_idx ON user_locations(contract_id, recorded_at DESC)`).catch(() => {});
 db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS inspection_doc TEXT`).catch(() => {});
 db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS compulsory_insurance_doc TEXT`).catch(() => {});
 

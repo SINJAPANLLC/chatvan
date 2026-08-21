@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useGetVanApplication } from '@workspace/api-client-react';
 import {
@@ -148,52 +148,6 @@ export default function VanStatus() {
   const { data: application, isLoading, refetch } = useGetVanApplication(applicationId, {
     query: { enabled: !!applicationId },
   });
-
-  // ── GPS位置情報トラッキング ──────────────────────────────────────────────
-  const lastSentAt   = useRef<number>(0);
-  const lastSentPos  = useRef<{ lat: number; lng: number } | null>(null);
-
-  function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
-    const R = 6371000;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLng = (lng2 - lng1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) ** 2 +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  }
-
-  useEffect(() => {
-    if (!navigator.geolocation) return;
-
-    const contract = (application as any)?.contract;
-    const contractId = contract?.id ?? null;
-    const INTERVAL_MS = 5 * 60 * 1000; // 5分
-    const DISTANCE_M  = 100;           // 100m移動で即時送信
-
-    const sendLocation = (lat: number, lng: number, accuracy: number) => {
-      const now = Date.now();
-      const prev = lastSentPos.current;
-      const moved = prev ? haversine(prev.lat, prev.lng, lat, lng) >= DISTANCE_M : true;
-      const elapsed = now - lastSentAt.current >= INTERVAL_MS;
-      if (!moved && !elapsed) return;
-
-      lastSentAt.current  = now;
-      lastSentPos.current = { lat, lng };
-      fetch(apiUrl('/van/location'), {
-        method: 'POST',
-        credentials: 'include',
-        headers: { ...authHeader(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ latitude: lat, longitude: lng, accuracy, contractId }),
-      }).catch(() => {});
-    };
-
-    const watchId = navigator.geolocation.watchPosition(
-      pos => sendLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy),
-      () => {},
-      { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 },
-    );
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, []);
 
   const fetchEkyc = useCallback(() => {
     if (!applicationId) return;
