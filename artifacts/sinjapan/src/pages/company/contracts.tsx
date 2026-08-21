@@ -130,6 +130,7 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
 
   const appStatus = contract.application_status ?? contract.status;
   const rc = related?.contracts?.[0];
+  const pickupAddress = contract.pickup_address || contract.rental_company_address;
   const vPhotos: string[] = (() => { try { return JSON.parse(rc?.vehicle_photos ?? '[]'); } catch { return []; } })();
   const pickupPhotos: string[] = (() => { try { return JSON.parse(rc?.pickup_photos ?? '[]'); } catch { return []; } })();
   const returnPhotos: string[] = (() => { try { return JSON.parse(rc?.return_photos ?? '[]'); } catch { return []; } })();
@@ -220,11 +221,11 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
         </div>
 
         {/* 下段：受け取り・オプション */}
-        {(contract.pickup_address || contract.pickup_datetime) && (
+        {(pickupAddress || contract.pickup_datetime) && (
           <Section title="受け取り日時・場所">
             <dl className="grid grid-cols-2 gap-4">
               <DL label="受け取り日時" value={fmtDT(contract.pickup_datetime)} />
-              <DL label="受け取り場所"  value={contract.pickup_address} span2 />
+              <DL label="受け取り場所"  value={pickupAddress} span2 />
             </dl>
           </Section>
         )}

@@ -30,8 +30,8 @@ export async function notifyAdmins(title: string, message: string) {
   }
 }
 
-/** 協力会社ユーザー全員にアプリ内通知＋メールを送る */
-export async function notifyRcUsers(rcId: number, title: string, message: string) {
+/** 協力会社ユーザー全員にアプリ内通知＋メールを送る。ユーザー未登録時は会社登録メールへ送る。 */
+export async function notifyRcUsers(rcId: number, title: string, message: string): Promise<number> {
   const raw = await db.execute(sql`SELECT id, email, name FROM users WHERE rental_company_id = ${rcId}`);
   const users = (raw as any)?.rows ?? (Array.isArray(raw) ? raw : []);
   for (const u of users) {
@@ -42,4 +42,14 @@ export async function notifyRcUsers(rcId: number, title: string, message: string
       sendEmail(email, `【SIN JAPAN】${title}`, html).catch(() => {});
     }
   }
+  if (users.length > 0) return users.length;
+
+  const companyRaw = await db.execute(sql`SELECT email, name FROM rental_companies WHERE id = ${rcId} LIMIT 1`);
+  const company = ((companyRaw as any)?.rows ?? companyRaw)[0];
+  if (company?.email) {
+    const html = buildEmailHtml({ subject: title, body: message, recipientName: company.name ?? undefined });
+    sendEmail(company.email, `【SIN JAPAN】${title}`, html).catch(() => {});
+    return 1;
+  }
+  return 0;
 }

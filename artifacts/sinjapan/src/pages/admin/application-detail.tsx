@@ -117,6 +117,23 @@ const STATUS_LABEL: Record<string, string> = {
 
 const ALL_STATUSES = Object.keys(STATUS_STYLES);
 
+function toTokyoDatetimeLocal(value?: string | Date | null) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(p => p.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}`;
+}
+
 type Tab = 'overview' | 'customer' | 'vehicle' | 'chat'
          | 'contract' | 'payment' | 'gps' | 'incident';
 
@@ -327,8 +344,7 @@ export default function AdminApplicationDetail() {
       const json = await r.json();
       if (!r.ok) throw new Error(json.error ?? '');
       toast({ title: json.method === 'card' ? '再決済が完了しました' : '手動入金確認しました' });
-      setRelated(null);
-      loadRelated();
+      loadRelated(true);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'エラー', description: e.message || '更新に失敗しました' });
     } finally { setPaymentConfirming(null); }
@@ -365,7 +381,7 @@ export default function AdminApplicationDetail() {
       toast({ title: json.method === 'card' ? 'カード決済が完了しました' : `請求書（${json.invoiceNumber}）を作成しました` });
       setShowAddPayment(false);
       setAddPaymentForm({ amount: '', description: '', method: 'invoice', dueDate: '' });
-      setRelated(null); loadRelated();
+      loadRelated(true);
     } catch (e: any) {
       toast({ variant: 'destructive', title: e.message || '追加決済に失敗しました' });
     } finally { setAddPaymentLoading(false); }
@@ -385,8 +401,7 @@ export default function AdminApplicationDetail() {
       if (!r.ok) throw new Error();
       const label: Record<string,string> = { paid: '入金済み', pending: '未払い', overdue: '延滞', cancelled: 'キャンセル' };
       toast({ title: `請求書を「${label[status]}」に変更しました` });
-      setRelated(null);
-      loadRelated();
+      loadRelated(true);
     } catch {
       toast({ variant: 'destructive', title: 'エラー', description: '更新に失敗しました' });
     } finally { setInvoiceUpdating(null); }
@@ -395,10 +410,10 @@ export default function AdminApplicationDetail() {
   // 追加タブ用関連データ
   const [related, setRelated] = useState<any>(null);
   const [relatedLoading, setRelatedLoading] = useState(false);
-  const RELATED_TABS: Tab[] = ['contract', 'payment', 'gps', 'incident'];
+  const RELATED_TABS: Tab[] = ['overview', 'contract', 'payment', 'gps', 'incident'];
 
-  const loadRelated = async () => {
-    if (related || relatedLoading) return;
+  const loadRelated = async (force = false) => {
+    if ((!force && related) || relatedLoading) return;
     setRelatedLoading(true);
     try {
       const token = localStorage.getItem('sinjapan_auth_token');
@@ -420,7 +435,8 @@ export default function AdminApplicationDetail() {
     if (!c) return;
     setPickupForm({
       address: c.pickup_address ?? '',
-      datetime: c.pickup_datetime ? new Date(c.pickup_datetime).toISOString().slice(0, 16) : '',
+      datetime: toTokyoDatetimeLocal(c.pickup_datetime)
+        || (c.start_date ? `${String(c.start_date).slice(0, 10)}T00:00` : ''),
     });
   }, [related]);
 
@@ -475,15 +491,24 @@ export default function AdminApplicationDetail() {
         body: JSON.stringify({
           pickupAddress: pickupForm.address,
           pickupDatetime: pickupForm.datetime || null,
+          deliveryDate: pickupForm.datetime ? pickupForm.datetime.slice(0, 10) : null,
           sendNotification: sendNotif,
         }),
       });
-      if (!r.ok) throw new Error();
-      toast({ title: sendNotif ? '受け取り情報を保存し、通知を送信しました' : '受け取り情報を保存しました' });
-      setRelated(null);
-      loadRelated();
-    } catch {
-      toast({ variant: 'destructive', title: 'エラー', description: '保存に失敗しました' });
+      const result = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(result.error || '保存に失敗しました');
+      const notificationFailed = sendNotif && Object.values(result.notification || {}).some((status: unknown) => status === 'failed');
+      toast({
+        title: sendNotif ? '納車・受け取り情報を保存し、通知を送信しました' : '納車・受け取り情報を保存しました',
+        description: notificationFailed ? '一部の通知を送信できませんでした。通知履歴をご確認ください。' : undefined,
+      });
+      loadRelated(true);
+    } catch (err) {
+      toast({
+        variant: 'destructive',
+        title: 'エラー',
+        description: err instanceof Error ? err.message : '保存に失敗しました',
+      });
     } finally { setPickupSaving(false); }
   };
 
@@ -528,6 +553,17 @@ export default function AdminApplicationDetail() {
 
   // ── render tabs ──────────────────────────────────────────────────────────────
   const app = application as any;
+  const pickupContract = related?.contracts?.[0] as any;
+  const companyPickupAddress = pickupContract?.rental_company_address || '';
+  const effectivePickupAddress = pickupForm.address.trim() || companyPickupAddress;
+  const optionContracts = related?.contracts ?? [];
+  const hasBlackNumberOption = optionContracts.some((contract: any) =>
+    contract.black_number_requested === true || contract.black_number_requested === 'true' || contract.black_number_requested === 't',
+  );
+  const hasInsuranceReferralOption = optionContracts.some((contract: any) =>
+    contract.insurance_referral_requested === true || contract.insurance_referral_requested === 'true' || contract.insurance_referral_requested === 't',
+  );
+  const optionFee = optionContracts.reduce((total: number, contract: any) => total + Number(contract.options_fee ?? 0), 0);
 
   return (
     <div className="space-y-0 max-w-6xl mx-auto">
@@ -616,47 +652,76 @@ export default function AdminApplicationDetail() {
             </Section>
 
             {/* オプション申請 */}
-            {related && (related.contracts ?? []).some((c: any) => c.black_number_requested || c.insurance_referral_requested) && (
+            {related && optionContracts.length > 0 && (
               <Section title="オプション申請">
-                <div className="flex flex-wrap gap-2">
-                  {(related.contracts ?? []).some((c: any) => c.black_number_requested) && (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                  {hasBlackNumberOption && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-foreground text-background text-xs font-medium rounded-full">
                       <BadgeCheck className="h-3.5 w-3.5" />
                       黒ナンバー取得申請あり
                     </span>
                   )}
-                  {(related.contracts ?? []).some((c: any) => c.insurance_referral_requested) && (
+                  {hasInsuranceReferralOption && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-foreground text-background text-xs font-medium rounded-full">
                       <Shield className="h-3.5 w-3.5" />
                       保険紹介申請あり
                     </span>
                   )}
+                  {!hasBlackNumberOption && !hasInsuranceReferralOption && (
+                    <span className="text-sm text-muted-foreground">オプション申請はありません。</span>
+                  )}
+                  </div>
+                  {optionFee > 0 && (
+                    <p className="text-sm font-medium">オプション料金: {yen(optionFee)}</p>
+                  )}
                 </div>
               </Section>
             )}
 
-            {/* 受け取り日時・場所 */}
+            {/* 納車・受け取り日時・場所 */}
             {related && (related.contracts ?? []).length > 0 && (
-              <Section title="受け取り日時・場所">
+              <Section title="納車・受け取り日時・場所">
                 <div className="space-y-3">
                   <div>
-                    <label className="text-xs text-muted-foreground block mb-1.5">受け取り日時</label>
+                    <label className="text-xs text-muted-foreground block mb-1.5">納車・受け取り日時</label>
                     <input
                       type="datetime-local"
                       value={pickupForm.datetime}
                       onChange={e => setPickupForm(p => ({ ...p, datetime: e.target.value }))}
                       className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm outline-none focus:border-foreground/50"
                     />
+                    <p className="mt-1.5 text-xs text-muted-foreground">この日時を納車予定と受け取り予定の両方に反映します。</p>
                   </div>
                   <div>
-                    <label className="text-xs text-muted-foreground block mb-1.5">受け取り場所</label>
+                    <label className="text-xs text-muted-foreground block mb-1.5">現在の受け取り場所</label>
+                    <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
+                      <p className="font-medium">{effectivePickupAddress || '未設定'}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {pickupForm.address.trim() ? '管理者による個別指定' : '協力会社所在地（既定）'}
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1.5">個別に変更する場合の受け取り場所</label>
                     <input
                       type="text"
                       value={pickupForm.address}
                       onChange={e => setPickupForm(p => ({ ...p, address: e.target.value }))}
-                      placeholder="例：神奈川県横浜市中区○○1-2-3 駐車場"
+                      placeholder={companyPickupAddress || '例：神奈川県横浜市中区○○1-2-3 駐車場'}
                       className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm outline-none focus:border-foreground/50"
                     />
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      空欄で保存すると、協力会社の所在地を受け取り場所として使用します。
+                    </p>
+                    {(related.contracts?.[0] as any)?.rental_company_name && (
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        貸出元: {(related.contracts?.[0] as any).rental_company_name}
+                        {(related.contracts?.[0] as any).rental_company_address
+                          ? `（所在地: ${(related.contracts?.[0] as any).rental_company_address}）`
+                          : ''}
+                      </p>
+                    )}
                   </div>
                   <div className="flex gap-2 pt-1">
                     <button
@@ -673,7 +738,7 @@ export default function AdminApplicationDetail() {
                       className="flex items-center gap-1 px-3 py-1.5 bg-foreground text-background text-xs font-medium rounded-lg hover:opacity-90 disabled:opacity-50"
                     >
                       {pickupSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Bell className="h-3 w-3" />}
-                      保存して通知を送る
+                      保存して両者へ通知
                     </button>
                   </div>
                 </div>
@@ -1044,7 +1109,7 @@ export default function AdminApplicationDetail() {
                 applicationId={id}
                 userId={application.userId!}
                 vehicles={vehiclesData?.vehicles ?? []}
-                onCreated={() => { setRelated(null); loadRelated(); }}
+                onCreated={() => { loadRelated(true); }}
               />
             )}
             {related?.contracts?.length === 0 && !['approved','contracting'].includes(application.status) && (

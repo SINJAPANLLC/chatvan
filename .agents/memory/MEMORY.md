@@ -3,3 +3,4 @@
 - [URL pattern for manual fetch](url-pattern.md) — 手動 fetch の API URL は BASE_URL をそのまま使う。replace(/\/$/, '') は禁止。
 - [Dashboard metric failures](dashboard-metric-failures.md) — 部分集計の失敗を0件として隠さず、必ずサーバーログに残す。
 - [Admin list completeness](admin-list-completeness.md) — 一覧の検索・件数表示は、取得済みの一部ではなく全対象件数と必ず整合させる。
+- [Pickup schedule time zone](pickup-schedule-time-zone.md) — 受け取り日時は日本時間で統一し、保存・表示・通知の変換を揃える。

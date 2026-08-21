@@ -1179,35 +1179,136 @@ ${c.special_terms ? `<h2>特記事項</h2><p style="white-space:pre-wrap">${c.sp
   }
 });
 
-// PATCH /van/contracts/:id/pickup  受け取り日時・場所の更新（管理者）
+// PATCH /van/contracts/:id/pickup  納車・受け取り日時・場所の更新（管理者）
 router.patch("/van/contracts/:id/pickup", requireAuth, requireAdmin, async (req: Request, res: Response) => {
   try {
     const id = parseInt(String(req.params.id));
-    const { pickupAddress, pickupDatetime, sendNotification } = req.body;
+    const { pickupAddress, pickupDatetime, deliveryDate, sendNotification } = req.body;
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: "Invalid contract id" });
+    }
+    if (typeof pickupAddress !== "string") {
+      return res.status(400).json({ error: "受け取り場所を入力してください" });
+    }
+    if (pickupDatetime != null && typeof pickupDatetime !== "string") {
+      return res.status(400).json({ error: "受け取り日時の形式が正しくありません" });
+    }
+    if (deliveryDate != null && typeof deliveryDate !== "string") {
+      return res.status(400).json({ error: "納車日の形式が正しくありません" });
+    }
+
+    const requestedAddress = pickupAddress.trim();
+    const pickupDatetimeText = pickupDatetime?.trim() ?? "";
+    if (pickupDatetimeText && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(pickupDatetimeText)) {
+      return res.status(400).json({ error: "受け取り日時の形式が正しくありません" });
+    }
+    // datetime-local の値はタイムゾーンを含まないため、受け取り予定は常に日本時間として保存する。
+    const pickupDate = pickupDatetimeText ? new Date(`${pickupDatetimeText}:00+09:00`) : null;
+    if (pickupDate && Number.isNaN(pickupDate.getTime())) {
+      return res.status(400).json({ error: "受け取り日時の形式が正しくありません" });
+    }
+    const deliveryDateText = deliveryDate?.trim() ?? "";
+    if (deliveryDateText && !/^\d{4}-\d{2}-\d{2}$/.test(deliveryDateText)) {
+      return res.status(400).json({ error: "納車日の形式が正しくありません" });
+    }
+    const rows = await db.execute(sql`
+      SELECT
+        vc.user_id,
+        vc.start_date AS delivery_date,
+        u.name AS user_name,
+        COALESCE(v.rental_company_id, vc.rental_company_id) AS rental_company_id,
+        rc.address AS rental_company_address
+      FROM van_contracts vc
+      LEFT JOIN vehicles v ON vc.vehicle_id = v.id
+      LEFT JOIN rental_companies rc ON rc.id = COALESCE(v.rental_company_id, vc.rental_company_id)
+      LEFT JOIN users u ON vc.user_id = u.id
+      WHERE vc.id = ${id}
+      LIMIT 1
+    `);
+    const contract = ((rows as any)?.rows ?? rows)[0] as {
+      user_id?: number;
+      user_name?: string | null;
+      delivery_date?: string | null;
+      rental_company_id?: number | null;
+      rental_company_address?: string | null;
+    } | undefined;
+    if (!contract) {
+      return res.status(404).json({ error: "Contract not found" });
+    }
+
+    // 空欄で保存すると、契約ごとの上書きを解除して協力会社所在地へ戻せる。
+    const effectivePickupAddress = requestedAddress || contract.rental_company_address?.trim() || "";
+    // 納車日と受け取り日時は同一予定として扱う。旧クライアントから
+    // deliveryDate だけ送られた場合のみ、後方互換としてその日付を利用する。
+    const effectiveDeliveryDate = pickupDatetimeText
+      ? pickupDatetimeText.slice(0, 10)
+      : Object.prototype.hasOwnProperty.call(req.body, "deliveryDate")
+        ? deliveryDateText || null
+        : contract.delivery_date ?? null;
+    if (sendNotification && !effectivePickupAddress) {
+      return res.status(400).json({ error: "受け取り場所が未設定のため通知できません" });
+    }
 
     await db.execute(sql`
       UPDATE van_contracts
-      SET pickup_address = ${pickupAddress ?? null},
-          pickup_datetime = ${pickupDatetime ? new Date(pickupDatetime) : null},
+      SET pickup_address = ${requestedAddress || null},
+          pickup_datetime = ${pickupDate},
+          start_date = ${effectiveDeliveryDate},
           updated_at = NOW()
       WHERE id = ${id}
     `);
 
+    let notification: {
+      user: "sent" | "no_recipient" | "failed" | "not_requested";
+      rentalCompany: "sent" | "no_recipient" | "failed" | "not_requested";
+    } = {
+      user: "not_requested",
+      rentalCompany: "not_requested",
+    };
+
     if (sendNotification) {
-      const row = await db.execute(sql`SELECT user_id FROM van_contracts WHERE id = ${id} LIMIT 1`);
-      const userId = ((row as any)?.rows ?? row)[0]?.user_id;
-      if (userId) {
-        const dtStr = pickupDatetime
-          ? new Date(pickupDatetime).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-          : '日時未定';
-        await notifyUser(userId, '【Chat VAN】車両受け取り日時・場所のご案内',
-          `受け取り日時: ${dtStr}\n受け取り場所: ${pickupAddress || '未定'}\n\nご不明な点はチャットよりお問い合わせください。`);
+      const dtStr = pickupDatetime
+        ? pickupDate!.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+        : '日時未定';
+      const scheduleLabel = pickupDatetimeText
+        ? dtStr
+        : effectiveDeliveryDate || '未定';
+      const userMessage = `納車・受け取り日時: ${scheduleLabel}\n受け取り場所: ${effectivePickupAddress}\n\n内容をご確認のうえ、ご不明な点はチャットよりお問い合わせください。`;
+      const companyMessage = `利用者: ${contract.user_name || "未入力"}\n納車・受け取り日時: ${scheduleLabel}\n受け取り場所: ${effectivePickupAddress}\n\n受け取り準備をお願いいたします。`;
+      const results = await Promise.allSettled([
+        contract.user_id
+          ? notifyUser(contract.user_id, "【Chat VAN】車両受け取り日時・場所のご案内", userMessage)
+          : Promise.resolve(),
+        contract.rental_company_id
+          ? notifyRcUsers(contract.rental_company_id, "【Chat VAN】車両受け取り情報のご案内", companyMessage)
+          : Promise.resolve(0),
+      ]);
+
+      notification = {
+        user: !contract.user_id ? "no_recipient" : results[0].status === "fulfilled" ? "sent" : "failed",
+        rentalCompany: !contract.rental_company_id
+          ? "no_recipient"
+          : results[1].status === "rejected"
+            ? "failed"
+            : results[1].value > 0
+              ? "sent"
+              : "no_recipient",
+      };
+      for (const result of results) {
+        if (result.status === "rejected") {
+          req.log.error({ err: result.reason, contractId: id }, "Pickup notification delivery failed");
+        }
       }
     }
 
-    return res.json({ ok: true });
+    return res.json({
+      ok: true,
+      pickupAddress: effectivePickupAddress || null,
+      deliveryDate: effectiveDeliveryDate,
+      notification,
+    });
   } catch (err) {
-    console.error("pickup update error:", err);
+    req.log.error({ err, contractId: req.params.id }, "Pickup update failed");
     return res.status(500).json({ error: "Internal error" });
   }
 });
@@ -2048,10 +2149,11 @@ router.get("/van/applications/:id/related", requireAuth, requireAdmin, async (re
           v.black_number_status, v.max_period_months,
           v.shaken_cert_path, v.kensakusho_cert_path,
           v.jibaiseki_cert_path, v.ninni_hoken_cert_path,
-          rc.name as rental_company_name, rc.phone as rental_company_phone
+          rc.id as rental_company_id, rc.name as rental_company_name,
+          rc.phone as rental_company_phone, rc.address as rental_company_address
         FROM van_contracts vc
         LEFT JOIN vehicles v ON vc.vehicle_id = v.id
-        LEFT JOIN rental_companies rc ON v.rental_company_id = rc.id
+        LEFT JOIN rental_companies rc ON rc.id = COALESCE(v.rental_company_id, vc.rental_company_id)
         WHERE vc.application_id = ${appId}
         ORDER BY vc.created_at DESC
       `),

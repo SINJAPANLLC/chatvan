@@ -219,12 +219,14 @@ router.get("/company/contracts", requireAuth, requireRentalCompany, async (req: 
             v.black_number_status, v.max_period_months,
             v.shaken_cert_path, v.kensakusho_cert_path,
             v.jibaiseki_cert_path, v.ninni_hoken_cert_path,
-            va.id as application_id, va.status as application_status
+            va.id as application_id, va.status as application_status,
+            rc.address as rental_company_address
           FROM van_contracts vc
           LEFT JOIN users u ON vc.user_id = u.id
           LEFT JOIN vehicles v ON vc.vehicle_id = v.id
+          LEFT JOIN rental_companies rc ON rc.id = COALESCE(v.rental_company_id, vc.rental_company_id)
           LEFT JOIN van_applications va ON vc.application_id = va.id
-          WHERE v.rental_company_id = ${rcId}
+          WHERE COALESCE(v.rental_company_id, vc.rental_company_id) = ${rcId}
           ORDER BY vc.created_at DESC
         `)
       : await db.execute(sql`
@@ -238,10 +240,12 @@ router.get("/company/contracts", requireAuth, requireRentalCompany, async (req: 
             v.black_number_status, v.max_period_months,
             v.shaken_cert_path, v.kensakusho_cert_path,
             v.jibaiseki_cert_path, v.ninni_hoken_cert_path,
-            va.id as application_id, va.status as application_status
+            va.id as application_id, va.status as application_status,
+            rc.address as rental_company_address
           FROM van_contracts vc
           LEFT JOIN users u ON vc.user_id = u.id
           LEFT JOIN vehicles v ON vc.vehicle_id = v.id
+          LEFT JOIN rental_companies rc ON rc.id = COALESCE(v.rental_company_id, vc.rental_company_id)
           LEFT JOIN van_applications va ON vc.application_id = va.id
           ORDER BY vc.created_at DESC
         `);
