@@ -34,7 +34,20 @@ router.get("/invoices/:id", requireAuth, async (req, res): Promise<void> => {
   }
 
   const items = await db.select().from(invoiceItemsTable).where(eq(invoiceItemsTable.invoiceId, id));
-  res.json({ ...fmt(invoice), items: items.map(i => ({ ...i, amount: Number(i.amount) })) });
+  // 過去に作成されたChat VAN請求書には明細レコードがないものがあるため、
+  // PDF/印刷用の表示では請求書本体の金額から安全に明細を補う。
+  const displayItems = items.length > 0
+    ? items.map(i => ({ ...i, amount: Number(i.amount) }))
+    : invoice.contractId
+      ? [{
+          id: `van-invoice-${invoice.id}`,
+          description: invoice.invoiceNumber.includes("-ADD-")
+            ? "追加請求"
+            : `車両利用料（${invoice.periodStart}〜${invoice.periodEnd}）`,
+          amount: Number(invoice.subtotal),
+        }]
+      : [];
+  res.json({ ...fmt(invoice), items: displayItems });
 });
 
 // ── 管理者エンドポイント ──────────────────────────────────────────────────────

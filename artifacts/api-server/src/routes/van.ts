@@ -1428,28 +1428,39 @@ router.post("/van/contracts/:id/invoice", requireAuth, requireAdmin, async (req:
     const tax = Math.round(subtotal * 0.1);
     const totalAmount = subtotal + tax;
 
-    const createdRows = await db.execute(sql`
-      INSERT INTO invoices (
-        user_id, contract_id, invoice_number, period_start, period_end,
-        subtotal, tax, total_amount, status, due_date, created_at
-      )
-      VALUES (
-        ${contract.user_id}, ${contractId}, ${invoiceNumber}, ${periodStart}, ${periodEnd},
-        ${subtotal}, ${tax}, ${totalAmount}, 'pending', ${dueDate}, NOW()
-      )
-      ON CONFLICT (invoice_number) DO NOTHING
-      RETURNING *
-    `);
-    const created = ((createdRows as any)?.rows ?? createdRows)[0];
-    if (!created) {
-      const concurrentRows = await db.execute(sql`
-        SELECT * FROM invoices
-        WHERE contract_id = ${contractId} AND invoice_number = ${invoiceNumber}
-        LIMIT 1
+    const periodLabel = `${periodStart}〜${periodEnd} 車両利用料`;
+    const issuance = await db.transaction(async (tx) => {
+      const createdRows = await tx.execute(sql`
+        INSERT INTO invoices (
+          user_id, contract_id, invoice_number, period_start, period_end,
+          subtotal, tax, total_amount, status, due_date, created_at
+        )
+        VALUES (
+          ${contract.user_id}, ${contractId}, ${invoiceNumber}, ${periodStart}, ${periodEnd},
+          ${subtotal}, ${tax}, ${totalAmount}, 'pending', ${dueDate}, NOW()
+        )
+        ON CONFLICT (invoice_number) DO NOTHING
+        RETURNING *
       `);
-      return res.json({ ok: true, alreadyIssued: true, invoice: ((concurrentRows as any)?.rows ?? concurrentRows)[0] });
+      const created = ((createdRows as any)?.rows ?? createdRows)[0];
+      if (!created) {
+        const concurrentRows = await tx.execute(sql`
+          SELECT * FROM invoices
+          WHERE contract_id = ${contractId} AND invoice_number = ${invoiceNumber}
+          LIMIT 1
+        `);
+        return { created: null, existing: ((concurrentRows as any)?.rows ?? concurrentRows)[0] };
+      }
+      await tx.execute(sql`
+        INSERT INTO invoice_items (invoice_id, description, amount)
+        VALUES (${created.id}, ${periodLabel}, ${subtotal})
+      `);
+      return { created, existing: null };
+    });
+    if (!issuance.created) {
+      return res.json({ ok: true, alreadyIssued: true, invoice: issuance.existing });
     }
-    return res.status(201).json({ ok: true, alreadyIssued: false, invoice: created });
+    return res.status(201).json({ ok: true, alreadyIssued: false, invoice: issuance.created });
   } catch (err) {
     console.error("issue contract invoice error:", err);
     return res.status(500).json({ error: "請求書の発行に失敗しました" });
@@ -1867,16 +1878,26 @@ router.post("/van/contracts/:id/additional-charge", requireAuth, requireAdmin, a
 
     } else {
       // 請求書作成
-      const now = new Date();
+      const now = new Date(Date.now() + 9 * 60 * 60 * 1000);
+      const issuedDate = now.toISOString().slice(0, 10);
       const invoiceNumber = `INV-${contractId}-ADD-${now.getTime()}`;
       const subtotal = Math.round(amount);
       const tax = Math.floor(subtotal * 0.1);
       const totalAmount = subtotal + tax;
-      const due = dueDate ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2,'0')}-${String(new Date(now.getFullYear(), now.getMonth()+1, 0).getDate()).padStart(2,'0')}`;
-      await db.execute(sql`
-        INSERT INTO invoices (user_id, contract_id, invoice_number, period_start, period_end, subtotal, tax, total_amount, status, due_date, created_at)
-        VALUES (${contract.userId}, ${contractId}, ${invoiceNumber}, NOW(), NOW(), ${subtotal}, ${tax}, ${totalAmount}, 'pending', ${due}, NOW())
-      `);
+      const due = dueDate ?? `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2,'0')}-${String(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate()).padStart(2,'0')}`;
+      await db.transaction(async (tx) => {
+        const createdRows = await tx.execute(sql`
+          INSERT INTO invoices (user_id, contract_id, invoice_number, period_start, period_end, subtotal, tax, total_amount, status, due_date, created_at)
+          VALUES (${contract.userId}, ${contractId}, ${invoiceNumber}, ${issuedDate}, ${issuedDate}, ${subtotal}, ${tax}, ${totalAmount}, 'pending', ${due}, NOW())
+          RETURNING id
+        `);
+        const created = ((createdRows as any)?.rows ?? createdRows)[0];
+        if (!created?.id) throw new Error("追加請求書の作成に失敗しました");
+        await tx.execute(sql`
+          INSERT INTO invoice_items (invoice_id, description, amount)
+          VALUES (${created.id}, ${description}, ${subtotal})
+        `);
+      });
       return res.json({ ok: true, method: 'invoice', invoiceNumber, totalAmount });
     }
   } catch (err) {
@@ -3552,11 +3573,23 @@ cron.schedule("0 0 * * *", async () => {
         const totalAmount = subtotal + tax;
         const invoiceNumber = `INV-${contract.id}-${prevYear}${String(prevMonth + 1).padStart(2, '0')}`;
 
-        await db.execute(sql`
-          INSERT INTO invoices (user_id, contract_id, invoice_number, period_start, period_end, subtotal, tax, total_amount, status, due_date, created_at)
-          VALUES (${contract.userId}, ${contract.id}, ${invoiceNumber}, ${periodStart}, ${periodEnd}, ${subtotal}, ${tax}, ${totalAmount}, 'pending', ${dueDate}, NOW())
-          ON CONFLICT DO NOTHING
-        `);
+        const created = await db.transaction(async (tx) => {
+          const createdRows = await tx.execute(sql`
+            INSERT INTO invoices (user_id, contract_id, invoice_number, period_start, period_end, subtotal, tax, total_amount, status, due_date, created_at)
+            VALUES (${contract.userId}, ${contract.id}, ${invoiceNumber}, ${periodStart}, ${periodEnd}, ${subtotal}, ${tax}, ${totalAmount}, 'pending', ${dueDate}, NOW())
+            ON CONFLICT DO NOTHING
+            RETURNING id
+          `);
+          const invoice = ((createdRows as any)?.rows ?? createdRows)[0];
+          if (!invoice?.id) return null;
+          const periodLabel = `${periodStart}〜${periodEnd} 車両利用料${billingNote}`;
+          await tx.execute(sql`
+            INSERT INTO invoice_items (invoice_id, description, amount)
+            VALUES (${invoice.id}, ${periodLabel}, ${subtotal})
+          `);
+          return invoice;
+        });
+        if (!created) continue;
 
         await notifyAdmins("Chat VAN - 月次請求書を発行してください",
           `契約ID: ${contract.id} / ${invoiceNumber}${billingNote}\n税抜: ¥${subtotal.toLocaleString()} 消費税: ¥${tax.toLocaleString()} 合計: ¥${totalAmount.toLocaleString()}\n支払期限: ${dueDate}`);

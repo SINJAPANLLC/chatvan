@@ -436,6 +436,19 @@ export default function AdminApplicationDetail() {
     } finally { setInvoiceUpdating(null); }
   };
 
+  const openInvoicePdf = (invoiceId: number) => {
+    const popup = window.open(`${import.meta.env.BASE_URL}invoices/${invoiceId}`, '_blank');
+    if (!popup) {
+      toast({
+        variant: 'destructive',
+        title: '請求書を開けませんでした',
+        description: 'ポップアップのブロックを解除して、もう一度お試しください。',
+      });
+    } else {
+      popup.opener = null;
+    }
+  };
+
   // 追加タブ用関連データ
   const [related, setRelated] = useState<any>(null);
   const [relatedLoading, setRelatedLoading] = useState(false);
@@ -1570,6 +1583,7 @@ export default function AdminApplicationDetail() {
                     <th className="pb-2 text-left">ステータス</th>
                     <th className="pb-2 text-left">支払期限</th>
                     <th className="pb-2 text-left">入金日</th>
+                    <th className="pb-2 text-right">PDF</th>
                   </tr></thead>
                   <tbody className="divide-y divide-border">
                     {invoicePaymentInvoices.map((inv: any) => {
@@ -1602,6 +1616,16 @@ export default function AdminApplicationDetail() {
                         </td>
                         <td className="py-2.5 text-xs text-muted-foreground">
                           {inv.paid_at ? format(new Date(inv.paid_at), 'yyyy/MM/dd') : '-'}
+                        </td>
+                        <td className="py-2.5 text-right">
+                          <button
+                            type="button"
+                            onClick={() => openInvoicePdf(inv.id)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs border border-border rounded-lg hover:bg-muted"
+                          >
+                            <Printer className="h-3 w-3" />
+                            PDF / 印刷
+                          </button>
                         </td>
                       </tr>
                       );
