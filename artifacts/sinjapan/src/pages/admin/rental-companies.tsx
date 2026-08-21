@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Loader2, Plus, Edit, Trash2, Building2, Save, Mail, Key, CheckCircle, XCircle, Car } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Building2, Save, Mail, CheckCircle, XCircle, Car } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
@@ -242,8 +242,8 @@ export default function AdminRentalCompanies() {
                       )}
                       {/* 共通操作 */}
                       <button onClick={() => { setInviteCompany(c); setInviteEmail(c.email ?? ''); setInviteResult(null); }}
-                        title="アカウント招待" className="p-1.5 text-muted-foreground hover:text-primary rounded">
-                        <Key className="h-4 w-4" />
+                        title="アカウント招待" className="px-2 py-1 text-xs text-muted-foreground hover:text-primary rounded">
+                        アカウント招待
                       </button>
                       <button onClick={() => handleOpenEdit(c)} className="p-1.5 text-muted-foreground hover:text-foreground rounded">
                         <Edit className="h-4 w-4" />
@@ -349,7 +349,7 @@ export default function AdminRentalCompanies() {
       <Dialog open={!!inviteCompany} onOpenChange={open => { if (!open) { setInviteCompany(null); setInviteResult(null); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Key className="h-4 w-4" />協力会社アカウント招待</DialogTitle>
+            <DialogTitle>協力会社アカウント招待</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">

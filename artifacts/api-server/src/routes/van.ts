@@ -3241,7 +3241,7 @@ router.post("/van/vehicles/parse-shaken", requireAuth, async (req: Request, res:
 });
 
 // ── Rental Companies ───────────────────────────────────────────────────────
-router.get("/van/rental-companies", requireAuth, async (req: Request, res: Response) => {
+router.get("/van/rental-companies", requireAuth, requireAdmin, async (req: Request, res: Response) => {
   try {
     const companies = await db.select({ company: rentalCompaniesTable, vehicleCount: sql<number>`count(${vehiclesTable.id})` })
       .from(rentalCompaniesTable)
@@ -3262,7 +3262,7 @@ router.post("/van/rental-companies", requireAuth, requireAdmin, async (req: Requ
   }
 });
 
-router.get("/van/rental-companies/:id", requireAuth, async (req: Request, res: Response) => {
+router.get("/van/rental-companies/:id", requireAuth, requireAdmin, async (req: Request, res: Response) => {
   try {
     const id = parseInt(String(req.params.id));
     const [company] = await db.select().from(rentalCompaniesTable).where(eq(rentalCompaniesTable.id, id));
