@@ -85,7 +85,10 @@ export default function InvoiceDetail() {
 
           <div className="px-8 py-5 border-t border-border text-xs text-muted-foreground">
             <p className="font-semibold text-foreground mb-1">Chat VAN 運営事務局</p>
-            <p>お振込先・ご不明点はサポートまでお問い合わせください</p>
+            <p className="font-semibold text-foreground mt-3">振込先</p>
+            <p className="mt-1">相愛信用組合 2318　　本店 003</p>
+            <p>普通　0170074　ド）シン　ジャパン</p>
+            <p className="mt-2">ご不明点はサポートまでお問い合わせください</p>
           </div>
         </div>
       </div>

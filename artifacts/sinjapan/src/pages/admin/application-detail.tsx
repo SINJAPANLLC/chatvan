@@ -110,7 +110,10 @@ function createInvoicePdfElement(
     });
     footer.append(
       create('div', 'Chat VAN 運営事務局', { color: '#111827', fontWeight: '700' }),
-      create('div', 'お振込先・ご不明点はサポートまでお問い合わせください', { marginTop: '4px' }),
+      create('div', '振込先', { marginTop: '10px', color: '#111827', fontWeight: '700' }),
+      create('div', '相愛信用組合 2318　　本店 003', { marginTop: '3px' }),
+      create('div', '普通　0170074　ド）シン　ジャパン', { marginTop: '2px' }),
+      create('div', 'ご不明点はサポートまでお問い合わせください', { marginTop: '8px' }),
     );
     root.append(footer);
   }
