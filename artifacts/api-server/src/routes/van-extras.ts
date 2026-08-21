@@ -97,9 +97,21 @@ router.post("/van/incidents", requireAuth, async (req: Request, res: Response) =
   try {
     const userId: number | undefined = (req.session as any)?.userId;
     const b = req.body;
+    const contractId = Number(b.contract_id);
+    if (!userId || !Number.isInteger(contractId)) {
+      return res.status(400).json({ error: "有効な契約を指定してください" });
+    }
+    const contractRows = await db.execute(sql`
+      SELECT id FROM van_contracts
+      WHERE id = ${contractId} AND user_id = ${userId}
+      LIMIT 1
+    `);
+    if (!toRow(contractRows)) {
+      return res.status(403).json({ error: "この契約の事故を登録する権限がありません" });
+    }
     const raw = await db.execute(sql`
       INSERT INTO van_incidents (contract_id, user_id, type, description, location, occurred_at, has_injuries, police_contacted, can_drive, counterpart_info, user_comment, status)
-      VALUES (${b.contract_id}, ${userId}, ${b.type ?? 'accident'}, ${b.description}, ${b.location}, ${b.occurred_at}, ${b.has_injuries ?? false}, ${b.police_contacted ?? false}, ${b.can_drive ?? false}, ${b.counterpart_info}, ${b.user_comment ?? b.description}, 'reported')
+      VALUES (${contractId}, ${userId}, ${b.type ?? 'accident'}, ${b.description}, ${b.location}, ${b.occurred_at}, ${b.has_injuries ?? false}, ${b.police_contacted ?? false}, ${b.can_drive ?? false}, ${b.counterpart_info}, ${b.user_comment ?? b.description}, 'reported')
       RETURNING *
     `);
 

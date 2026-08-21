@@ -1,10 +1,13 @@
 import { pgTable, serial, integer, text, numeric, timestamp } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";
 import { shipmentsTable } from "./shipments";
+import { vanContractsTable } from "./van_contracts";
 
 export const invoicesTable = pgTable("invoices", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => usersTable.id),
+  // Chat VANの請求書は契約単位で表示・操作する
+  contractId: integer("contract_id").references(() => vanContractsTable.id),
   invoiceNumber: text("invoice_number").unique().notNull(),
   periodStart: text("period_start").notNull(),
   periodEnd: text("period_end").notNull(),

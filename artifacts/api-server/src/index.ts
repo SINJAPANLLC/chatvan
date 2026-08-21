@@ -194,6 +194,26 @@ async function runMigrations() {
     }
   }
 
+  // ─── Chat VAN請求書を契約単位に移行 ──────────────────────────────────────
+  try {
+    await db.execute(sql`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS contract_id INTEGER REFERENCES van_contracts(id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS invoices_contract_id_idx ON invoices (contract_id)`);
+    // Chat VANの既存請求書は INV-{契約ID}-{年月} または INV-{契約ID}-ADD-{時刻}。
+    // 一般配送の請求書とは形式を区別しているため、安全に再紐付けできる。
+    await db.execute(sql`
+      UPDATE invoices AS i
+      SET contract_id = vc.id
+      FROM van_contracts AS vc
+      WHERE i.contract_id IS NULL
+        AND i.invoice_number ~ '^INV-[0-9]+-([0-9]{6}|ADD-[0-9]+)$'
+        AND split_part(i.invoice_number, '-', 2)::INTEGER = vc.id
+    `);
+    logger.info("migration: Chat VAN invoices linked to contracts");
+  } catch (e: any) {
+    logger.error({ err: e.message }, "Chat VAN invoice contract migration failed");
+    throw e;
+  }
+
   // ─── rental_company_status enum & column ────────────────────────────────
   try {
     await db.execute(sql`
@@ -463,14 +483,26 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${process.env.PORT}"`);
 }
 
-app.listen(port, (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
+async function startServer() {
+  try {
+    // 契約単位で請求書を取得する経路は contract_id に依存するため、
+    // 必須移行が完了するまでHTTPリクエストを受け付けない。
+    await runMigrations();
+    await seedRequiredAccounts();
+  } catch (err) {
+    logger.error({ err }, "Required startup migration failed");
     process.exit(1);
   }
-  logger.info({ port }, "Server listening");
-  runMigrations();
-  seedRequiredAccounts();
-  startScheduler();
-  startAutoProspect();
-});
+
+  app.listen(port, (err) => {
+    if (err) {
+      logger.error({ err }, "Error listening on port");
+      process.exit(1);
+    }
+    logger.info({ port }, "Server listening");
+    startScheduler();
+    startAutoProspect();
+  });
+}
+
+void startServer();

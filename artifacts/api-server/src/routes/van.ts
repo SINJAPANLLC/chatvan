@@ -1778,8 +1778,8 @@ router.post("/van/contracts/:id/additional-charge", requireAuth, requireAdmin, a
       const totalAmount = subtotal + tax;
       const due = dueDate ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2,'0')}-${String(new Date(now.getFullYear(), now.getMonth()+1, 0).getDate()).padStart(2,'0')}`;
       await db.execute(sql`
-        INSERT INTO invoices (user_id, invoice_number, period_start, period_end, subtotal, tax, total_amount, status, due_date, created_at)
-        VALUES (${contract.userId}, ${invoiceNumber}, NOW(), NOW(), ${subtotal}, ${tax}, ${totalAmount}, 'pending', ${due}, NOW())
+        INSERT INTO invoices (user_id, contract_id, invoice_number, period_start, period_end, subtotal, tax, total_amount, status, due_date, created_at)
+        VALUES (${contract.userId}, ${contractId}, ${invoiceNumber}, NOW(), NOW(), ${subtotal}, ${tax}, ${totalAmount}, 'pending', ${due}, NOW())
       `);
       return res.json({ ok: true, method: 'invoice', invoiceNumber, totalAmount });
     }
@@ -2136,7 +2136,7 @@ router.get("/van/applications/:id/related", requireAuth, requireAdmin, async (re
     const userId = ((appRow as any)?.rows ?? appRow)[0]?.user_id;
     if (!userId) return res.status(404).json({ error: "Application not found" });
 
-    const [contracts, incidents, screening, identityVerification] = await Promise.all([
+    const [contracts, screening, identityVerification] = await Promise.all([
       // 契約（この相談に紐づく1件のみ）
       db.execute(sql`
         SELECT vc.*,
@@ -2157,16 +2157,6 @@ router.get("/van/applications/:id/related", requireAuth, requireAdmin, async (re
         WHERE vc.application_id = ${appId}
         ORDER BY vc.created_at DESC
       `),
-      // 事故
-      db.execute(sql`
-        SELECT vi.*, vc.id as contract_number,
-          v.maker, v.model, v.license_plate
-        FROM van_incidents vi
-        LEFT JOIN van_contracts vc ON vi.contract_id = vc.id
-        LEFT JOIN vehicles v ON vc.vehicle_id = v.id
-        WHERE vi.user_id = ${userId}
-        ORDER BY vi.created_at DESC
-      `),
       // 審査
       db.execute(sql`
         SELECT s.* FROM screenings s WHERE s.application_id = ${appId} ORDER BY s.created_at DESC
@@ -2184,8 +2174,18 @@ router.get("/van/applications/:id/related", requireAuth, requireAdmin, async (re
     const contractRows = ((contracts as any)?.rows ?? contracts) as any[];
     const contractIds = contractRows.map((c: any) => c.id).filter(Boolean);
 
-    // 保険・GPS・決済はcontract経由
-    const [insurance, gps, payments] = await Promise.all([
+    // 事故・保険・GPS・決済は、この相談に紐づく契約だけを対象にする。
+    const [incidents, insurance, gps, payments, invoices] = await Promise.all([
+      contractIds.length ? db.execute(sql`
+        SELECT vi.*, vc.id as contract_number,
+          v.maker, v.model, v.license_plate
+        FROM van_incidents vi
+        LEFT JOIN van_contracts vc ON vi.contract_id = vc.id
+        LEFT JOIN vehicles v ON vc.vehicle_id = v.id
+        WHERE vi.user_id = ${userId}
+          AND vi.contract_id = ANY(ARRAY[${sql.raw(contractIds.join(','))}]::int[])
+        ORDER BY vi.created_at DESC
+      `) : { rows: [] },
       contractIds.length ? db.execute(sql`
         SELECT ip.*, v.maker, v.model, v.license_plate
         FROM insurance_policies ip
@@ -2209,12 +2209,12 @@ router.get("/van/applications/:id/related", requireAuth, requireAdmin, async (re
         WHERE pr.contract_id = ANY(ARRAY[${sql.raw(contractIds.join(','))}]::int[])
         ORDER BY pr.attempted_at DESC
       `) : { rows: [] },
+      contractIds.length ? db.execute(sql`
+        SELECT * FROM invoices
+        WHERE contract_id = ANY(ARRAY[${sql.raw(contractIds.join(','))}]::int[])
+        ORDER BY created_at DESC
+      `) : { rows: [] },
     ]);
-
-    // 請求書（invoicesはcontract_id未保持のためuser_id紐付け）
-    const invoices = await db.execute(sql`
-      SELECT * FROM invoices WHERE user_id = ${userId} ORDER BY created_at DESC
-    `);
 
     // ユーザー位置情報（最新50件）
     const userLocations = await db.execute(sql`
@@ -3394,8 +3394,8 @@ cron.schedule("0 0 * * *", async () => {
         const invoiceNumber = `INV-${contract.id}-${prevYear}${String(prevMonth + 1).padStart(2, '0')}`;
 
         await db.execute(sql`
-          INSERT INTO invoices (user_id, invoice_number, period_start, period_end, subtotal, tax, total_amount, status, due_date, created_at)
-          VALUES (${contract.userId}, ${invoiceNumber}, ${periodStart}, ${periodEnd}, ${subtotal}, ${tax}, ${totalAmount}, 'pending', ${dueDate}, NOW())
+          INSERT INTO invoices (user_id, contract_id, invoice_number, period_start, period_end, subtotal, tax, total_amount, status, due_date, created_at)
+          VALUES (${contract.userId}, ${contract.id}, ${invoiceNumber}, ${periodStart}, ${periodEnd}, ${subtotal}, ${tax}, ${totalAmount}, 'pending', ${dueDate}, NOW())
           ON CONFLICT DO NOTHING
         `);
 
