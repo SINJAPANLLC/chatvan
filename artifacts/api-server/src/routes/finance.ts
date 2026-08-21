@@ -227,6 +227,234 @@ router.get("/admin/finance/van/pl", requireAdmin, async (req, res): Promise<void
   res.json(result);
 });
 
+// ── VAN BS（請求残高） ─────────────────────────────────────────────────────────
+// GET /admin/finance/van/balance-sheet?year=2026&month=08
+// 銀行残高や固定資産は記録していないため、請求書の現在ステータスから導ける残高だけを返す。
+router.get("/admin/finance/van/balance-sheet", requireAdmin, async (req, res): Promise<void> => {
+  const year = Number(req.query.year ?? new Date().getFullYear());
+  const month = Number(req.query.month ?? new Date().getMonth() + 1);
+  if (!Number.isInteger(year) || year < 2000 || year > 2100 || !Number.isInteger(month) || month < 1 || month > 12) {
+    res.status(400).json({ error: "year と month を正しく指定してください" });
+    return;
+  }
+
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const asOf = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+  const [summaryRaw, outstandingRaw] = await Promise.all([
+    db.execute(sql`
+      SELECT
+        COUNT(*) AS issued_count,
+        COALESCE(SUM(i.total_amount), 0) AS issued_amount,
+        COUNT(*) FILTER (
+          WHERE i.paid_at IS NULL
+            OR ((i.paid_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Tokyo')::date > ${asOf}::date
+        ) AS outstanding_count,
+        COALESCE(SUM(i.total_amount) FILTER (
+          WHERE i.paid_at IS NULL
+            OR ((i.paid_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Tokyo')::date > ${asOf}::date
+        ), 0) AS outstanding_amount,
+        COUNT(*) FILTER (
+          WHERE (
+              i.paid_at IS NULL
+              OR ((i.paid_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Tokyo')::date > ${asOf}::date
+            )
+            AND i.due_date IS NOT NULL
+            AND i.due_date < ${asOf}
+        ) AS overdue_count,
+        COALESCE(SUM(i.total_amount) FILTER (
+          WHERE (
+              i.paid_at IS NULL
+              OR ((i.paid_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Tokyo')::date > ${asOf}::date
+            )
+            AND i.due_date IS NOT NULL
+            AND i.due_date < ${asOf}
+        ), 0) AS overdue_amount,
+        COUNT(*) FILTER (
+          WHERE i.paid_at IS NOT NULL
+            AND ((i.paid_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Tokyo')::date <= ${asOf}::date
+        ) AS paid_count,
+        COALESCE(SUM(i.total_amount) FILTER (
+          WHERE i.paid_at IS NOT NULL
+            AND ((i.paid_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Tokyo')::date <= ${asOf}::date
+        ), 0) AS paid_amount
+      FROM invoices i
+      WHERE i.contract_id IS NOT NULL
+        AND ((i.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Tokyo')::date <= ${asOf}::date
+        AND i.status NOT IN ('draft', 'cancelled', 'canceled', 'void')
+    `),
+    db.execute(sql`
+      SELECT
+        i.id,
+        i.invoice_number,
+        i.total_amount,
+        i.status,
+        i.due_date,
+        i.paid_at,
+        i.created_at,
+        u.name AS user_name,
+        u.company_name
+      FROM invoices i
+      LEFT JOIN users u ON u.id = i.user_id
+      WHERE i.contract_id IS NOT NULL
+        AND ((i.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Tokyo')::date <= ${asOf}::date
+        AND i.status NOT IN ('draft', 'cancelled', 'canceled', 'void')
+        AND (
+          i.paid_at IS NULL
+          OR ((i.paid_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Tokyo')::date > ${asOf}::date
+        )
+      ORDER BY
+        CASE WHEN i.due_date IS NOT NULL AND i.due_date < ${asOf} THEN 0 ELSE 1 END,
+        i.due_date NULLS LAST,
+        i.created_at DESC
+    `),
+  ]);
+
+  const summary = ((summaryRaw as any)?.rows ?? summaryRaw ?? [])[0] ?? {};
+  const outstandingRows: any[] = (outstandingRaw as any)?.rows ?? outstandingRaw ?? [];
+  res.json({
+    asOf,
+    accountingNote: "対象月末までに作成されたVAN請求書を、入金日と支払期限で集計しています。対象月末の後に入金された請求書は未回収として扱います。銀行残高や正式な会計BSではありません。",
+    summary: {
+      issuedCount: Number(summary.issued_count ?? 0),
+      issuedAmount: Number(summary.issued_amount ?? 0),
+      outstandingCount: Number(summary.outstanding_count ?? 0),
+      outstandingAmount: Number(summary.outstanding_amount ?? 0),
+      overdueCount: Number(summary.overdue_count ?? 0),
+      overdueAmount: Number(summary.overdue_amount ?? 0),
+      paidCount: Number(summary.paid_count ?? 0),
+      paidAmount: Number(summary.paid_amount ?? 0),
+    },
+    outstandingInvoices: outstandingRows.map(row => ({
+      id: Number(row.id),
+      invoiceNumber: row.invoice_number,
+      totalAmount: Number(row.total_amount ?? 0),
+      status: row.due_date && row.due_date < asOf
+        ? "overdue"
+        : row.status === "pending"
+          ? "pending"
+          : row.status === "sent"
+            ? "sent"
+          : "outstanding",
+      dueDate: row.due_date,
+      paidAt: row.paid_at instanceof Date ? row.paid_at.toISOString() : row.paid_at,
+      createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
+      userName: row.user_name,
+      companyName: row.company_name,
+    })),
+  });
+});
+
+// ── VAN CF（資金入出金） ───────────────────────────────────────────────────────
+// GET /admin/finance/van/cash-flow?year=2026
+// 入金は決済/入金日の実績、レンタル会社分は契約期間から算出した支払予定として分離する。
+router.get("/admin/finance/van/cash-flow", requireAdmin, async (req, res): Promise<void> => {
+  const year = Number(req.query.year ?? new Date().getFullYear());
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+    res.status(400).json({ error: "year を正しく指定してください" });
+    return;
+  }
+
+  const [invoiceRaw, cardRaw, contractsRaw] = await Promise.all([
+    db.execute(sql`
+      SELECT
+        TO_CHAR((i.paid_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Tokyo', 'YYYY-MM') AS month,
+        COUNT(*) AS receipt_count,
+        COALESCE(SUM(i.total_amount), 0) AS receipt_amount
+      FROM invoices i
+      WHERE i.contract_id IS NOT NULL
+        AND i.status = 'paid'
+        AND i.paid_at IS NOT NULL
+        AND EXTRACT(YEAR FROM ((i.paid_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Tokyo')) = ${year}
+      GROUP BY TO_CHAR((i.paid_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Tokyo', 'YYYY-MM')
+    `),
+    db.execute(sql`
+      SELECT
+        TO_CHAR((pr.attempted_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Tokyo', 'YYYY-MM') AS month,
+        COUNT(*) FILTER (WHERE pr.square_payment_id IS NOT NULL) AS card_receipt_count,
+        COALESCE(SUM(pr.amount) FILTER (WHERE pr.square_payment_id IS NOT NULL), 0) AS card_receipt_amount,
+        COUNT(*) FILTER (WHERE pr.square_payment_id IS NULL) AS manual_receipt_count,
+        COALESCE(SUM(pr.amount) FILTER (WHERE pr.square_payment_id IS NULL), 0) AS manual_receipt_amount
+      FROM payment_retries pr
+      WHERE pr.result = 'success'
+        AND EXTRACT(YEAR FROM ((pr.attempted_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Tokyo')) = ${year}
+      GROUP BY TO_CHAR((pr.attempted_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Tokyo', 'YYYY-MM')
+    `),
+    db.execute(sql`
+      SELECT
+        vc.start_date,
+        vc.planned_end_date,
+        vc.monthly_price,
+        vc.status,
+        TO_CHAR((vc.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Tokyo', 'YYYY-MM-DD') AS created_date
+      FROM van_contracts vc
+      WHERE vc.status::text NOT IN (
+        'draft', 'pending_documents', 'pending_signature', 'pending_payment', 'payment_processing', 'cancelled'
+      )
+    `),
+  ]);
+
+  const invoiceRows: any[] = (invoiceRaw as any)?.rows ?? invoiceRaw ?? [];
+  const cardRows: any[] = (cardRaw as any)?.rows ?? cardRaw ?? [];
+  const contracts: any[] = (contractsRaw as any)?.rows ?? contractsRaw ?? [];
+  const invoiceByMonth = new Map(invoiceRows.map(row => [row.month, row]));
+  const cardByMonth = new Map(cardRows.map(row => [row.month, row]));
+
+  const contractStart = (contract: any) => {
+    const start = String(contract.start_date ?? "").slice(0, 10);
+    const fallback = String(contract.created_date ?? "").slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(start)
+      ? start
+      : /^\d{4}-\d{2}-\d{2}$/.test(fallback)
+        ? fallback
+        : null;
+  };
+  const contractEnd = (contract: any) => {
+    const end = String(contract.planned_end_date ?? "").slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(end) ? end : null;
+  };
+
+  const months = Array.from({ length: 12 }, (_, index) => {
+    const month = index + 1;
+    const key = `${year}-${String(month).padStart(2, "0")}`;
+    const periodStart = `${key}-01`;
+    const periodEnd = `${key}-${String(new Date(Date.UTC(year, month, 0)).getUTCDate()).padStart(2, "0")}`;
+    const invoice = invoiceByMonth.get(key);
+    const card = cardByMonth.get(key);
+    const activeContracts = contracts.filter(contract => {
+      const start = contractStart(contract);
+      const end = contractEnd(contract);
+      return start && start <= periodEnd && (!end || end >= periodStart);
+    });
+    const rentalPaymentPlanned = activeContracts.reduce(
+      (total, contract) => total + Math.round(Number(contract.monthly_price ?? 0) * 1.1),
+      0,
+    );
+    const invoiceReceipts = Number(invoice?.receipt_amount ?? 0);
+    const cardReceipts = Number(card?.card_receipt_amount ?? 0);
+    const manualReceipts = Number(card?.manual_receipt_amount ?? 0);
+    const actualInflows = invoiceReceipts + cardReceipts + manualReceipts;
+    return {
+      month: key,
+      invoiceReceipts,
+      invoiceReceiptCount: Number(invoice?.receipt_count ?? 0),
+      cardReceipts,
+      cardReceiptCount: Number(card?.card_receipt_count ?? 0),
+      manualReceipts,
+      manualReceiptCount: Number(card?.manual_receipt_count ?? 0),
+      actualInflows,
+      rentalPaymentPlanned,
+      rentalContractCount: activeContracts.length,
+      estimatedNetCashFlow: actualInflows - rentalPaymentPlanned,
+    };
+  });
+
+  res.json({
+    year,
+    accountingNote: "入金は請求書の入金日、Squareカード決済成功日、手動確認入金日の実績です。レンタル会社分は契約開始日・予定終了日・月額から算出した税込の支払予定であり、実際の支払額や現預金残高ではありません。",
+    months,
+  });
+});
+
 // ── VAN レンタル会社支払い ────────────────────────────────────────────────────
 
 // GET /admin/finance/van/rental-payments?year=2026&month=08

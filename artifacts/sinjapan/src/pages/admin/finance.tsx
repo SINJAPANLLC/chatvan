@@ -34,6 +34,13 @@ const PAY_STATUS: Record<string, { label: string; cls: string }> = {
   '返金済み':     { label: '返金済み',     cls: 'bg-muted text-muted-foreground border-border' },
 };
 
+const BS_INVOICE_STATUS: Record<string, { label: string; cls: string }> = {
+  pending: { label: '発行待ち', cls: 'bg-muted text-muted-foreground border-border' },
+  outstanding: { label: '未回収', cls: 'bg-amber-100 text-amber-800 border-amber-200' },
+  sent:    { label: '送付済み', cls: 'bg-blue-100 text-blue-700 border-blue-200' },
+  overdue: { label: '期限超過', cls: 'bg-red-100 text-red-700 border-red-200' },
+};
+
 // ─── sub-components ───────────────────────────────────────────────────────────
 
 function DrillDown({ year, month, label, onClose }: { year: number; month: string; label: string; onClose: () => void }) {
@@ -424,6 +431,254 @@ function CardReconcile() {
   );
 }
 
+// ─── BS（請求残高） ─────────────────────────────────────────────────────────────
+function BalanceSheet() {
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const currentYear = now.getFullYear();
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setData(await apiFetch(`/api/admin/finance/van/balance-sheet?year=${year}&month=${month}`));
+    } catch {
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [year, month]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const summary = data?.summary;
+  const cards = summary ? [
+    { label: '発行済み請求', value: summary.issuedAmount, count: summary.issuedCount, tone: 'bg-muted/30' },
+    { label: '未回収請求', value: summary.outstandingAmount, count: summary.outstandingCount, tone: 'bg-amber-50 border-amber-200' },
+    { label: 'うち期限超過', value: summary.overdueAmount, count: summary.overdueCount, tone: 'bg-red-50 border-red-200' },
+    { label: '回収済み', value: summary.paidAmount, count: summary.paidCount, tone: 'bg-green-50 border-green-200' },
+  ] : [];
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <p className="text-sm font-semibold">請求残高（管理用BS）</p>
+          <p className="text-xs text-muted-foreground mt-1">対象月末までに作成されたVAN請求書を、入金日と支払期限で集計します。</p>
+        </div>
+        <div className="flex items-center gap-1">
+          {[currentYear - 1, currentYear, currentYear + 1].map(y => (
+            <button key={y} onClick={() => setYear(y)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${year === y ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:text-foreground'}`}>
+              {y}年
+            </button>
+          ))}
+          <select value={month} onChange={event => setMonth(Number(event.target.value))}
+            className="ml-1 px-3 py-1.5 border border-border rounded-lg text-sm bg-background outline-none focus:border-foreground/50 cursor-pointer">
+            {MONTHS.map((label, index) => <option key={label} value={index + 1}>{label}</option>)}
+          </select>
+          <button onClick={load} className="ml-1 p-1.5 text-muted-foreground hover:text-foreground" aria-label="再読み込み">
+            <RefreshCw className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : !data ? (
+        <div className="text-center py-12 text-sm text-muted-foreground">請求残高を取得できませんでした</div>
+      ) : (
+        <>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+            <span className="font-semibold">集計の注意：</span>{data.accountingNote}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {cards.map(card => (
+              <div key={card.label} className={`rounded-xl border border-border p-4 ${card.tone}`}>
+                <p className="text-xs text-muted-foreground">{card.label}</p>
+                <p className="mt-1 text-xl font-bold">{yen(card.value)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{card.count}件</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-xl border border-border shadow-sm overflow-x-auto">
+            <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-border">
+              <div>
+                <p className="text-sm font-semibold">未回収の請求書</p>
+                <p className="text-xs text-muted-foreground mt-0.5">対象月末時点で未回収の請求書</p>
+              </div>
+              <span className="text-xs text-muted-foreground">{data.asOf} 時点</span>
+            </div>
+            <table className="w-full min-w-[720px] text-sm">
+              <thead>
+                <tr className="bg-muted/40 border-b border-border">
+                  <th className="px-5 py-3 text-left font-medium text-muted-foreground">請求書番号</th>
+                  <th className="px-5 py-3 text-left font-medium text-muted-foreground">顧客</th>
+                  <th className="px-5 py-3 text-right font-medium text-muted-foreground">金額</th>
+                  <th className="px-5 py-3 text-left font-medium text-muted-foreground">支払期限</th>
+                  <th className="px-5 py-3 text-left font-medium text-muted-foreground">ステータス</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border bg-card">
+                {!data.outstandingInvoices?.length ? (
+                  <tr><td colSpan={5} className="py-12 text-center text-sm text-muted-foreground">未回収の請求書はありません</td></tr>
+                ) : data.outstandingInvoices.map((invoice: any) => {
+                  const status = BS_INVOICE_STATUS[invoice.status] ?? BS_INVOICE_STATUS.pending;
+                  return (
+                    <tr key={invoice.id} className="hover:bg-muted/20 transition-colors">
+                      <td className="px-5 py-3.5 font-mono text-xs">{invoice.invoiceNumber}</td>
+                      <td className="px-5 py-3.5">
+                        <div className="font-medium">{invoice.companyName || invoice.userName || '—'}</div>
+                        {invoice.companyName && <div className="text-xs text-muted-foreground">{invoice.userName}</div>}
+                      </td>
+                      <td className="px-5 py-3.5 text-right font-semibold">{yen(invoice.totalAmount)}</td>
+                      <td className="px-5 py-3.5 text-xs text-muted-foreground">{invoice.dueDate || '—'}</td>
+                      <td className="px-5 py-3.5">
+                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium border ${status.cls}`}>{status.label}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── CF（資金入出金） ───────────────────────────────────────────────────────────
+function CashFlow() {
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const currentYear = now.getFullYear();
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setData(await apiFetch(`/api/admin/finance/van/cash-flow?year=${year}`));
+    } catch {
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [year]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const rows = data?.months ?? [];
+  const totals = rows.reduce((total: any, row: any) => ({
+    invoiceReceipts: total.invoiceReceipts + row.invoiceReceipts,
+    cardReceipts: total.cardReceipts + row.cardReceipts,
+    manualReceipts: total.manualReceipts + row.manualReceipts,
+    actualInflows: total.actualInflows + row.actualInflows,
+    rentalPaymentPlanned: total.rentalPaymentPlanned + row.rentalPaymentPlanned,
+    estimatedNetCashFlow: total.estimatedNetCashFlow + row.estimatedNetCashFlow,
+  }), { invoiceReceipts: 0, cardReceipts: 0, manualReceipts: 0, actualInflows: 0, rentalPaymentPlanned: 0, estimatedNetCashFlow: 0 });
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <p className="text-sm font-semibold">資金入出金（管理用CF）</p>
+          <p className="text-xs text-muted-foreground mt-1">入金は実績、レンタル会社への金額は支払予定として分けて確認します。</p>
+        </div>
+        <div className="flex items-center gap-1">
+          {[currentYear - 1, currentYear, currentYear + 1].map(y => (
+            <button key={y} onClick={() => setYear(y)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${year === y ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:text-foreground'}`}>
+              {y}年
+            </button>
+          ))}
+          <button onClick={load} className="ml-1 p-1.5 text-muted-foreground hover:text-foreground" aria-label="再読み込み">
+            <RefreshCw className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : !data ? (
+        <div className="text-center py-12 text-sm text-muted-foreground">資金入出金を取得できませんでした</div>
+      ) : (
+        <>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+            <span className="font-semibold">集計の注意：</span>{data.accountingNote}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            {[
+              { label: '請求書の入金実績', value: totals.invoiceReceipts, tone: 'bg-green-50 border-green-200' },
+              { label: 'カードの入金実績', value: totals.cardReceipts, tone: 'bg-green-50 border-green-200' },
+              { label: '手動確認の入金実績', value: totals.manualReceipts, tone: 'bg-green-50 border-green-200' },
+              { label: '入金実績 合計', value: totals.actualInflows, tone: 'bg-muted/30' },
+              { label: 'レンタル会社支払予定', value: totals.rentalPaymentPlanned, tone: 'bg-amber-50 border-amber-200' },
+            ].map(card => (
+              <div key={card.label} className={`rounded-xl border border-border p-4 ${card.tone}`}>
+                <p className="text-xs text-muted-foreground">{card.label}</p>
+                <p className="mt-1 text-xl font-bold">{yen(card.value)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{year}年累計</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-xl border border-border shadow-sm overflow-x-auto">
+            <table className="w-full min-w-[1040px] text-sm">
+              <thead>
+                <tr className="bg-muted/40 border-b border-border">
+                  <th className="px-5 py-3 text-left font-medium text-muted-foreground">月</th>
+                  <th className="px-5 py-3 text-right font-medium text-muted-foreground">請求書入金（実績）</th>
+                  <th className="px-5 py-3 text-right font-medium text-muted-foreground">カード入金（実績）</th>
+                  <th className="px-5 py-3 text-right font-medium text-muted-foreground">手動確認入金（実績）</th>
+                  <th className="px-5 py-3 text-right font-medium text-muted-foreground">入金実績 合計</th>
+                  <th className="px-5 py-3 text-right font-medium text-muted-foreground">支払予定</th>
+                  <th className="px-5 py-3 text-right font-medium text-muted-foreground">参考差引</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border bg-card">
+                {rows.map((row: any, index: number) => {
+                  const isEmpty = row.actualInflows === 0 && row.rentalPaymentPlanned === 0;
+                  return (
+                    <tr key={row.month} className={isEmpty ? 'opacity-40' : 'hover:bg-muted/20 transition-colors'}>
+                      <td className="px-5 py-3 font-medium">{MONTHS[index]}</td>
+                      <td className="px-5 py-3 text-right">{row.invoiceReceipts ? yen(row.invoiceReceipts) : '—'}</td>
+                      <td className="px-5 py-3 text-right">{row.cardReceipts ? yen(row.cardReceipts) : '—'}</td>
+                      <td className="px-5 py-3 text-right">{row.manualReceipts ? yen(row.manualReceipts) : '—'}</td>
+                      <td className="px-5 py-3 text-right font-semibold">{row.actualInflows ? yen(row.actualInflows) : '—'}</td>
+                      <td className="px-5 py-3 text-right text-muted-foreground">{row.rentalPaymentPlanned ? yen(row.rentalPaymentPlanned) : '—'}</td>
+                      <td className={`px-5 py-3 text-right font-semibold ${row.estimatedNetCashFlow < 0 ? 'text-red-600' : 'text-green-700'}`}>
+                        {isEmpty ? '—' : yen(row.estimatedNetCashFlow)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="bg-foreground text-background">
+                  <td className="px-5 py-3.5 font-bold">合計</td>
+                  <td className="px-5 py-3.5 text-right">{yen(totals.invoiceReceipts)}</td>
+                  <td className="px-5 py-3.5 text-right">{yen(totals.cardReceipts)}</td>
+                  <td className="px-5 py-3.5 text-right">{yen(totals.manualReceipts)}</td>
+                  <td className="px-5 py-3.5 text-right font-bold">{yen(totals.actualInflows)}</td>
+                  <td className="px-5 py-3.5 text-right opacity-75">{yen(totals.rentalPaymentPlanned)}</td>
+                  <td className="px-5 py-3.5 text-right font-bold">{yen(totals.estimatedNetCashFlow)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── レンタル会社支払い ────────────────────────────────────────────────────────
 function RentalPayments() {
   const now = new Date();
@@ -550,6 +805,8 @@ function RentalPayments() {
 // ─── メインページ ──────────────────────────────────────────────────────────────
 const MAIN_TABS = [
   { key: 'pl',      label: 'PL（損益計算書）' },
+  { key: 'bs',      label: 'BS（請求残高）' },
+  { key: 'cf',      label: 'CF（資金入出金）' },
   { key: 'invoice', label: '請求書消し込み' },
   { key: 'card',    label: 'カード消し込み' },
   { key: 'rental',  label: 'レンタル会社支払い' },
@@ -561,7 +818,7 @@ export default function AdminFinance() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">PL / BS / CF</h1>
+      <h1 className="text-2xl font-bold tracking-tight">PL / BS / CF（管理用）</h1>
 
       <div className="flex gap-1 border-b border-border">
         {MAIN_TABS.map(t => (
@@ -573,6 +830,8 @@ export default function AdminFinance() {
       </div>
 
       {tab === 'pl'      && <PLTable year={year} setYear={setYear} />}
+      {tab === 'bs'      && <BalanceSheet />}
+      {tab === 'cf'      && <CashFlow />}
       {tab === 'invoice' && <InvoiceReconcile />}
       {tab === 'card'    && <CardReconcile />}
       {tab === 'rental'  && <RentalPayments />}

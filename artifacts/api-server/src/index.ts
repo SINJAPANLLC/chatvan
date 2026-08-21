@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { seedRequiredAccounts } from "./lib/seed";
 import { startScheduler } from "./lib/blogAutoGen";
 import { startScheduler as startAutoProspect } from "./lib/autoProspect";
+import { startMonthlyBillingScheduler } from "./routes/van";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 
@@ -110,7 +111,7 @@ async function runMigrations() {
     `);
     await db.execute(sql`
       CREATE TYPE van_contract_status AS ENUM (
-        'draft','pending_documents','pending_signature','pending_payment',
+        'draft','pending_documents','pending_signature','pending_payment','payment_processing',
         'active','payment_issue','return_pending','completed','cancelled'
       )
     `);
@@ -452,6 +453,19 @@ async function runMigrations() {
   }
 
   logger.info("migration: all Chat VAN tables ready");
+  // 決済経路は入金台帳の一意制約がない状態で開始させない。
+  // payment_retries の作成後、HTTP・スケジューラー開始前に必ず完了させる。
+  await db.execute(sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS payment_retries_initial_period_unique
+    ON payment_retries (contract_id, period_month)
+    WHERE failure_reason = '[初回決済]'
+  `);
+  await db.execute(sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS payment_retries_recurring_period_unique
+    ON payment_retries (contract_id, period_month)
+    WHERE failure_reason = '[月額自動決済]'
+  `);
+  logger.info("migration: payment ledger uniqueness indexes ready");
 
   // prospects prospect_type カラム
   try {
@@ -500,6 +514,7 @@ async function startServer() {
       process.exit(1);
     }
     logger.info({ port }, "Server listening");
+    startMonthlyBillingScheduler();
     startScheduler();
     startAutoProspect();
   });

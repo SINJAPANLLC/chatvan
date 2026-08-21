@@ -34,6 +34,22 @@ import { notifyUser, notifyAdmins, notifyRcUsers } from "../lib/notifyHelpers";
 
 const objectStorage = new ObjectStorageService();
 
+function parseCalendarDate(value: unknown): string | null {
+  const dateString = String(value ?? "").slice(0, 10);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year
+    || date.getUTCMonth() !== month - 1
+    || date.getUTCDate() !== day
+  ) return null;
+  return dateString;
+}
+
 // ── eKYC AI自動判定 ─────────────────────────────────────────────────────────
 async function runAIeKYC(verificationId: number, data: {
   fullName: string; birthDate: string; licenseNumber: string;
@@ -1620,21 +1636,108 @@ router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request
 
     const [contract] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.id, id));
     if (!contract) return res.status(404).json({ error: "Contract not found" });
-
+    if (contract.userId !== req.session.userId && req.session.userRole !== "admin") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const contractStartDate = parseCalendarDate(contract.startDate);
+    if (!contractStartDate) {
+      return res.status(400).json({ error: "契約開始日を設定してからカード決済を行ってください" });
+    }
+    const initialPeriodMonth = contractStartDate.slice(0, 7);
+    const existingInitial = await db.execute(sql`
+      SELECT id, square_payment_id
+      FROM payment_retries
+      WHERE contract_id = ${id}
+        AND period_month = ${initialPeriodMonth}
+        AND failure_reason = '[初回決済]'
+        AND result = 'success'
+      LIMIT 1
+    `);
+    const existingInitialRow = ((existingInitial as any)?.rows ?? existingInitial ?? [])[0];
+    if (existingInitialRow) {
+      await db.execute(sql`UPDATE van_contracts SET status = 'active', payment_method = 'card', updated_at = NOW() WHERE id = ${id}`);
+      return res.json({ ok: true, alreadyPaid: true, paymentId: existingInitialRow.square_payment_id });
+    }
     const monthlyBase = Number(contract.monthlyPrice) + Number(contract.sinJapanFee ?? 0);
     // optionsFee は契約署名時に保存済み（raw SQL で読む）
     const optionsRow = await db.execute(sql`SELECT options_fee FROM van_contracts WHERE id = ${id}`);
     const optionsFee = Number((optionsRow as any)?.rows?.[0]?.options_fee ?? 0);
     const totalAmount = Math.round(monthlyBase * 1.1) + optionsFee;
     if (totalAmount <= 0) return res.status(400).json({ error: "金額が設定されていません" });
+    const initialPaymentNote = `Chat VAN 初回決済 契約#${id}${optionsFee > 0 ? " +オプション" : ""}`;
+    const paymentClaim = await db.execute(sql`
+      UPDATE van_contracts
+      SET status = 'payment_processing', updated_at = NOW()
+      WHERE id = ${id} AND status = 'pending_payment'
+      RETURNING id
+    `);
+    if (((paymentClaim as any)?.rows ?? paymentClaim ?? []).length === 0) {
+      const currentStatus = await db.execute(sql`SELECT status FROM van_contracts WHERE id = ${id} LIMIT 1`);
+      const status = ((currentStatus as any)?.rows ?? currentStatus ?? [])[0]?.status;
+      if (status !== "payment_processing") {
+        return res.status(409).json({ error: "この契約はすでに決済済み、または決済処理中です" });
+      }
+      try {
+        const claimTime = new Date(contract.updatedAt ?? Date.now());
+        let cursor: string | undefined;
+        let recoveredPayment: any;
+        for (let page = 0; page < 20 && !recoveredPayment; page += 1) {
+          const params = new URLSearchParams({
+            location_id: String(process.env.SQUARE_LOCATION_ID ?? ""),
+            begin_time: claimTime.toISOString(),
+            sort_order: "DESC",
+            limit: "100",
+          });
+          if (cursor) params.set("cursor", cursor);
+          const recoveryResponse = await squareFetch(`/v2/payments?${params.toString()}`, "GET");
+          const recoveryData = await recoveryResponse.json() as any;
+          if (!recoveryResponse.ok) throw new Error(JSON.stringify(recoveryData.errors ?? "Square照合エラー"));
+          recoveredPayment = recoveryData.payments?.find((payment: any) =>
+            payment.status === "COMPLETED"
+            && payment.note === initialPaymentNote
+            && Number(payment.amount_money?.amount) === totalAmount
+            && payment.amount_money?.currency === "JPY"
+          );
+          cursor = recoveryData.cursor;
+          if (!cursor) break;
+        }
+        const recoveredAt = new Date(recoveredPayment?.created_at ?? "");
+        if (recoveredPayment?.id && !Number.isNaN(recoveredAt.getTime())) {
+          await db.execute(sql`
+            INSERT INTO payment_retries (
+              contract_id, user_id, amount, period_month, result,
+              square_payment_id, failure_reason, attempted_at
+            )
+            VALUES (
+              ${id}, ${contract.userId}, ${Number(recoveredPayment.amount_money?.amount ?? 0)}, ${initialPeriodMonth}, 'success',
+              ${recoveredPayment.id}, '[初回決済]', ${recoveredAt}
+            )
+            ON CONFLICT (contract_id, period_month)
+              WHERE failure_reason = '[初回決済]'
+            DO NOTHING
+          `);
+          await db.execute(sql`UPDATE van_contracts SET status = 'active', payment_method = 'card', updated_at = NOW() WHERE id = ${id}`);
+          if (contract.applicationId) {
+            await db.update(vanApplicationsTable).set({ status: "delivery_pending", updatedAt: new Date() })
+              .where(eq(vanApplicationsTable.id, contract.applicationId));
+          }
+          await db.update(vehiclesTable).set({ status: "rented", updatedAt: new Date() })
+            .where(eq(vehiclesTable.id, contract.vehicleId));
+          return res.json({ ok: true, recovered: true, paymentId: recoveredPayment.id });
+        }
+      } catch (error) {
+        console.error("初回決済のSquare照合に失敗しました", error);
+      }
+      return res.status(409).json({ error: "決済処理中です。二重請求を防ぐため、管理者へ確認を依頼してください。" });
+    }
 
     const squareRes = await squareFetch("/v2/payments", "POST", {
       source_id: sourceId,
-      idempotency_key: randomUUID(),
+      idempotency_key: `initial-${contract.id}-${initialPeriodMonth}`,
       amount_money: { amount: totalAmount, currency: "JPY" },
       location_id: process.env.SQUARE_LOCATION_ID,
       autocomplete: true,
-      note: `Chat VAN 初回決済 契約#${id}${optionsFee > 0 ? " +オプション" : ""}`,
+      note: initialPaymentNote,
     });
 
     const data = await squareRes.json() as any;
@@ -1648,23 +1751,35 @@ router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request
         };
         return msgs[code] ?? "決済処理中にエラーが発生しました";
       })();
+      await db.execute(sql`
+        UPDATE van_contracts
+        SET status = 'pending_payment', updated_at = NOW()
+        WHERE id = ${id} AND status = 'payment_processing'
+      `);
       return res.status(502).json({ error: errMsg });
     }
 
-    // 決済成功 → contract/application/vehicle をアクティブに
-    await db.execute(sql`UPDATE van_contracts SET status = 'active', payment_method = 'card', updated_at = NOW() WHERE id = ${id}`);
     // 初回カード決済も売上台帳に残す（ダッシュボード・PLのカード売上集計元）
-    const initialPeriodMonth = contract.startDate?.slice(0, 7) ?? new Date().toISOString().slice(0, 7);
-    await db.execute(sql`
+    const initialLedgerInsert = await db.execute(sql`
       INSERT INTO payment_retries (
         contract_id, user_id, amount, period_month, result,
         square_payment_id, failure_reason, attempted_at
       )
       VALUES (
         ${id}, ${contract.userId}, ${totalAmount}, ${initialPeriodMonth}, 'success',
-        ${data.payment?.id ?? null}, NULL, NOW()
+        ${data.payment?.id ?? null}, '[初回決済]', NOW()
       )
+      ON CONFLICT (contract_id, period_month)
+        WHERE failure_reason = '[初回決済]'
+      DO NOTHING
+      RETURNING id
     `);
+    const initialLedgerInserted = ((initialLedgerInsert as any)?.rows ?? initialLedgerInsert ?? []).length > 0;
+    // 決済成功 → contract/application/vehicle をアクティブに
+    await db.execute(sql`UPDATE van_contracts SET status = 'active', payment_method = 'card', updated_at = NOW() WHERE id = ${id}`);
+    if (!initialLedgerInserted) {
+      return res.json({ ok: true, alreadyPaid: true, paymentId: data.payment?.id ?? null });
+    }
     if (contract.applicationId) {
       await db.update(vanApplicationsTable).set({ status: "delivery_pending", updatedAt: new Date() }).where(eq(vanApplicationsTable.id, contract.applicationId));
     }
@@ -3485,9 +3600,11 @@ db.execute(sql`CREATE INDEX IF NOT EXISTS user_locations_user_id_idx ON user_loc
 db.execute(sql`CREATE INDEX IF NOT EXISTS user_locations_contract_id_idx ON user_locations(contract_id, recorded_at DESC)`).catch(() => {});
 db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS inspection_doc TEXT`).catch(() => {});
 db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS compulsory_insurance_doc TEXT`).catch(() => {});
+// 月額自動決済は契約・対象月ごとに一度だけ入金台帳へ残す。
 
 // ── 月額自動決済スケジューラー (毎日 JST 9:00 = UTC 0:00) ────────────────
-cron.schedule("0 0 * * *", async () => {
+export function startMonthlyBillingScheduler() {
+  cron.schedule("0 0 * * *", async () => {
   const jstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
   const today    = jstNow.getUTCDate();
   const jstYear  = jstNow.getUTCFullYear();
@@ -3504,7 +3621,7 @@ cron.schedule("0 0 * * *", async () => {
         and(
           eq(vanContractsTable.status, "active" as any),
           sql`${vanContractsTable.paymentMethod} = 'card'`,
-          sql`${vanContractsTable.paymentDay} = ${today}`
+          sql`${vanContractsTable.paymentDay} <= ${today}`
         )
       );
 
@@ -3514,8 +3631,35 @@ cron.schedule("0 0 * * *", async () => {
       const preTax = Number(contract.monthlyPrice) + Number(contract.sinJapanFee ?? 0);
       const amount = Math.floor(preTax * 1.1);
       const idempotencyKey = `monthly-${contract.id}-${jstYear}-${jstMonth}`;
+      const periodMonth = `${jstYear}-${String(jstMonth + 1).padStart(2, "0")}`;
+      const todayDate = `${periodMonth}-${String(today).padStart(2, "0")}`;
 
       try {
+        const startDate = parseCalendarDate(contract.startDate);
+        if (!startDate) {
+          console.warn(`[月額決済] 契約開始日が未設定 contract=${contract.id}`);
+          await notifyAdmins("Chat VAN - 契約開始日が未設定です",
+            `契約ID: ${contract.id} はカード月額決済の対象外にしています。契約開始日を設定してください。`);
+          continue;
+        }
+        if (startDate > todayDate) continue;
+
+        // 初回決済・月額決済・既存の月額再試行が同じ対象月に成功していれば重ねて請求しない。
+        const ledgerCheck = await db.execute(sql`
+          SELECT id
+          FROM payment_retries
+          WHERE contract_id = ${contract.id}
+            AND period_month = ${periodMonth}
+            AND result = 'success'
+            AND square_payment_id IS NOT NULL
+            AND (
+              failure_reason IN ('[初回決済]', '[月額自動決済]')
+              OR failure_reason IS NULL
+            )
+          LIMIT 1
+        `);
+        if (((ledgerCheck as any)?.rows ?? ledgerCheck ?? []).length > 0) continue;
+
         if (user?.squareCardId && user?.squareCustomerId) {
           const squareRes = await squareFetch("/v2/payments", "POST", {
             source_id: user.squareCardId,
@@ -3536,6 +3680,26 @@ cron.schedule("0 0 * * *", async () => {
             await notifyUser(contract.userId, "Chat VAN - 月額決済に失敗しました",
               `月額料金（¥${amount.toLocaleString()}）の決済に失敗しました。お支払い情報をご確認ください。`);
           } else {
+            const squarePaymentId = data.payment?.id;
+            if (!squarePaymentId) {
+              console.error(`[月額決済] 決済IDが取得できません contract=${contract.id}`);
+              continue;
+            }
+            const ledgerInsert = await db.execute(sql`
+              INSERT INTO payment_retries (
+                contract_id, user_id, amount, period_month, attempt_number, result,
+                square_payment_id, failure_reason, attempted_at
+              )
+              VALUES (
+                ${contract.id}, ${contract.userId}, ${amount}, ${periodMonth}, 1, 'success',
+                ${squarePaymentId}, '[月額自動決済]', NOW()
+              )
+              ON CONFLICT (contract_id, period_month)
+                WHERE failure_reason = '[月額自動決済]'
+              DO NOTHING
+              RETURNING id
+            `);
+            if (((ledgerInsert as any)?.rows ?? ledgerInsert ?? []).length === 0) continue;
             console.log(`[月額決済] カード成功 contract=${contract.id} ¥${amount}`);
             await notifyUser(contract.userId, "Chat VAN - 月額料金のお支払いが完了しました",
               `月額料金（¥${amount.toLocaleString()}）のお支払いが完了しました。`);
@@ -3554,8 +3718,7 @@ cron.schedule("0 0 * * *", async () => {
     console.error("[月額決済] カードスケジューラーエラー:", e);
   }
 
-  // ── ② 請求書払い：月初（1日）に前月分を末締め翌月末払いで発行 ──────
-  if (today !== 1) return;
+  // ── ② 請求書払い：前月分を日次で補完発行（同じ請求書番号は作成しない） ──
 
   try {
     // 前月の情報
@@ -3637,6 +3800,7 @@ cron.schedule("0 0 * * *", async () => {
   } catch (e) {
     console.error("[月次請求書] スケジューラーエラー:", e);
   }
-}, { timezone: "UTC" });
+  }, { timezone: "UTC" });
+}
 
 export default router;
