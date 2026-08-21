@@ -1344,7 +1344,7 @@ router.patch("/van/invoices/:id/status", requireAuth, requireAdmin, async (req: 
   try {
     const id = parseInt(String(req.params.id));
     const { status } = req.body; // 'pending' | 'paid' | 'overdue' | 'cancelled'
-    if (!['pending', 'paid', 'overdue', 'cancelled'].includes(status)) {
+    if (!['draft', 'sent', 'pending', 'paid', 'overdue', 'cancelled'].includes(status)) {
       return res.status(400).json({ error: "Invalid status" });
     }
     await db.execute(sql`
@@ -1357,6 +1357,102 @@ router.patch("/van/invoices/:id/status", requireAuth, requireAdmin, async (req: 
   } catch (err) {
     console.error("invoice status update error:", err);
     return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// POST /van/contracts/:id/invoice  掛け払い請求書を手動発行（管理者）
+router.post("/van/contracts/:id/invoice", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const contractId = parseInt(String(req.params.id));
+    if (!Number.isInteger(contractId)) return res.status(400).json({ error: "Invalid contract id" });
+
+    const contractRows = await db.execute(sql`
+      SELECT id, user_id, status, payment_method, monthly_price, sin_japan_fee, start_date
+      FROM van_contracts
+      WHERE id = ${contractId}
+      LIMIT 1
+    `);
+    const contract = ((contractRows as any)?.rows ?? contractRows)[0];
+    if (!contract) return res.status(404).json({ error: "Contract not found" });
+    if (contract.payment_method !== "invoice") {
+      return res.status(400).json({ error: "この契約は請求書払いではありません" });
+    }
+    if (contract.status !== "active") {
+      return res.status(400).json({ error: "利用中の契約のみ請求書を発行できます" });
+    }
+
+    const jstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    const year = jstNow.getUTCFullYear();
+    const month = jstNow.getUTCMonth();
+    const monthText = String(month + 1).padStart(2, "0");
+    const monthDays = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    const monthStart = `${year}-${monthText}-01`;
+    const monthEnd = `${year}-${monthText}-${String(monthDays).padStart(2, "0")}`;
+    const startDate = contract.start_date ? String(contract.start_date).slice(0, 10) : null;
+    if (!startDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+      return res.status(400).json({ error: "契約開始日が不正なため請求書を発行できません" });
+    }
+    const [startYear, startMonth, startDay] = startDate.split("-").map(Number);
+    const startDateUtc = new Date(Date.UTC(startYear, startMonth - 1, startDay));
+    if (
+      startDateUtc.getUTCFullYear() !== startYear
+      || startDateUtc.getUTCMonth() !== startMonth - 1
+      || startDateUtc.getUTCDate() !== startDay
+    ) {
+      return res.status(400).json({ error: "契約開始日が不正なため請求書を発行できません" });
+    }
+    if (startDate > monthEnd) {
+      return res.status(400).json({ error: "契約開始前の月の請求書は発行できません" });
+    }
+    // 管理画面からの手動発行は、当月分だけに固定する。
+    // 初月は契約開始日から月末までを日割りで請求する。
+    const periodStart = startDate > monthStart ? startDate : monthStart;
+    const periodEnd = monthEnd;
+    const dueDate = monthEnd;
+
+    const invoiceNumber = `INV-${contractId}-${periodStart.slice(0, 7).replace("-", "")}`;
+    const existingRows = await db.execute(sql`
+      SELECT * FROM invoices
+      WHERE contract_id = ${contractId} AND invoice_number = ${invoiceNumber}
+      LIMIT 1
+    `);
+    const existing = ((existingRows as any)?.rows ?? existingRows)[0];
+    if (existing) return res.json({ ok: true, alreadyIssued: true, invoice: existing });
+
+    const preTaxMonthly = Number(contract.monthly_price) + Number(contract.sin_japan_fee ?? 0);
+    const periodStartDate = new Date(`${periodStart}T00:00:00Z`);
+    const days = Math.floor((new Date(`${periodEnd}T00:00:00Z`).getTime() - periodStartDate.getTime()) / 86400000) + 1;
+    const subtotal = Math.round(
+      periodStart === monthStart ? preTaxMonthly : (preTaxMonthly / monthDays) * days,
+    );
+    const tax = Math.round(subtotal * 0.1);
+    const totalAmount = subtotal + tax;
+
+    const createdRows = await db.execute(sql`
+      INSERT INTO invoices (
+        user_id, contract_id, invoice_number, period_start, period_end,
+        subtotal, tax, total_amount, status, due_date, created_at
+      )
+      VALUES (
+        ${contract.user_id}, ${contractId}, ${invoiceNumber}, ${periodStart}, ${periodEnd},
+        ${subtotal}, ${tax}, ${totalAmount}, 'pending', ${dueDate}, NOW()
+      )
+      ON CONFLICT (invoice_number) DO NOTHING
+      RETURNING *
+    `);
+    const created = ((createdRows as any)?.rows ?? createdRows)[0];
+    if (!created) {
+      const concurrentRows = await db.execute(sql`
+        SELECT * FROM invoices
+        WHERE contract_id = ${contractId} AND invoice_number = ${invoiceNumber}
+        LIMIT 1
+      `);
+      return res.json({ ok: true, alreadyIssued: true, invoice: ((concurrentRows as any)?.rows ?? concurrentRows)[0] });
+    }
+    return res.status(201).json({ ok: true, alreadyIssued: false, invoice: created });
+  } catch (err) {
+    console.error("issue contract invoice error:", err);
+    return res.status(500).json({ error: "請求書の発行に失敗しました" });
   }
 });
 

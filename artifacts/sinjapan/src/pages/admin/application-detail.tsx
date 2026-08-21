@@ -389,6 +389,35 @@ export default function AdminApplicationDetail() {
 
   // 請求書ステータス変更
   const [invoiceUpdating, setInvoiceUpdating] = useState<number | null>(null);
+  const [invoiceIssuing, setInvoiceIssuing] = useState(false);
+  const issueInvoice = async () => {
+    const contract = related?.contracts?.find(
+      (c: any) => c.payment_method === 'invoice' && c.status === 'active',
+    );
+    if (!contract?.id) {
+      toast({ variant: 'destructive', title: '請求書を発行できる利用中の掛け払い契約が見つかりません' });
+      return;
+    }
+    if (!confirm('今月分の請求書を発行しますか？')) return;
+    setInvoiceIssuing(true);
+    try {
+      const token = localStorage.getItem('sinjapan_auth_token');
+      const r = await fetch(`${import.meta.env.BASE_URL}api/van/contracts/${contract.id}/invoice`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error ?? '請求書の発行に失敗しました');
+      toast({ title: json.alreadyIssued ? 'この期間の請求書は発行済みです' : `請求書（${json.invoice?.invoice_number ?? ''}）を発行しました` });
+      loadRelated(true);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: e.message || '請求書の発行に失敗しました' });
+    } finally {
+      setInvoiceIssuing(false);
+    }
+  };
+
   const updateInvoiceStatus = async (invoiceId: number, status: string) => {
     setInvoiceUpdating(invoiceId);
     try {
@@ -416,10 +445,19 @@ export default function AdminApplicationDetail() {
       .filter((contract: any) => contract.payment_method === 'invoice')
       .map((contract: any) => Number(contract.id)),
   );
+  const activeInvoicePaymentContractIds = new Set(
+    (related?.contracts ?? [])
+      .filter((contract: any) => contract.payment_method === 'invoice' && contract.status === 'active')
+      .map((contract: any) => Number(contract.id)),
+  );
   const invoicePaymentInvoices = (related?.invoices ?? []).filter((invoice: any) =>
     invoicePaymentContractIds.has(Number(invoice.contract_id)),
   );
+  const activeInvoicePaymentInvoices = invoicePaymentInvoices.filter((invoice: any) =>
+    activeInvoicePaymentContractIds.has(Number(invoice.contract_id)),
+  );
   const hasInvoicePaymentContract = invoicePaymentContractIds.size > 0;
+  const canIssueInvoice = activeInvoicePaymentContractIds.size > 0;
 
   const loadRelated = async (force = false) => {
     if ((!force && related) || relatedLoading) return;
@@ -1424,19 +1462,37 @@ export default function AdminApplicationDetail() {
                   <div className="text-right">
                     <p className="text-xs text-muted-foreground">請求書発行状況</p>
                     <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${
-                      invoicePaymentInvoices.length > 0
+                      activeInvoicePaymentInvoices.length > 0
                         ? 'bg-green-100 text-green-700'
-                        : 'bg-amber-100 text-amber-700'
+                        : canIssueInvoice ? 'bg-amber-100 text-amber-700' : 'bg-muted text-muted-foreground'
                     }`}>
-                      {invoicePaymentInvoices.length > 0 ? `発行済み（${invoicePaymentInvoices.length}件）` : '未発行'}
+                      {!canIssueInvoice
+                        ? '発行対象外'
+                        : activeInvoicePaymentInvoices.length > 0
+                          ? `発行済み（${activeInvoicePaymentInvoices.length}件）`
+                          : '未発行'}
                     </span>
                   </div>
                 </div>
-                {invoicePaymentInvoices.length === 0 && (
-                  <p className="mt-3 pt-3 border-t border-border text-xs text-muted-foreground">
-                    請求書が発行されると、下の請求書発行履歴に追加されます。
+                <div className="mt-3 pt-3 border-t border-border flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    {!canIssueInvoice
+                      ? '利用中の掛け払い契約がないため、新しい請求書は発行できません。'
+                      : activeInvoicePaymentInvoices.length === 0
+                        ? '請求書が発行されると、下の請求書発行履歴に追加されます。'
+                        : '発行後の入金状況は履歴のステータスから変更できます。'}
                   </p>
-                )}
+                  {canIssueInvoice && (
+                    <button
+                      type="button"
+                      onClick={issueInvoice}
+                      disabled={invoiceIssuing}
+                      className="px-3 py-1.5 text-xs rounded-lg bg-foreground text-background hover:opacity-90 disabled:opacity-50"
+                    >
+                      {invoiceIssuing ? '発行中…' : '請求書を発行'}
+                    </button>
+                  )}
+                </div>
               </Section>
             )}
 
@@ -1518,7 +1574,7 @@ export default function AdminApplicationDetail() {
                   <tbody className="divide-y divide-border">
                     {invoicePaymentInvoices.map((inv: any) => {
                       const isUpdating = invoiceUpdating === inv.id;
-                      const STATUS_LABEL: Record<string,string> = { paid: '入金済み', pending: '未払い', overdue: '延滞', cancelled: 'キャンセル' };
+                      const STATUS_LABEL: Record<string,string> = { draft: '下書き', sent: '発行済み', paid: '入金済み', pending: '未払い', overdue: '延滞', cancelled: 'キャンセル' };
                       return (
                       <tr key={inv.id}>
                         <td className="py-2.5 font-mono text-xs">{inv.invoice_number}</td>
