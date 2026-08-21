@@ -21,6 +21,7 @@ const VanContract   = lazy(() => import('@/pages/van-contract'));
 const VanPayment    = lazy(() => import('@/pages/van-payment'));
 const VanPickup     = lazy(() => import('@/pages/van-pickup'));
 const VanHistory    = lazy(() => import('@/pages/van-history'));
+const InvoiceDetail = lazy(() => import('@/pages/invoice-detail'));
 const MyPage        = lazy(() => import('@/pages/mypage'));
 const Settings      = lazy(() => import('@/pages/settings'));
 const Login          = lazy(() => import('@/pages/login'));
@@ -233,6 +234,9 @@ function Router() {
         </Route>
         <Route path="/mypage">
           <UserLayout><MyPage /></UserLayout>
+        </Route>
+        <Route path="/invoices/:id">
+          <UserLayout><InvoiceDetail /></UserLayout>
         </Route>
         <Route path="/settings">
           <UserLayout><Settings /></UserLayout>
