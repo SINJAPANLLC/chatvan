@@ -674,10 +674,9 @@ router.get("/van/applications/stats", requireAuth, requireAdmin, async (_req: Re
     const rows = await db.execute(sql`
       SELECT
         COUNT(*)                                                                      AS total,
-        COUNT(*) FILTER (WHERE status IN (
-          'new','hearing','proposed','application_received','screening',
-          'approved','contracting','payment_pending','delivery_pending'
-        ))                                                                            AS active,
+        COUNT(*) FILTER (
+          WHERE status NOT IN ('active','completed','cancelled','rejected')
+        )                                                                             AS active,
         COUNT(*) FILTER (WHERE status = 'active')                                    AS contract,
         COUNT(*) FILTER (WHERE status = 'return_pending')                            AS return_pending,
         COUNT(*) FILTER (WHERE status IN ('completed','cancelled','rejected'))        AS closed,

@@ -10,6 +10,8 @@ import { format } from 'date-fns';
 const STATUS_STYLES: Record<string, string> = {
   new:                  'bg-gray-100 text-gray-700 border-gray-200',
   hearing:              'bg-orange-50 text-orange-700 border-orange-200',
+  vehicle_search:       'bg-cyan-50 text-cyan-700 border-cyan-200',
+  proposal_ready:       'bg-violet-50 text-violet-700 border-violet-200',
   proposed:             'bg-blue-50 text-blue-700 border-blue-200',
   application_received: 'bg-yellow-50 text-yellow-700 border-yellow-200',
   screening:            'bg-purple-50 text-purple-700 border-purple-200',
@@ -18,6 +20,7 @@ const STATUS_STYLES: Record<string, string> = {
   payment_pending:      'bg-pink-50 text-pink-700 border-pink-200',
   delivery_pending:     'bg-sky-50 text-sky-700 border-sky-200',
   active:               'bg-green-50 text-green-700 border-green-200',
+  payment_issue:        'bg-rose-50 text-rose-700 border-rose-200',
   return_pending:       'bg-amber-50 text-amber-700 border-amber-200',
   completed:            'bg-gray-50 text-gray-500 border-gray-200',
   cancelled:            'bg-red-50 text-red-400 border-red-200',
@@ -27,6 +30,8 @@ const STATUS_STYLES: Record<string, string> = {
 const STATUS_LABEL: Record<string, string> = {
   new:                  '新規',
   hearing:              'ヒアリング中',
+  vehicle_search:       '車両確認中',
+  proposal_ready:       '提案準備完了',
   proposed:             '提案送信済',
   application_received: '申込受付',
   screening:            '審査中',
@@ -35,6 +40,7 @@ const STATUS_LABEL: Record<string, string> = {
   payment_pending:      '決済待ち',
   delivery_pending:     '納車待ち',
   active:               '利用中',
+  payment_issue:        '未払い',
   return_pending:       '返却予定',
   completed:            '契約終了',
   cancelled:            'キャンセル',
@@ -46,7 +52,8 @@ const ALL_STATUSES = Object.keys(STATUS_STYLES);
 export default function AdminApplications() {
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
-  const { data, isLoading } = useListVanApplications();
+  // 一覧・検索が一部の相談だけを対象にしないよう、管理対象をまとめて取得する。
+  const { data, isLoading } = useListVanApplications({ limit: 100 });
   const [, setLocation] = useLocation();
   const [stats, setStats] = useState({ total: 0, active: 0, contract: 0, today: 0 });
 
@@ -203,7 +210,7 @@ export default function AdminApplications() {
             </table>
           </div>
           <div className="px-4 py-2.5 border-t border-border bg-muted/30 text-xs text-muted-foreground">
-            {filtered.length}件 / 全{applications.length}件
+            {filtered.length}件 / 全{data?.total ?? applications.length}件
           </div>
         </div>
       )}
