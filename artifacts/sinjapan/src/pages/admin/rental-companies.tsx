@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Loader2, Plus, Edit, Trash2, Building2, Save, Mail, CheckCircle, XCircle, Car } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Building2, Save, CheckCircle, XCircle, Car } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
@@ -41,11 +41,6 @@ export default function AdminRentalCompanies() {
   const [form, setForm] = useState<any>({ name: '', contactPerson: '', phone: '', email: '', address: '', serviceArea: '', notes: '', fleetSize: '' });
   const [newPassword, setNewPassword] = useState('');
   const [saving, setSaving] = useState(false);
-
-  const [inviteCompany, setInviteCompany] = useState<any | null>(null);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviting, setInviting] = useState(false);
-  const [inviteResult, setInviteResult] = useState<any | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -127,20 +122,6 @@ export default function AdminRentalCompanies() {
     const r = await fetch(`${BASE()}/van/rental-companies/${id}`, { method: 'DELETE', headers: hdrs() });
     if (r.ok) { toast({ title: '削除しました' }); load(); }
     else toast({ variant: 'destructive', title: '削除失敗' });
-  };
-
-  const handleInvite = async () => {
-    if (!inviteCompany) return;
-    setInviting(true);
-    try {
-      const r = await fetch(`${BASE()}/van/rental-companies/${inviteCompany.id}/invite`, {
-        method: 'POST', headers: hdrs(),
-        body: JSON.stringify({ email: inviteEmail || inviteCompany.email }),
-      });
-      const j = await r.json();
-      if (r.ok) { setInviteResult(j); toast({ title: j.message ?? 'アカウントを発行しました' }); }
-      else toast({ variant: 'destructive', title: j.error });
-    } finally { setInviting(false); }
   };
 
   return (
@@ -240,11 +221,6 @@ export default function AdminRentalCompanies() {
                           再開
                         </button>
                       )}
-                      {/* 共通操作 */}
-                      <button onClick={() => { setInviteCompany(c); setInviteEmail(c.email ?? ''); setInviteResult(null); }}
-                        title="アカウント招待" className="px-2 py-1 text-xs text-muted-foreground hover:text-primary rounded">
-                        アカウント招待
-                      </button>
                       <button onClick={() => handleOpenEdit(c)} className="p-1.5 text-muted-foreground hover:text-foreground rounded">
                         <Edit className="h-4 w-4" />
                       </button>
@@ -345,48 +321,6 @@ export default function AdminRentalCompanies() {
         </DialogContent>
       </Dialog>
 
-      {/* 招待ダイアログ */}
-      <Dialog open={!!inviteCompany} onOpenChange={open => { if (!open) { setInviteCompany(null); setInviteResult(null); } }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>協力会社アカウント招待</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <p className="text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">{inviteCompany?.name}</span> にポータルアクセス用アカウントを発行します。
-            </p>
-            {!inviteResult ? (<>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">メールアドレス</label>
-                <input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
-                  placeholder={inviteCompany?.email ?? 'example@company.jp'}
-                  className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:border-foreground/50" />
-              </div>
-              <div className="flex justify-end gap-3">
-                <button onClick={() => setInviteCompany(null)} className="px-4 py-2 border rounded-md text-sm hover:bg-muted">キャンセル</button>
-                <button onClick={handleInvite} disabled={inviting}
-                  className="flex items-center gap-2 px-4 py-2 bg-foreground text-background rounded-md text-sm font-medium disabled:opacity-50">
-                  {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}アカウント発行
-                </button>
-              </div>
-            </>) : (
-              <div className="space-y-3">
-                <div className="p-4 bg-green-50 border border-green-200 rounded-xl space-y-1">
-                  <p className="text-sm font-medium text-green-700">アカウントを発行しました</p>
-                  <p className="text-sm text-green-700">メール: <span className="font-mono font-medium">{inviteResult.email}</span></p>
-                  {inviteResult.tempPassword && (
-                    <p className="text-sm text-green-700">仮パスワード: <span className="font-mono font-medium bg-green-100 px-1 rounded">{inviteResult.tempPassword}</span></p>
-                  )}
-                </div>
-                <div className="flex justify-end">
-                  <button onClick={() => { setInviteCompany(null); setInviteResult(null); }}
-                    className="px-4 py-2 bg-foreground text-background rounded-md text-sm font-medium">閉じる</button>
-                </div>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
