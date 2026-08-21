@@ -2177,14 +2177,77 @@ router.get("/van/applications/:id/related", requireAuth, requireAdmin, async (re
     // 事故・保険・GPS・決済は、この相談に紐づく契約だけを対象にする。
     const [incidents, insurance, gps, payments, invoices] = await Promise.all([
       contractIds.length ? db.execute(sql`
-        SELECT vi.*, vc.id as contract_number,
+        WITH reports AS (
+          -- 現在の事故・故障報告フォームは契約メッセージとして保存される。
+          -- 会話ではなく、定型報告だけを事故・故障データとして取り出す。
+          SELECT
+            'report-message-' || cm.id AS report_key,
+            cm.id,
+            cm.contract_id,
+            CASE
+              WHEN cm.message LIKE '【交通事故】%' THEN 'accident'
+              WHEN cm.message LIKE '【車両故障】%' THEN 'breakdown'
+              WHEN cm.message LIKE '【盗難・不正使用】%' THEN 'theft'
+              ELSE 'other'
+            END AS incident_type,
+            'reported'::text AS status,
+            cm.message AS description,
+            NULL::text AS location,
+            NULL::boolean AS has_injuries,
+            NULL::boolean AS police_contacted,
+            NULL::boolean AS can_drive,
+            cm.created_at
+          FROM contract_messages cm
+          WHERE cm.contract_id = ANY(ARRAY[${sql.raw(contractIds.join(','))}]::int[])
+            AND (
+              cm.message LIKE '【交通事故】%'
+              OR cm.message LIKE '【車両故障】%'
+              OR cm.message LIKE '【盗難・不正使用】%'
+              OR cm.message LIKE '【その他トラブル】%'
+            )
+
+          UNION ALL
+
+          -- 旧形式の事故記録も、契約に紐づく限り表示を継続する。
+          SELECT
+            'van-incident-' || vi.id AS report_key,
+            vi.id,
+            vi.contract_id,
+            vi.incident_type::text AS incident_type,
+            vi.status::text,
+            vi.description,
+            vi.location,
+            vi.has_injuries,
+            vi.police_contacted,
+            vi.can_drive,
+            vi.created_at
+          FROM van_incidents vi
+          WHERE vi.contract_id = ANY(ARRAY[${sql.raw(contractIds.join(','))}]::int[])
+
+          UNION ALL
+
+          -- AI一次受付経由の故障報告も表示する。
+          SELECT
+            'breakdown-' || b.id AS report_key,
+            b.id,
+            b.contract_id,
+            'breakdown'::text AS incident_type,
+            b.status::text,
+            COALESCE(b.user_comment, b.symptom) AS description,
+            b.location,
+            NULL::boolean AS has_injuries,
+            NULL::boolean AS police_contacted,
+            b.can_drive,
+            b.created_at
+          FROM breakdowns b
+          WHERE b.contract_id = ANY(ARRAY[${sql.raw(contractIds.join(','))}]::int[])
+        )
+        SELECT reports.*, vc.id as contract_number,
           v.maker, v.model, v.license_plate
-        FROM van_incidents vi
-        LEFT JOIN van_contracts vc ON vi.contract_id = vc.id
+        FROM reports
+        LEFT JOIN van_contracts vc ON reports.contract_id = vc.id
         LEFT JOIN vehicles v ON vc.vehicle_id = v.id
-        WHERE vi.user_id = ${userId}
-          AND vi.contract_id = ANY(ARRAY[${sql.raw(contractIds.join(','))}]::int[])
-        ORDER BY vi.created_at DESC
+        ORDER BY reports.created_at DESC
       `) : { rows: [] },
       contractIds.length ? db.execute(sql`
         SELECT ip.*, v.maker, v.model, v.license_plate

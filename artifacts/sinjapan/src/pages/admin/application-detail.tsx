@@ -1613,15 +1613,26 @@ export default function AdminApplicationDetail() {
             related?.incidents?.length === 0 ? (
               <div className="bg-card border border-border rounded-xl p-12 text-center text-muted-foreground text-sm">事故・故障の報告はありません</div>
             ) : related?.incidents?.map((inc: any) => (
-              <Section key={inc.id} title={`#${inc.id} ${inc.incident_type === 'accident' ? '🚨 事故' : inc.incident_type === 'breakdown' ? '🔧 故障' : '報告'}`}>
+              <Section key={inc.report_key ?? inc.id} title={`#${inc.id} ${
+                inc.incident_type === 'accident' ? '🚨 交通事故'
+                  : inc.incident_type === 'breakdown' ? '🔧 車両故障'
+                  : inc.incident_type === 'theft' ? '🚨 盗難・不正使用'
+                  : 'トラブル報告'
+              }`}>
                 <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-                  <DL label="ステータス" value={<span className={`px-2 py-0.5 rounded-full text-xs ${inc.status === '解決済み' ? 'bg-green-100 text-green-700' : inc.status === '対応中' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>{inc.status}</span>} />
+                  <DL label="ステータス" value={<span className={`px-2 py-0.5 rounded-full text-xs ${
+                    ['resolved', 'closed', '解決済み'].includes(inc.status) ? 'bg-green-100 text-green-700'
+                      : ['in_progress', '対応中'].includes(inc.status) ? 'bg-yellow-100 text-yellow-700'
+                      : 'bg-red-100 text-red-700'
+                  }`}>{
+                    ({ reported: '報告済み', in_progress: '対応中', resolved: '解決済み', closed: 'クローズ' } as Record<string, string>)[inc.status] ?? inc.status
+                  }</span>} />
                   <DL label="車両" value={`${inc.maker ?? ''} ${inc.model ?? ''} ${inc.license_plate ?? ''}`} />
                   <DL label="現在地" value={inc.location} />
                   <DL label="怪我あり" value={inc.has_injuries != null ? (inc.has_injuries ? 'あり' : 'なし') : null} />
                   <DL label="警察対応" value={inc.police_contacted != null ? (inc.police_contacted ? '済み' : '未') : null} />
                   <DL label="報告日時" value={inc.created_at ? format(new Date(inc.created_at), 'yyyy/MM/dd HH:mm') : null} />
-                  {inc.description && <DL label="状況説明" value={inc.description} span2 />}
+                  {inc.description && <DL label="報告内容" value={<span className="whitespace-pre-line">{inc.description}</span>} span2 />}
                 </dl>
               </Section>
             ))
