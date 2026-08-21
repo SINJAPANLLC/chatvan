@@ -13,10 +13,153 @@ import {
   User, Car, MessageSquare, FileText, CreditCard, ClipboardList,
   Phone, Mail, MapPin, Calendar, Banknote, Shield, BadgeCheck,
   Truck, Wrench, Camera, Package, Plus, X,
-  ScrollText, Wallet, MapPinned, AlertTriangle, ClipboardCheck,
+  ScrollText, Wallet, MapPinned, AlertTriangle, ClipboardCheck, Download,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+
+const formatYen = (value: unknown) => `¥${Number(value ?? 0).toLocaleString('ja-JP')}`;
+
+function createInvoicePdfElement(
+  invoice: any,
+  items: any[],
+  showTotals: boolean,
+  isContinuation: boolean,
+): HTMLDivElement {
+  const create = (tag: string, text?: string, styles: Record<string, string> = {}) => {
+    const node = document.createElement(tag);
+    if (text !== undefined) node.textContent = text;
+    Object.assign(node.style, styles);
+    return node;
+  };
+  const root = create('div', undefined, {
+    position: 'fixed', left: '-100000px', top: '0', width: '794px', boxSizing: 'border-box',
+    padding: '54px', background: '#ffffff', color: '#111827',
+    fontFamily: '"Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif',
+    fontSize: '14px', lineHeight: '1.6',
+  });
+  const header = create('div', undefined, {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+    paddingBottom: '22px', borderBottom: '2px solid #111827',
+  });
+  const left = create('div');
+  left.append(
+    create('div', isContinuation ? '請求書（明細続き）' : '請 求 書', { fontSize: '30px', fontWeight: '700', letterSpacing: '0.12em' }),
+    create('div', 'Chat VAN 運営事務局', { marginTop: '7px', color: '#4b5563', fontSize: '12px' }),
+  );
+  const right = create('div', undefined, { textAlign: 'right', fontSize: '12px', color: '#374151' });
+  right.append(
+    create('div', `請求書番号：${invoice.invoiceNumber ?? '-'}`, { fontWeight: '700', fontSize: '13px', color: '#111827' }),
+    create('div', `発行日：${String(invoice.createdAt ?? '').slice(0, 10).replaceAll('-', '/') || '-'}`, { marginTop: '5px' }),
+    create('div', `支払期限：${String(invoice.dueDate ?? '').replaceAll('-', '/') || '-'}`, { marginTop: '3px' }),
+  );
+  header.append(left, right);
+  root.append(header);
+
+  const period = create('div', undefined, {
+    marginTop: '26px', padding: '16px 18px', background: '#f3f4f6', borderRadius: '6px',
+  });
+  period.append(
+    create('div', '対象期間', { color: '#6b7280', fontSize: '11px', fontWeight: '700' }),
+    create('div', `${invoice.periodStart ?? '-'} 〜 ${invoice.periodEnd ?? '-'}`, { marginTop: '4px', fontSize: '16px', fontWeight: '700' }),
+  );
+  root.append(period);
+
+  const table = create('div', undefined, { marginTop: '28px', borderTop: '1px solid #374151' });
+  const addRow = (description: string, amount: string, isHeader = false) => {
+    const row = create('div', undefined, {
+      display: 'grid', gridTemplateColumns: '1fr 150px', gap: '16px',
+      padding: isHeader ? '10px 12px' : '14px 12px', borderBottom: '1px solid #d1d5db',
+      background: isHeader ? '#f3f4f6' : '#ffffff', fontSize: isHeader ? '12px' : '14px',
+      fontWeight: isHeader ? '700' : '400',
+    });
+    row.append(
+      create('div', description, { color: isHeader ? '#374151' : '#111827' }),
+      create('div', amount, { textAlign: 'right', color: '#111827', fontVariantNumeric: 'tabular-nums' }),
+    );
+    table.append(row);
+  };
+  addRow('内容', '金額', true);
+  if (items.length === 0) addRow('請求明細', formatYen(invoice.subtotal));
+  else items.forEach((item: any) => addRow(
+    String(item.description ?? '請求明細'),
+    item.continuation ? '' : formatYen(item.amount),
+  ));
+  root.append(table);
+
+  if (showTotals) {
+    const totals = create('div', undefined, {
+      marginTop: '24px', marginLeft: 'auto', width: '300px', borderTop: '1px solid #9ca3af',
+    });
+    const addTotal = (label: string, amount: string, strong = false) => {
+      const row = create('div', undefined, {
+        display: 'flex', justifyContent: 'space-between', padding: strong ? '14px 8px 0' : '9px 8px',
+        fontWeight: strong ? '700' : '400', fontSize: strong ? '18px' : '13px',
+        borderTop: strong ? '2px solid #111827' : 'none', marginTop: strong ? '4px' : '0',
+      });
+      row.append(create('span', label), create('span', amount, { fontVariantNumeric: 'tabular-nums' }));
+      totals.append(row);
+    };
+    addTotal('小計', formatYen(invoice.subtotal));
+    addTotal('消費税（10%）', formatYen(invoice.tax));
+    addTotal('合計金額', formatYen(invoice.totalAmount), true);
+    root.append(totals);
+
+    const footer = create('div', undefined, {
+      marginTop: '38px', paddingTop: '16px', borderTop: '1px solid #d1d5db', color: '#4b5563', fontSize: '11px',
+    });
+    footer.append(
+      create('div', 'Chat VAN 運営事務局', { color: '#111827', fontWeight: '700' }),
+      create('div', 'お振込先・ご不明点はサポートまでお問い合わせください', { marginTop: '4px' }),
+    );
+    root.append(footer);
+  }
+  return root;
+}
+
+function createInvoicePdfPages(invoice: any): HTMLDivElement[] {
+  const sourceItems = Array.isArray(invoice.items) && invoice.items.length > 0
+    ? invoice.items
+    : [{ description: '請求明細', amount: invoice.subtotal }];
+  const rows = sourceItems.flatMap((item: any) => {
+    const description = String(item.description ?? '').trim() || '請求明細';
+    const chunks = Array.from(description).reduce<string[]>((result, character, index) => {
+      const chunkIndex = Math.floor(index / 52);
+      result[chunkIndex] = (result[chunkIndex] ?? '') + character;
+      return result;
+    }, []);
+    return chunks.map((chunk, index) => ({
+      description: index === 0 ? chunk : `（続き）${chunk}`,
+      amount: item.amount,
+      continuation: index > 0,
+    }));
+  });
+  const groupedRows: any[][] = [];
+  let currentRows: any[] = [];
+  const maxPageHeight = 1080;
+
+  rows.forEach((row: any) => {
+    const candidateRows = [...currentRows, row];
+    const candidate = createInvoicePdfElement(invoice, candidateRows, true, groupedRows.length > 0);
+    document.body.appendChild(candidate);
+    const fitsOnPage = candidate.getBoundingClientRect().height <= maxPageHeight;
+    candidate.remove();
+    if (!fitsOnPage && currentRows.length > 0) {
+      groupedRows.push(currentRows);
+      currentRows = [row];
+    } else {
+      currentRows = candidateRows;
+    }
+  });
+  if (currentRows.length > 0) groupedRows.push(currentRows);
+
+  return groupedRows.map((pageRows, index) => createInvoicePdfElement(
+    invoice,
+    pageRows,
+    index === groupedRows.length - 1,
+    index > 0,
+  ));
+}
 
 // ─── GPS Map Component ────────────────────────────────────────────────────────
 const GpsMap: React.FC<{ locs: any[] }> = ({ locs }) => {
@@ -390,6 +533,7 @@ export default function AdminApplicationDetail() {
   // 請求書ステータス変更
   const [invoiceUpdating, setInvoiceUpdating] = useState<number | null>(null);
   const [invoiceIssuing, setInvoiceIssuing] = useState(false);
+  const [invoiceDownloading, setInvoiceDownloading] = useState<number | null>(null);
   const issueInvoice = async () => {
     const contract = related?.contracts?.find(
       (c: any) => c.payment_method === 'invoice' && c.status === 'active',
@@ -436,16 +580,52 @@ export default function AdminApplicationDetail() {
     } finally { setInvoiceUpdating(null); }
   };
 
-  const openInvoicePdf = (invoiceId: number) => {
-    const popup = window.open(`${import.meta.env.BASE_URL}invoices/${invoiceId}`, '_blank');
-    if (!popup) {
+  const downloadInvoicePdf = async (invoiceId: number) => {
+    setInvoiceDownloading(invoiceId);
+    let invoicePages: HTMLDivElement[] = [];
+    try {
+      const token = localStorage.getItem('sinjapan_auth_token');
+      if (!token) throw new Error('ログイン情報を確認できませんでした。再度ログインしてください。');
+      const response = await fetch(`${import.meta.env.BASE_URL}api/invoices/${invoiceId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const invoice = await response.json();
+      if (!response.ok) throw new Error(invoice.error ?? '請求書を取得できませんでした');
+
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ]);
+      invoicePages = createInvoicePdfPages(invoice);
+      document.body.append(...invoicePages);
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+      pdf.setProperties({ title: `請求書 ${invoice.invoiceNumber ?? invoiceId}`, subject: 'Chat VAN 請求書' });
+
+      const pageWidth = 210;
+      for (let page = 0; page < invoicePages.length; page += 1) {
+        const rendered = await html2canvas(invoicePages[page], { backgroundColor: '#ffffff', scale: 2 });
+        if (page > 0) pdf.addPage();
+        pdf.addImage(
+          rendered.toDataURL('image/png'),
+          'PNG',
+          0,
+          0,
+          pageWidth,
+          rendered.height * (pageWidth / rendered.width),
+        );
+      }
+      const safeNumber = String(invoice.invoiceNumber ?? `invoice-${invoiceId}`).replace(/[^\w.-]+/g, '_');
+      pdf.save(`${safeNumber}.pdf`);
+      toast({ title: 'PDFをダウンロードしました' });
+    } catch (e: any) {
       toast({
         variant: 'destructive',
-        title: '請求書を開けませんでした',
-        description: 'ポップアップのブロックを解除して、もう一度お試しください。',
+        title: 'PDFを作成できませんでした',
+        description: e.message ?? '時間をおいてもう一度お試しください。',
       });
-    } else {
-      popup.opener = null;
+    } finally {
+      invoicePages.forEach(page => page.remove());
+      setInvoiceDownloading(null);
     }
   };
 
@@ -1620,11 +1800,14 @@ export default function AdminApplicationDetail() {
                         <td className="py-2.5 text-right">
                           <button
                             type="button"
-                            onClick={() => openInvoicePdf(inv.id)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs border border-border rounded-lg hover:bg-muted"
+                            onClick={() => downloadInvoicePdf(inv.id)}
+                            disabled={invoiceDownloading === inv.id}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs border border-border rounded-lg hover:bg-muted disabled:opacity-50"
                           >
-                            <Printer className="h-3 w-3" />
-                            PDF / 印刷
+                            {invoiceDownloading === inv.id
+                              ? <Loader2 className="h-3 w-3 animate-spin" />
+                              : <Download className="h-3 w-3" />}
+                            PDFをダウンロード
                           </button>
                         </td>
                       </tr>

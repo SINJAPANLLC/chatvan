@@ -12,6 +12,8 @@
   "dependencies": {
     "@types/leaflet": "^1.9.22",
     "@workspace/object-storage-web": "workspace:*",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
     "react-markdown": "^10.1.0"
   },

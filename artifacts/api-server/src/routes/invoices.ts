@@ -29,7 +29,7 @@ router.get("/invoices/:id", requireAuth, async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
   const [invoice] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, id)).limit(1);
   if (!invoice) { res.status(404).json({ error: "請求書が見つかりません" }); return; }
-  if (invoice.userId !== req.session.userId && req.session.role !== "admin") {
+  if (invoice.userId !== req.session.userId && req.session.userRole !== "admin") {
     res.status(403).json({ error: "権限がありません" }); return;
   }
 
