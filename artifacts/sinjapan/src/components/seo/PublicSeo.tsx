@@ -55,7 +55,7 @@ export function PublicSeo() {
     if (!settings) return;
     const baseUrl = settings.siteUrl || window.location.origin;
     const canonical = absoluteUrl(location || "/", baseUrl);
-    const image = absoluteUrl(settings.ogImage || "/logo.jpg", baseUrl);
+    const image = absoluteUrl(settings.ogImage || "/og-image.jpg", baseUrl);
     const title = settings.title;
     const description = settings.description;
 
@@ -64,11 +64,15 @@ export function PublicSeo() {
     setMeta("name", "keywords", settings.keywords);
     setMeta("property", "og:title", settings.ogTitle || title);
     setMeta("property", "og:description", settings.ogDescription || description);
+    setMeta("property", "og:site_name", "Chat VAN");
+    setMeta("property", "og:locale", "ja_JP");
     setMeta("property", "og:image", image);
+    setMeta("property", "og:image:alt", "Chat VANのロゴ");
     setMeta("property", "og:url", canonical);
     setMeta("name", "twitter:title", settings.ogTitle || title);
     setMeta("name", "twitter:description", settings.ogDescription || description);
     setMeta("name", "twitter:image", image);
+    setMeta("name", "twitter:image:alt", "Chat VANのロゴ");
 
     let canonicalLink = document.head.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
     if (!canonicalLink) {

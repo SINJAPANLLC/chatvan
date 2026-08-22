@@ -9,12 +9,12 @@ const router: IRouter = Router();
 export const publicSeoRouter: IRouter = Router();
 
 const DEFAULT_SEO = {
-  title: "Chat VAN — 軽バンレンタル相談サービス",
-  description: "チャットで条件を伝えるだけ。あなたに合った軽バンをご提案します。",
-  keywords: "軽バン レンタル, 軽バン 月額, 軽貨物 レンタル",
-  ogTitle: "Chat VAN — 軽バンレンタル相談サービス",
-  ogDescription: "チャットで条件を伝えるだけ。あなたに合った軽バンをご提案します。",
-  ogImage: "",
+  title: "軽バンレンタルをチャットで相談｜Chat VAN",
+  description: "希望エリア・利用期間・用途をチャットで伝えるだけ。Chat VANがあなたに合った軽バンレンタルをご提案します。",
+  keywords: "軽バンレンタル, 軽バン 月額, 軽貨物車両, 車両レンタル, 軽バン 相談",
+  ogTitle: "軽バンレンタルならChat VAN",
+  ogDescription: "希望エリア・利用期間・用途をチャットで伝えるだけ。Chat VANがあなたに合った軽バンをご提案します。",
+  ogImage: "/og-image.jpg",
   gaTag: "",
   gscCode: "",
   robotsTxt: "",

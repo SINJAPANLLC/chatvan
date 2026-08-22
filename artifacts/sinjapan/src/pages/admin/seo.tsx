@@ -17,13 +17,13 @@ function apiFetch(path: string, opts?: RequestInit) {
 type SeoField = { label: string; key: string; type: 'input' | 'textarea'; placeholder: string };
 
 const SEO_FIELDS: SeoField[] = [
-  { label: 'サイトタイトル',        key: 'title',          type: 'input',    placeholder: 'Chat VAN | チャットするだけ。軽バンかりれる。' },
+  { label: 'サイトタイトル',        key: 'title',          type: 'input',    placeholder: '軽バンレンタルをチャットで相談｜Chat VAN' },
   { label: 'サイトURL',             key: 'siteUrl',        type: 'input',    placeholder: 'https://example.com' },
-  { label: 'メタディスクリプション', key: 'description',    type: 'textarea', placeholder: 'チャットで希望条件を伝えるだけ。あなたに合った軽バンをご提案します。月額定額・最短1ヶ月から。' },
-  { label: 'メタキーワード',         key: 'keywords',       type: 'input',    placeholder: '軽バン レンタル, 軽バン 月額, 軽バン サブスク, 軽貨物 レンタル' },
-  { label: 'OGタイトル（SNS表示）', key: 'ogTitle',        type: 'input',    placeholder: 'Chat VAN | チャットするだけ。軽バンかりれる。' },
-  { label: 'OG説明文（SNS表示）',   key: 'ogDescription',  type: 'textarea', placeholder: 'チャットで条件を伝えるだけ。Chat VANが最適な軽バンをご提案します。' },
-  { label: 'OG画像URL',            key: 'ogImage',        type: 'input',    placeholder: 'https://example.com/og-image.png' },
+  { label: 'メタディスクリプション', key: 'description',    type: 'textarea', placeholder: '希望エリア・利用期間・用途をチャットで伝えるだけ。Chat VANがあなたに合った軽バンレンタルをご提案します。' },
+  { label: 'メタキーワード',         key: 'keywords',       type: 'input',    placeholder: '軽バンレンタル, 軽バン 月額, 軽貨物車両, 車両レンタル, 軽バン 相談' },
+  { label: 'OGタイトル（SNS表示）', key: 'ogTitle',        type: 'input',    placeholder: '軽バンレンタルならChat VAN' },
+  { label: 'OG説明文（SNS表示）',   key: 'ogDescription',  type: 'textarea', placeholder: '希望エリア・利用期間・用途をチャットで伝えるだけ。Chat VANがあなたに合った軽バンをご提案します。' },
+  { label: 'OG画像URL',            key: 'ogImage',        type: 'input',    placeholder: 'https://example.com/og-image.jpg' },
   { label: 'Google Analyticsタグ', key: 'gaTag',          type: 'input',    placeholder: 'G-XXXXXXXXXX' },
   { label: 'Googleサーチコンソール確認コード', key: 'gscCode', type: 'input', placeholder: 'google-site-verification=...' },
   { label: 'robots.txt 内容',      key: 'robotsTxt',      type: 'textarea', placeholder: 'User-agent: *\nAllow: /' },
