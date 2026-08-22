@@ -268,7 +268,7 @@ function PromptEditor({
           <Button
             size="sm"
             onClick={handleSave}
-            disabled={saving || !isDirty}
+            disabled={saving || !isDirty || !value.trim()}
             className="bg-black text-white hover:bg-black/90 gap-1 text-xs"
           >
             {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
@@ -297,6 +297,7 @@ function PromptEditor({
         <textarea
           value={value}
           onChange={e => setValue(e.target.value)}
+          maxLength={20000}
           className="w-full min-h-[200px] px-5 py-4 text-sm font-mono leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-inset focus:ring-foreground/20 bg-card transition-shadow"
           placeholder="プロンプトを入力..."
           spellCheck={false}
@@ -338,7 +339,7 @@ export default function AdminPrompts() {
           <Bot className="h-6 w-6" />AIプロンプト設定
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          アプリ内でAIが使用するプロンプトを編集できます。変更はリアルタイムで反映されます。
+          アプリ内でAIが使用するプロンプトを編集できます。保存後、次回のAI処理から反映されます。
         </p>
       </div>
 

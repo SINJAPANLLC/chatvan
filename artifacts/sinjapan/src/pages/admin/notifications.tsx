@@ -13,7 +13,7 @@ import { format } from 'date-fns';
 
 function apiFetch(path: string, opts?: RequestInit) {
   const token = localStorage.getItem('sinjapan_auth_token');
-  return fetch(path, {
+  return fetch(`${import.meta.env.BASE_URL}api${path}`, {
     ...opts,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...opts?.headers },
   }).then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); });
@@ -80,7 +80,7 @@ function SendForm({ onSent }: { onSent: () => void }) {
       const payload = target === 'all'
         ? { sendAll: true, subject, body }
         : { userIds: [...selectedIds], subject, body };
-      const res = await apiFetch('/api/admin/notifications/send', { method: 'POST', body: JSON.stringify(payload) });
+      const res = await apiFetch('/admin/notifications/send', { method: 'POST', body: JSON.stringify(payload) });
       setResult(res);
       toast({ title: res.message });
       onSent();
@@ -183,11 +183,9 @@ function SendForm({ onSent }: { onSent: () => void }) {
         {result && (
           <div className="rounded-lg bg-muted/30 border border-border p-3 text-sm">
             <p className="font-medium text-green-700">{result.message}</p>
-            {result.results?.some((r: any) => !r.sent) && (
-              <p className="text-xs text-muted-foreground mt-1">
-                ※ SMTP未設定のためメール送信はスキップされました。システム内通知は作成済みです。
-              </p>
-            )}
+            {result.results?.some((r: any) => !r.sent) && <p className="text-xs text-muted-foreground mt-1">
+              送信できなかった対象は「送信履歴」から理由を確認し、再送できます。
+            </p>}
           </div>
         )}
       </div>
@@ -199,26 +197,60 @@ function SendForm({ onSent }: { onSent: () => void }) {
 function SendHistory() {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [query, setQuery] = useState('');
+  const [resending, setResending] = useState<number | null>(null);
+  const { toast } = useToast();
+  const limit = 20;
 
   useEffect(() => {
-    const token = localStorage.getItem('sinjapan_auth_token');
     setLoading(true);
-    fetch('/api/admin/notifications', { headers: { Authorization: `Bearer ${token}` } })
-      .then(async r => { if (!r.ok) return; const text = await r.text(); if (text) setLogs(JSON.parse(text)); })
+    apiFetch(`/admin/notifications?limit=${limit}&offset=${offset}&q=${encodeURIComponent(query)}`)
+      .then(data => {
+        setLogs(data.notifications ?? []);
+        setTotal(data.total ?? 0);
+      })
+      .catch(() => {
+        setLogs([]);
+        setTotal(0);
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [offset, query]);
 
-  const grouped = logs.reduce((acc: Record<string, any[]>, item) => {
-    const key = `${item.title}__${item.createdAt?.slice(0, 10)}`;
-    (acc[key] = acc[key] ?? []).push(item);
-    return acc;
-  }, {});
+  const resend = async (id: number) => {
+    setResending(id);
+    try {
+      const result = await apiFetch(`/admin/notifications/${id}/resend`, { method: 'POST' });
+      toast({ title: result.sent ? 'メールを再送しました' : 'メールを再送できませんでした', description: result.reason });
+      const data = await apiFetch(`/admin/notifications?limit=${limit}&offset=${offset}&q=${encodeURIComponent(query)}`);
+      setLogs(data.notifications ?? []);
+      setTotal(data.total ?? 0);
+    } catch (error: any) {
+      toast({ title: '再送に失敗しました', description: error.message, variant: 'destructive' });
+    } finally {
+      setResending(null);
+    }
+  };
+
+  const statusLabel = (status?: string) => {
+    if (status === 'sent') return <span className="text-green-700">送信済み</span>;
+    if (status === 'skipped') return <span className="text-amber-700">SMTP未設定</span>;
+    if (status === 'failed') return <span className="text-destructive">失敗</span>;
+    if (status === 'sending') return <span className="text-muted-foreground">送信中</span>;
+    return <span className="text-muted-foreground">システム内通知のみ</span>;
+  };
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row gap-3 justify-between">
+        <Input value={query} onChange={e => { setQuery(e.target.value); setOffset(0); }}
+          placeholder="件名・本文・送信先で検索..." className="max-w-md" />
+        <p className="text-sm text-muted-foreground">{total}件の送信履歴</p>
+      </div>
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-      ) : Object.keys(grouped).length === 0 ? (
+      ) : logs.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground text-sm">送信履歴はありません</div>
       ) : (
         <div className="rounded-xl border border-border shadow-sm overflow-x-auto">
@@ -228,36 +260,45 @@ function SendHistory() {
                 <th className="px-5 py-3 text-left font-medium text-muted-foreground">件名</th>
                 <th className="px-5 py-3 text-left font-medium text-muted-foreground">送信先</th>
                 <th className="px-5 py-3 text-left font-medium text-muted-foreground">本文</th>
-                <th className="px-5 py-3 text-right font-medium text-muted-foreground">送信数</th>
-                <th className="px-5 py-3 text-left font-medium text-muted-foreground">既読</th>
+                <th className="px-5 py-3 text-left font-medium text-muted-foreground">メール結果</th>
                 <th className="px-5 py-3 text-left font-medium text-muted-foreground">送信日時</th>
+                <th className="px-5 py-3 text-right font-medium text-muted-foreground">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border bg-card">
-              {(Object.entries(grouped) as [string, any[]][]).map(([key, items]) => {
-                const first = items[0];
-                const readCount = items.filter((i: any) => i.readStatus).length;
-                const recipients = items.map((i: any) => i.companyName || i.userName).filter(Boolean).join('、');
+              {logs.map((item: any) => {
                 return (
-                  <tr key={key} className="hover:bg-muted/20 transition-colors align-top">
-                    <td className="px-5 py-3.5 font-medium max-w-[200px]"><div className="truncate">{first.title}</div></td>
-                    <td className="px-5 py-3.5 text-xs text-muted-foreground max-w-[160px]"><div className="line-clamp-2">{recipients || '—'}</div></td>
-                    <td className="px-5 py-3.5 text-xs text-muted-foreground max-w-[240px]"><div className="line-clamp-2 whitespace-pre-wrap">{first.message}</div></td>
-                    <td className="px-5 py-3.5 text-right font-medium">{items.length}名</td>
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-1.5">
-                        <CheckCheck className={`h-4 w-4 ${readCount === items.length ? 'text-green-600' : 'text-muted-foreground'}`} />
-                        <span className="text-xs text-muted-foreground">{readCount}/{items.length}</span>
-                      </div>
+                  <tr key={item.id} className="hover:bg-muted/20 transition-colors align-top">
+                    <td className="px-5 py-3.5 font-medium max-w-[200px]"><div className="truncate">{item.title}</div></td>
+                    <td className="px-5 py-3.5 text-xs text-muted-foreground max-w-[160px]"><div className="line-clamp-2">{item.companyName || item.userName || item.userEmail || '—'}</div></td>
+                    <td className="px-5 py-3.5 text-xs text-muted-foreground max-w-[240px]"><div className="line-clamp-2 whitespace-pre-wrap">{item.message}</div></td>
+                    <td className="px-5 py-3.5 text-xs">
+                      <div className="font-medium">{statusLabel(item.emailStatus)}</div>
+                      {item.emailError && <div className="mt-1 max-w-44 text-muted-foreground line-clamp-2">{item.emailError}</div>}
+                      {item.emailAttemptCount > 1 && <div className="mt-1 text-muted-foreground">再送 {item.emailAttemptCount - 1}回</div>}
                     </td>
                     <td className="px-5 py-3.5 text-xs text-muted-foreground whitespace-nowrap">
-                      {first.createdAt ? format(new Date(first.createdAt), 'yyyy/MM/dd HH:mm') : '—'}
+                      {item.createdAt ? format(new Date(item.createdAt), 'yyyy/MM/dd HH:mm') : '—'}
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      {item.emailStatus !== 'sent' && item.emailStatus !== 'not_requested' && (
+                        <Button variant="outline" size="sm" onClick={() => resend(item.id)} disabled={resending === item.id}>
+                          {resending === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '再送'}
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+        </div>
+      )}
+      {total > limit && (
+        <div className="flex justify-end items-center gap-3 text-sm">
+          <Button variant="outline" size="sm" disabled={offset === 0 || loading} onClick={() => setOffset(v => Math.max(0, v - limit))}>前へ</Button>
+          <span className="text-muted-foreground">{Math.floor(offset / limit) + 1} / {Math.ceil(total / limit)}</span>
+          <Button variant="outline" size="sm" disabled={offset + limit >= total || loading} onClick={() => setOffset(v => v + limit)}>次へ</Button>
         </div>
       )}
     </div>
@@ -523,10 +564,11 @@ function MaintenanceForm({ onSent }: { onSent: () => void }) {
   const handleSend = async () => {
     if (!startDatetime) { toast({ variant: 'destructive', title: 'メンテナンス開始日時を入力してください' }); return; }
     if (!endDatetime)   { toast({ variant: 'destructive', title: 'メンテナンス終了日時を入力してください' }); return; }
+    if (new Date(endDatetime) <= new Date(startDatetime)) { toast({ variant: 'destructive', title: '終了日時は開始日時より後にしてください' }); return; }
     if (!detail.trim()) { toast({ variant: 'destructive', title: '詳細説明を入力してください' }); return; }
     setSending(true);
     try {
-      const res = await apiFetch('/api/admin/notifications/send', {
+      const res = await apiFetch('/admin/notifications/send', {
         method: 'POST',
         body: JSON.stringify({ sendAll: true, subject: autoSubject, body: autoBody }),
       });

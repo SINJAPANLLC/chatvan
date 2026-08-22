@@ -3,6 +3,7 @@ import cors from "cors";
 import session from "express-session";
 import pinoHttp from "pino-http";
 import router from "./routes";
+import { publicSeoRouter } from "./routes/seo";
 import { logger } from "./lib/logger";
 import { pool } from "@workspace/db";
 
@@ -63,6 +64,8 @@ app.use(
   })
 );
 
+// 検索エンジンが要求する標準URLでも動的なサイトマップとrobotsを返す。
+app.use("/", publicSeoRouter);
 app.use("/api", router);
 
 export default app;

@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { MessageSquare, Mail, Clock, CheckCheck, Loader2, ChevronDown, ChevronUp, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
 function apiFetch(path: string, opts?: RequestInit) {
   const token = localStorage.getItem('sinjapan_auth_token');
-  return fetch(path, {
+  return fetch(`${import.meta.env.BASE_URL}api${path}`, {
     ...opts,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...opts?.headers },
   }).then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); });
@@ -21,6 +22,13 @@ type Inquiry = {
   message: string;
   replied: boolean;
   createdAt: string;
+  replyBody?: string | null;
+  repliedAt?: string | null;
+  replyEmailStatus?: string;
+  replyEmailError?: string | null;
+  replyEmailSentAt?: string | null;
+  adminNotifyStatus?: string;
+  adminNotifyError?: string | null;
 };
 
 export default function AdminContacts() {
@@ -30,23 +38,35 @@ export default function AdminContacts() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [replyBodies, setReplyBodies] = useState<Record<number, string>>({});
   const [replying, setReplying] = useState<number | null>(null);
+  const [resending, setResending] = useState<number | null>(null);
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState<'all' | 'unreplied' | 'replied'>('all');
+  const [offset, setOffset] = useState(0);
+  const [total, setTotal] = useState(0);
+  const limit = 20;
 
-  const load = () => {
+  const load = React.useCallback(() => {
     setLoading(true);
-    apiFetch('/api/admin/contacts')
-      .then(d => setInquiries(d.contacts ?? []))
-      .catch(() => setInquiries([]))
+    apiFetch(`/admin/contacts?limit=${limit}&offset=${offset}&status=${status === 'all' ? '' : status}&q=${encodeURIComponent(query)}`)
+      .then(d => {
+        setInquiries(d.contacts ?? []);
+        setTotal(d.total ?? 0);
+      })
+      .catch(() => {
+        setInquiries([]);
+        setTotal(0);
+      })
       .finally(() => setLoading(false));
-  };
+  }, [offset, query, status]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const handleReply = async (inquiry: Inquiry) => {
     const body = replyBodies[inquiry.id];
     if (!body?.trim()) { toast({ title: '返信内容を入力してください', variant: 'destructive' }); return; }
     setReplying(inquiry.id);
     try {
-      await apiFetch(`/api/admin/contacts/${inquiry.id}/reply`, {
+      await apiFetch(`/admin/contacts/${inquiry.id}/reply`, {
         method: 'POST',
         body: JSON.stringify({ body }),
       });
@@ -60,8 +80,24 @@ export default function AdminContacts() {
     }
   };
 
-  const unreplied = inquiries.filter(i => !i.replied);
-  const replied = inquiries.filter(i => i.replied);
+  const handleResend = async (inquiry: Inquiry) => {
+    setResending(inquiry.id);
+    try {
+      const updated = await apiFetch(`/admin/contacts/${inquiry.id}/reply/resend`, { method: 'POST' });
+      toast({
+        title: updated.replyEmailStatus === 'sent' ? '返信メールを再送しました' : '返信メールを再送できませんでした',
+        description: updated.replyEmailError ?? undefined,
+        variant: updated.replyEmailStatus === 'sent' ? 'default' : 'destructive',
+      });
+      load();
+    } catch (error: any) {
+      toast({ title: '再送に失敗しました', description: error.message, variant: 'destructive' });
+    } finally {
+      setResending(null);
+    }
+  };
+
+  const unrepliedCount = inquiries.filter(i => !i.replied).length;
 
   if (loading) return (
     <div className="flex items-center justify-center h-48">
@@ -124,9 +160,25 @@ export default function AdminContacts() {
               </div>
             )}
             {inquiry.replied && (
-              <p className="text-xs text-green-600 flex items-center gap-1">
-                <CheckCheck className="h-3.5 w-3.5" />返信済み
-              </p>
+              <div className="space-y-3">
+                <div className="rounded-lg border border-border bg-background p-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">送信した返信{inquiry.repliedAt ? ` · ${format(new Date(inquiry.repliedAt), 'yyyy/MM/dd HH:mm')}` : ''}</p>
+                  <p className="text-sm whitespace-pre-wrap">{inquiry.replyBody || '返信本文は記録されていません'}</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  {inquiry.replyEmailStatus === 'sent' ? (
+                    <span className="text-green-700 flex items-center gap-1"><CheckCheck className="h-3.5 w-3.5" />メール送信済み</span>
+                  ) : (
+                    <>
+                      <span className="text-destructive">メール {inquiry.replyEmailStatus === 'skipped' ? 'SMTP未設定' : '送信失敗'}</span>
+                      {inquiry.replyEmailError && <span className="text-muted-foreground">{inquiry.replyEmailError}</span>}
+                      <Button variant="outline" size="sm" className="h-7 text-xs" disabled={resending === inquiry.id} onClick={() => handleResend(inquiry)}>
+                        {resending === inquiry.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'メールを再送'}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -142,8 +194,19 @@ export default function AdminContacts() {
           <p className="text-muted-foreground mt-1 text-sm">ユーザーからのお問い合わせを確認・返信します。</p>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <span className="text-orange-500 font-medium">{unreplied.length} 件未返信</span>
-          <span>/ 全 {inquiries.length} 件</span>
+          <span className="text-orange-500 font-medium">表示中 {unrepliedCount} 件未返信</span>
+          <span>/ 全 {total} 件</span>
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3 justify-between">
+        <Input value={query} onChange={e => { setQuery(e.target.value); setOffset(0); }}
+          placeholder="氏名・メール・件名・内容で検索..." className="max-w-md" />
+        <div className="flex gap-1">
+          {([{ key: 'all', label: 'すべて' }, { key: 'unreplied', label: '未返信' }, { key: 'replied', label: '返信済み' }] as const).map(item => (
+            <Button key={item.key} size="sm" variant={status === item.key ? 'default' : 'outline'}
+              onClick={() => { setStatus(item.key); setOffset(0); }}>{item.label}</Button>
+          ))}
         </div>
       </div>
 
@@ -154,22 +217,14 @@ export default function AdminContacts() {
         </div>
       ) : (
         <div className="space-y-6">
-          {unreplied.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-semibold text-orange-600 flex items-center gap-1.5">
-                <Mail className="h-4 w-4" />未返信 ({unreplied.length})
-              </h2>
-              {unreplied.map(i => <InquiryCard key={i.id} inquiry={i} />)}
-            </div>
-          )}
-          {replied.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">
-                <CheckCheck className="h-4 w-4" />返信済み ({replied.length})
-              </h2>
-              {replied.map(i => <InquiryCard key={i.id} inquiry={i} />)}
-            </div>
-          )}
+          {inquiries.map(i => <InquiryCard key={i.id} inquiry={i} />)}
+        </div>
+      )}
+      {total > limit && (
+        <div className="flex items-center justify-end gap-3">
+          <Button variant="outline" size="sm" disabled={offset === 0 || loading} onClick={() => setOffset(v => Math.max(0, v - limit))}>前へ</Button>
+          <span className="text-xs text-muted-foreground">{Math.floor(offset / limit) + 1} / {Math.ceil(total / limit)}</span>
+          <Button variant="outline" size="sm" disabled={offset + limit >= total || loading} onClick={() => setOffset(v => v + limit)}>次へ</Button>
         </div>
       )}
     </div>

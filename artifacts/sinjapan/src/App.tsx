@@ -11,6 +11,7 @@ setAuthTokenGetter(() => localStorage.getItem('sinjapan_auth_token'));
 import { UserLayout } from '@/components/layout/UserLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { CompanyLayout } from '@/components/layout/CompanyLayout';
+import { PublicSeo } from '@/components/seo/PublicSeo';
 
 // User Pages
 const Home          = lazy(() => import('@/pages/home'));
@@ -268,6 +269,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+          <PublicSeo />
           <Router />
         </WouterRouter>
         <Toaster />

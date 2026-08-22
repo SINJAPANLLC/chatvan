@@ -14,6 +14,10 @@ export const notificationsTable = pgTable("notifications", {
   title: text("title").notNull(),
   message: text("message").notNull(),
   readStatus: boolean("read_status").notNull().default(false),
+  emailStatus: text("email_status").notNull().default("not_requested"),
+  emailError: text("email_error"),
+  emailSentAt: timestamp("email_sent_at"),
+  emailAttemptCount: integer("email_attempt_count").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

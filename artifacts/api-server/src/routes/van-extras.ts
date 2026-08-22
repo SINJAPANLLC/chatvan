@@ -6,6 +6,7 @@ import { db, notificationsTable, usersTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { notifyAdmins } from "../lib/notifyHelpers";
+import { logAdminAudit } from "../lib/auditLogger";
 
 const router: IRouter = Router();
 
@@ -52,27 +53,25 @@ router.get("/van/screenings", requireAuth, requireAdmin, async (req: Request, re
 // ── 監査ログ (audit_logs) ─────────────────────────────────────────────────
 router.get("/van/audit-logs", requireAuth, requireAdmin, async (req: Request, res: Response) => {
   try {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
+    const offset = Math.max(Number(req.query.offset) || 0, 0);
+    const query = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 100) : "";
+    const where = query
+      ? sql`WHERE al.action ILIKE ${`%${query}%`}
+          OR al.target_type ILIKE ${`%${query}%`}
+          OR al.actor_name ILIKE ${`%${query}%`}`
+      : sql``;
     const raw = await db.execute(sql`
       SELECT al.*, u.name as actor_name
       FROM audit_logs al
       LEFT JOIN users u ON al.actor_id = u.id
-      ORDER BY al.created_at DESC LIMIT 200
+      ${where}
+      ORDER BY al.created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
     `);
-    return res.json(toRows(raw));
-  } catch (err) {
-    return res.status(500).json({ error: "Internal error" });
-  }
-});
-
-router.post("/van/audit-logs", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const actorId: number | undefined = (req.session as any)?.userId;
-    const b = req.body;
-    await db.execute(sql`
-      INSERT INTO audit_logs (actor_id, actor_type, action, target_type, target_id, after_data, ip_address, user_agent)
-      VALUES (${actorId}, ${b.actor_type ?? 'admin'}, ${b.action}, ${b.target_type}, ${b.target_id}, ${b.after_data ? JSON.stringify(b.after_data) : null}, ${req.ip}, ${req.headers['user-agent']})
-    `);
-    return res.status(201).json({ ok: true });
+    const totalRaw = await db.execute(sql`SELECT COUNT(*)::int AS total FROM audit_logs al ${where}`);
+    const total = Number((toRow(totalRaw) as any)?.total ?? 0);
+    return res.json({ logs: toRows(raw), total, limit, offset });
   } catch (err) {
     return res.status(500).json({ error: "Internal error" });
   }

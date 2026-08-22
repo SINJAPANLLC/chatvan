@@ -1,8 +1,9 @@
 import { Router, type IRouter } from "express";
 import { db, notificationsTable, usersTable } from "@workspace/db";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, ne, desc, inArray, count, ilike, or, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { sendEmail, buildEmailHtml } from "../lib/email";
+import { logAdminAudit } from "../lib/auditLogger";
 
 const router: IRouter = Router();
 
@@ -15,6 +16,55 @@ function formatNotification(n: any) {
     ...n,
     createdAt: n.createdAt instanceof Date ? n.createdAt.toISOString() : n.createdAt,
   };
+}
+
+type DeliveryResult = {
+  notificationId: number;
+  userId: number;
+  email: string;
+  sent: boolean;
+  status: "sent" | "failed" | "skipped";
+  reason?: string;
+};
+
+function deliveryStatus(result: { sent: boolean; reason?: string }): DeliveryResult["status"] {
+  if (result.sent) return "sent";
+  return result.reason?.includes("SMTP未設定") ? "skipped" : "failed";
+}
+
+async function deliverAdminNotification(input: {
+  userId: number;
+  email: string;
+  name?: string | null;
+  title: string;
+  message: string;
+  shipmentId?: number | null;
+}): Promise<DeliveryResult> {
+  const [notification] = await db.insert(notificationsTable).values({
+    userId: input.userId,
+    shipmentId: input.shipmentId ?? null,
+    title: input.title,
+    message: input.message,
+    readStatus: false,
+    emailStatus: "sending",
+    emailAttemptCount: 1,
+  }).returning();
+
+  try {
+    const result = await sendEmail(input.email, input.title, buildEmailHtml(input.title, input.message, input.name ?? undefined));
+    const status = deliveryStatus(result);
+    await db.update(notificationsTable).set({
+      emailStatus: status,
+      emailError: result.sent ? null : result.reason ?? "メール送信に失敗しました",
+      emailSentAt: result.sent ? new Date() : null,
+    }).where(eq(notificationsTable.id, notification.id));
+    return { notificationId: notification.id, userId: input.userId, email: input.email, status, ...result };
+  } catch (error: any) {
+    const reason = error?.message ?? "メール送信に失敗しました";
+    await db.update(notificationsTable).set({ emailStatus: "failed", emailError: reason })
+      .where(eq(notificationsTable.id, notification.id));
+    return { notificationId: notification.id, userId: input.userId, email: input.email, sent: false, status: "failed", reason };
+  }
 }
 
 // ── ユーザー向け ──────────────────────────────────────────────────────────────
@@ -45,7 +95,19 @@ router.patch("/notifications/:id/read", requireAuth, async (req, res): Promise<v
 // ── 管理者向け ────────────────────────────────────────────────────────────────
 
 // GET /admin/notifications — 送信済み通知の履歴
-router.get("/admin/notifications", requireAdmin, async (_req, res): Promise<void> => {
+router.get("/admin/notifications", requireAdmin, async (req, res): Promise<void> => {
+  const limit = Math.min(Math.max(Number(req.query.limit) || 30, 1), 100);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+  const query = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 100) : "";
+  const filter = query
+    ? or(
+      ilike(notificationsTable.title, `%${query}%`),
+      ilike(notificationsTable.message, `%${query}%`),
+      ilike(usersTable.name, `%${query}%`),
+      ilike(usersTable.email, `%${query}%`),
+      ilike(usersTable.companyName, `%${query}%`),
+    )
+    : undefined;
   const rows = await db.select({
     id:         notificationsTable.id,
     title:      notificationsTable.title,
@@ -55,14 +117,32 @@ router.get("/admin/notifications", requireAdmin, async (_req, res): Promise<void
     userName:   usersTable.name,
     userEmail:  usersTable.email,
     companyName:usersTable.companyName,
+    emailStatus: notificationsTable.emailStatus,
+    emailError: notificationsTable.emailError,
+    emailSentAt: notificationsTable.emailSentAt,
+    emailAttemptCount: notificationsTable.emailAttemptCount,
   }).from(notificationsTable)
     .leftJoin(usersTable, eq(notificationsTable.userId, usersTable.id))
-    .orderBy(desc(notificationsTable.createdAt));
+    .where(filter)
+    .orderBy(desc(notificationsTable.createdAt))
+    .limit(limit)
+    .offset(offset);
 
-  res.json(rows.map(r => ({
-    ...r,
-    createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
-  })));
+  const [totalRow] = await db.select({ total: count() })
+    .from(notificationsTable)
+    .leftJoin(usersTable, eq(notificationsTable.userId, usersTable.id))
+    .where(filter);
+
+  res.json({
+    notifications: rows.map(r => ({
+      ...r,
+      createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+      emailSentAt: r.emailSentAt instanceof Date ? r.emailSentAt.toISOString() : r.emailSentAt,
+    })),
+    total: Number(totalRow?.total ?? 0),
+    limit,
+    offset,
+  });
 });
 
 // POST /admin/shipments/:id/notify-price-approval — 値引き承認通知
@@ -97,24 +177,20 @@ router.post("/admin/shipments/:id/notify-price-approval", requireAdmin, async (r
   const body = customMsg || `案件 #${shipmentId} の配送料金を ${priceLabel}（税別）にてご対応できることになりました。ご確認のうえ、ご依頼をお進めください。`;
 
   // DB通知レコード
-  const [notif] = await db.insert(notificationsTable).values({
-    userId: shipment.userId,
-    shipmentId,
-    title,
-    message: body,
-    readStatus: false,
-  }).returning();
-
-  // メール送信
   const [user] = await db.select({ name: usersTable.name, email: usersTable.email })
     .from(usersTable).where(eq(usersTable.id, shipment.userId));
 
-  if (user) {
-    const html = buildEmailHtml(title, body, user.name ?? undefined);
-    await sendEmail(user.email, title, html);
-  }
-
-  res.json({ ok: true, notificationId: notif.id });
+  if (!user) { res.status(404).json({ error: "送信先ユーザーが見つかりません" }); return; }
+  const result = await deliverAdminNotification({
+    userId: shipment.userId, email: user.email, name: user.name, title, message: body, shipmentId,
+  });
+  await logAdminAudit(req, {
+    action: "send",
+    targetType: "shipment_price_notification",
+    targetId: shipmentId,
+    afterData: { notificationId: result.notificationId, emailStatus: result.status, sent: result.sent },
+  });
+  res.json({ ok: true, notificationId: result.notificationId, result });
 });
 
 // POST /admin/notifications/send — 通知メール送信
@@ -122,8 +198,12 @@ router.post("/admin/shipments/:id/notify-price-approval", requireAdmin, async (r
 router.post("/admin/notifications/send", requireAdmin, async (req, res): Promise<void> => {
   const { userIds, sendAll, subject, body } = req.body;
 
-  if (!subject || !body) {
+  if (typeof subject !== "string" || typeof body !== "string" || !subject.trim() || !body.trim()) {
     res.status(400).json({ error: "件名と本文を入力してください" });
+    return;
+  }
+  if (subject.length > 200 || body.length > 5_000) {
+    res.status(400).json({ error: "件名は200文字、本文は5,000文字以内にしてください" });
     return;
   }
 
@@ -134,7 +214,7 @@ router.post("/admin/notifications/send", requireAdmin, async (req, res): Promise
       .from(usersTable).where(eq(usersTable.role, "user"));
   } else if (Array.isArray(userIds) && userIds.length > 0) {
     users = await db.select({ id: usersTable.id, name: usersTable.name, email: usersTable.email })
-      .from(usersTable).where(inArray(usersTable.id, userIds.map(Number)));
+      .from(usersTable).where(inArray(usersTable.id, [...new Set(userIds.map(Number).filter(Number.isInteger))]));
   } else {
     res.status(400).json({ error: "送信対象を指定してください" });
     return;
@@ -145,29 +225,89 @@ router.post("/admin/notifications/send", requireAdmin, async (req, res): Promise
     return;
   }
 
-  const results: { userId: number; email: string; sent: boolean; reason?: string }[] = [];
+  const results: DeliveryResult[] = [];
 
   for (const user of users) {
-    // DB通知レコード保存
-    await db.insert(notificationsTable).values({
-      userId:    user.id,
-      shipmentId: null as any,
-      title:     subject,
-      message:   body,
-      readStatus: false,
-    });
-
-    // メール送信
-    const html = buildEmailHtml(subject, body, user.name ?? undefined);
-    const result = await sendEmail(user.email, subject, html);
-    results.push({ userId: user.id, email: user.email, ...result });
+    try {
+      results.push(await deliverAdminNotification({
+        userId: user.id, email: user.email, name: user.name, title: subject.trim(), message: body.trim(),
+      }));
+    } catch (error: any) {
+      results.push({
+        notificationId: 0, userId: user.id, email: user.email, sent: false, status: "failed",
+        reason: error?.message ?? "通知の保存に失敗しました",
+      });
+    }
   }
 
   const sentCount = results.filter(r => r.sent).length;
+  await logAdminAudit(req, {
+    action: "send",
+    targetType: "notification",
+    targetId: "bulk",
+    afterData: {
+      recipients: users.length,
+      sent: sentCount,
+      failed: results.filter(r => r.status === "failed").length,
+      skipped: results.filter(r => r.status === "skipped").length,
+    },
+  });
   res.json({
     message: `${users.length}件に通知を作成、${sentCount}件のメール送信成功`,
     results,
   });
+});
+
+// POST /admin/notifications/:id/resend — 失敗・未送信のメールだけを再送
+router.post("/admin/notifications/:id/resend", requireAdmin, async (req, res): Promise<void> => {
+  const id = parseId(req.params.id);
+  if (!Number.isInteger(id)) { res.status(400).json({ error: "無効なIDです" }); return; }
+  const [notification] = await db.select({
+    id: notificationsTable.id,
+    userId: notificationsTable.userId,
+    title: notificationsTable.title,
+    message: notificationsTable.message,
+    shipmentId: notificationsTable.shipmentId,
+    emailStatus: notificationsTable.emailStatus,
+    emailAttemptCount: notificationsTable.emailAttemptCount,
+    userName: usersTable.name,
+    userEmail: usersTable.email,
+  }).from(notificationsTable)
+    .leftJoin(usersTable, eq(notificationsTable.userId, usersTable.id))
+    .where(eq(notificationsTable.id, id))
+    .limit(1);
+  if (!notification || !notification.userEmail) { res.status(404).json({ error: "通知または送信先が見つかりません" }); return; }
+  if (notification.emailStatus === "sent") { res.status(409).json({ error: "このメールはすでに送信済みです" }); return; }
+
+  const [claimed] = await db.update(notificationsTable).set({
+    emailStatus: "sending",
+    emailError: null,
+    emailAttemptCount: sql`COALESCE(${notificationsTable.emailAttemptCount}, 0) + 1`,
+  }).where(and(
+    eq(notificationsTable.id, id),
+    ne(notificationsTable.emailStatus, "sent"),
+    ne(notificationsTable.emailStatus, "sending"),
+  )).returning({ id: notificationsTable.id });
+  if (!claimed) {
+    res.status(409).json({ error: "このメールはすでに送信済み、または送信処理中です" });
+    return;
+  }
+
+  try {
+    const result = await sendEmail(notification.userEmail, notification.title, buildEmailHtml(notification.title, notification.message, notification.userName ?? undefined));
+    const status = deliveryStatus(result);
+    await db.update(notificationsTable).set({
+      emailStatus: status,
+      emailError: result.sent ? null : result.reason ?? "メール送信に失敗しました",
+      emailSentAt: result.sent ? new Date() : null,
+    }).where(eq(notificationsTable.id, id));
+    await logAdminAudit(req, { action: "resend", targetType: "notification", targetId: id, afterData: { status, sent: result.sent } });
+    res.json({ notificationId: id, status, ...result });
+  } catch (error: any) {
+    const reason = error?.message ?? "メール送信に失敗しました";
+    await db.update(notificationsTable).set({ emailStatus: "failed", emailError: reason }).where(eq(notificationsTable.id, id));
+    res.status(502).json({ error: reason });
+  }
 });
 
 export default router;

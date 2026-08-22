@@ -11,7 +11,7 @@ import { format } from 'date-fns';
 
 function apiFetch(path: string) {
   const token = localStorage.getItem('sinjapan_auth_token');
-  return fetch(path, { headers: { Authorization: `Bearer ${token}` } }).then(async r => {
+  return fetch(`${import.meta.env.BASE_URL}api${path}`, { headers: { Authorization: `Bearer ${token}` } }).then(async r => {
     if (!r.ok) throw new Error(await r.text());
     return r.json();
   });
@@ -50,7 +50,14 @@ const ACTION_OPTIONS = [
   { value: 'chat_message',      label: 'メッセージ送信' },
   { value: 'apply',             label: '申込確定' },
   { value: 'cancel',            label: 'キャンセル' },
+  { value: 'profile_update',    label: 'プロフィール更新' },
+  { value: 'view_proposal',     label: '提案確認' },
+  { value: 'proposal_accepted', label: '提案承諾' },
+  { value: 'contract_started',  label: '契約開始' },
+  { value: 'contract_ended',    label: '契約終了' },
   { value: 'payment_completed', label: '決済完了' },
+  { value: 'password_reset_request', label: 'パスワード再設定要求' },
+  { value: 'kyc_uploaded',      label: '本人確認書類アップロード' },
   { value: 'contact_sent',      label: 'お問い合わせ' },
 ];
 
@@ -91,7 +98,7 @@ export default function AdminUserLogs() {
         ...(dateFrom    && { dateFrom }),
         ...(dateTo      && { dateTo }),
       });
-      const data = await apiFetch(`/api/admin/user-logs?${params}`);
+       const data = await apiFetch(`/admin/user-logs?${params}`);
       setLogs(data.logs ?? []);
       setTotal(data.total ?? 0);
     } catch { setLogs([]); }
@@ -101,7 +108,10 @@ export default function AdminUserLogs() {
   useEffect(() => { load(); }, [load]);
 
   // フィルター変更時はページ1に戻す
-  const applyFilter = () => { setPage(1); load(); };
+  const applyFilter = () => {
+    if (page === 1) void load();
+    else setPage(1);
+  };
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 

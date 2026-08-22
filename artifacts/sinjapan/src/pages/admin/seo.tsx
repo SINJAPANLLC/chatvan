@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 
 function apiFetch(path: string, opts?: RequestInit) {
   const token = localStorage.getItem('sinjapan_auth_token');
-  return fetch(path, {
+  return fetch(`${import.meta.env.BASE_URL}api${path}`, {
     ...opts,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...opts?.headers },
   }).then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); });
@@ -18,6 +18,7 @@ type SeoField = { label: string; key: string; type: 'input' | 'textarea'; placeh
 
 const SEO_FIELDS: SeoField[] = [
   { label: 'サイトタイトル',        key: 'title',          type: 'input',    placeholder: 'Chat VAN | チャットするだけ。軽バンかりれる。' },
+  { label: 'サイトURL',             key: 'siteUrl',        type: 'input',    placeholder: 'https://example.com' },
   { label: 'メタディスクリプション', key: 'description',    type: 'textarea', placeholder: 'チャットで希望条件を伝えるだけ。あなたに合った軽バンをご提案します。月額定額・最短1ヶ月から。' },
   { label: 'メタキーワード',         key: 'keywords',       type: 'input',    placeholder: '軽バン レンタル, 軽バン 月額, 軽バン サブスク, 軽貨物 レンタル' },
   { label: 'OGタイトル（SNS表示）', key: 'ogTitle',        type: 'input',    placeholder: 'Chat VAN | チャットするだけ。軽バンかりれる。' },
@@ -73,6 +74,7 @@ export default function AdminSeo() {
   };
 
   const set = (key: string, val: string) => setValues(prev => ({ ...prev, [key]: val }));
+  const siteUrl = (values.siteUrl || window.location.origin).replace(/\/$/, '');
 
   if (loading) return (
     <div className="flex items-center justify-center h-48">
@@ -109,7 +111,7 @@ export default function AdminSeo() {
         <h2 className="text-sm font-semibold mb-4 flex items-center gap-2"><Globe className="h-4 w-4" />プレビュー（Googleでの表示イメージ）</h2>
         <div className="border border-border rounded-xl p-4 bg-muted/20 space-y-1">
           <p className="text-[#1a0dab] text-base font-medium truncate">{values.title || 'Chat VAN | チャットするだけ。軽バンかりれる。'}</p>
-          <p className="text-[#006621] text-xs">https://chatlogi.jp</p>
+          <p className="text-[#006621] text-xs">{siteUrl}</p>
           <p className="text-sm text-muted-foreground line-clamp-2">{values.description || 'メタディスクリプションを入力してください。'}</p>
         </div>
       </div>
@@ -125,7 +127,7 @@ export default function AdminSeo() {
           <Button onClick={handleSitemapPing} disabled={pinging} variant="outline" className="font-medium">
             {pinging ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />送信中…</> : <><Send className="h-4 w-4 mr-2" />Google・Bingに送信</>}
           </Button>
-          <a href="https://chatlogi.jp/sitemap.xml" target="_blank" rel="noopener noreferrer"
+          <a href={`${siteUrl}/sitemap.xml`} target="_blank" rel="noopener noreferrer"
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
             <ExternalLink className="h-3 w-3" />sitemap.xml を確認
           </a>

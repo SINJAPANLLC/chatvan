@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, settingsTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/auth";
+import { logAdminAudit } from "../lib/auditLogger";
 
 const router: IRouter = Router();
 
@@ -17,6 +18,7 @@ export const PROMPT_KEYS = [
 ] as const;
 
 export type PromptKey = (typeof PROMPT_KEYS)[number];
+const MAX_PROMPT_LENGTH = 20_000;
 
 export const PROMPT_DEFAULTS: Record<PromptKey, string> = {
   ai_system_prompt: `あなたは「Chat VAN」のAIアシスタントです。
@@ -179,11 +181,18 @@ router.put("/admin/ai-prompts/:key", requireAdmin, async (req, res): Promise<voi
     res.status(400).json({ error: "不明なプロンプトキーです" }); return;
   }
   const { value } = req.body as { value: string };
-  if (typeof value !== "string") { res.status(400).json({ error: "value is required" }); return; }
-  await db.insert(settingsTable)
-    .values({ key, value, updatedAt: new Date() })
-    .onConflictDoUpdate({ target: settingsTable.key, set: { value, updatedAt: new Date() } });
-  res.json({ ok: true, key });
+  if (typeof value !== "string" || !value.trim()) { res.status(400).json({ error: "プロンプトを入力してください" }); return; }
+  if (value.length > MAX_PROMPT_LENGTH) { res.status(400).json({ error: `プロンプトは${MAX_PROMPT_LENGTH.toLocaleString()}文字以内にしてください` }); return; }
+  try {
+    await db.insert(settingsTable)
+      .values({ key, value, updatedAt: new Date() })
+      .onConflictDoUpdate({ target: settingsTable.key, set: { value, updatedAt: new Date() } });
+    await logAdminAudit(req, { action: "update", targetType: "ai_prompt", targetId: key, afterData: { customized: true, length: value.length } });
+    res.json({ ok: true, key });
+  } catch (error) {
+    console.error("save ai prompt error:", error);
+    res.status(500).json({ error: "プロンプトの保存に失敗しました" });
+  }
 });
 
 // ── DELETE /api/admin/ai-prompts/:key — デフォルトに戻す ─────────────────────
@@ -192,8 +201,14 @@ router.delete("/admin/ai-prompts/:key", requireAdmin, async (req, res): Promise<
   if (!(PROMPT_KEYS as readonly string[]).includes(key)) {
     res.status(400).json({ error: "不明なプロンプトキーです" }); return;
   }
-  await db.delete(settingsTable).where(eq(settingsTable.key, key));
-  res.json({ ok: true, key, defaultValue: PROMPT_DEFAULTS[key] });
+  try {
+    await db.delete(settingsTable).where(eq(settingsTable.key, key));
+    await logAdminAudit(req, { action: "reset", targetType: "ai_prompt", targetId: key, afterData: { customized: false } });
+    res.json({ ok: true, key, defaultValue: PROMPT_DEFAULTS[key] });
+  } catch (error) {
+    console.error("reset ai prompt error:", error);
+    res.status(500).json({ error: "プロンプトの復元に失敗しました" });
+  }
 });
 
 // ── 後方互換: 旧 GET/PUT /api/admin/ai-prompt ────────────────────────────────
@@ -203,10 +218,12 @@ router.get("/admin/ai-prompt", requireAdmin, async (_req, res): Promise<void> =>
 });
 router.put("/admin/ai-prompt", requireAdmin, async (req, res): Promise<void> => {
   const { prompt } = req.body as { prompt: string };
-  if (typeof prompt !== "string") { res.status(400).json({ error: "prompt is required" }); return; }
+  if (typeof prompt !== "string" || !prompt.trim()) { res.status(400).json({ error: "プロンプトを入力してください" }); return; }
+  if (prompt.length > MAX_PROMPT_LENGTH) { res.status(400).json({ error: `プロンプトは${MAX_PROMPT_LENGTH.toLocaleString()}文字以内にしてください` }); return; }
   await db.insert(settingsTable)
     .values({ key: "ai_system_prompt", value: prompt })
     .onConflictDoUpdate({ target: settingsTable.key, set: { value: prompt, updatedAt: new Date() } });
+  await logAdminAudit(req, { action: "update", targetType: "ai_prompt", targetId: "ai_system_prompt", afterData: { customized: true, length: prompt.length } });
   res.json({ ok: true });
 });
 

@@ -17,17 +17,22 @@ export default function AdminAuditLogs() {
   const [logs, setLogs] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [filter, setFilter] = useState('');
+  const [offset, setOffset] = useState(0);
+  const [total, setTotal] = useState(0);
+  const limit = 50;
 
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(API('/van/audit-logs'), { headers: { Authorization: `Bearer ${token()}` } });
-      if (r.ok) setLogs(await r.json());
+      const r = await fetch(API(`/van/audit-logs?limit=${limit}&offset=${offset}&q=${encodeURIComponent(filter)}`), { headers: { Authorization: `Bearer ${token()}` } });
+      if (r.ok) {
+        const data = await r.json();
+        setLogs(data.logs ?? []);
+        setTotal(data.total ?? 0);
+      }
     } finally { setLoading(false); }
-  }, []);
+  }, [filter, offset]);
   React.useEffect(() => { load(); }, [load]);
-
-  const filtered = filter ? logs.filter(l => l.action?.includes(filter) || l.target_type?.includes(filter) || l.actor_name?.includes(filter)) : logs;
 
   return (
     <div className="space-y-6">
@@ -41,12 +46,15 @@ export default function AdminAuditLogs() {
         </button>
       </div>
 
-      <input className="w-full border border-border rounded-lg px-4 py-2 text-sm" placeholder="アクション・対象・操作者で絞り込み..." value={filter} onChange={e => setFilter(e.target.value)} />
+      <div className="flex flex-col sm:flex-row gap-3 justify-between">
+        <input className="w-full sm:max-w-md border border-border rounded-lg px-4 py-2 text-sm" placeholder="アクション・対象・操作者で絞り込み..." value={filter} onChange={e => { setFilter(e.target.value); setOffset(0); }} />
+        <p className="text-sm text-muted-foreground">{total}件の操作履歴</p>
+      </div>
 
       <div className="bg-card border border-border rounded-xl overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">読み込み中...</div>
-        ) : filtered.length === 0 ? (
+        ) : logs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 gap-2">
             <ScrollText className="h-8 w-8 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">ログはありません</p>
@@ -63,7 +71,7 @@ export default function AdminAuditLogs() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((log: any) => (
+              {logs.map((log: any) => (
                 <tr key={log.id} className="border-b border-border hover:bg-muted/20">
                   <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                     {new Date(log.created_at).toLocaleString('ja-JP')}
@@ -82,7 +90,7 @@ export default function AdminAuditLogs() {
                     <div className="text-muted-foreground">ID: {log.target_id ?? '-'}</div>
                   </td>
                   <td className="px-4 py-3 text-xs text-muted-foreground max-w-xs truncate">
-                    {log.after_data ? JSON.stringify(log.after_data).slice(0, 80) + '...' : '-'}
+                    {log.after_data ? (typeof log.after_data === 'string' ? log.after_data : JSON.stringify(log.after_data)).slice(0, 80) + '...' : '-'}
                   </td>
                 </tr>
               ))}
@@ -90,6 +98,13 @@ export default function AdminAuditLogs() {
           </table>
         )}
       </div>
+      {total > limit && (
+        <div className="flex items-center justify-end gap-3 text-sm">
+          <button className="px-3 py-2 border border-border rounded-lg disabled:opacity-50" disabled={offset === 0 || loading} onClick={() => setOffset(v => Math.max(0, v - limit))}>前へ</button>
+          <span className="text-muted-foreground">{Math.floor(offset / limit) + 1} / {Math.ceil(total / limit)}</span>
+          <button className="px-3 py-2 border border-border rounded-lg disabled:opacity-50" disabled={offset + limit >= total || loading} onClick={() => setOffset(v => v + limit)}>次へ</button>
+        </div>
+      )}
     </div>
   );
 }

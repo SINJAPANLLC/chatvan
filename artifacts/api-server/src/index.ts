@@ -466,6 +466,22 @@ async function runMigrations() {
   }
 
   logger.info("migration: all Chat VAN tables ready");
+  // 管理通知・お問い合わせの送信状態を既存データを保持したまま追跡可能にする。
+  await db.execute(sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS email_status TEXT NOT NULL DEFAULT 'not_requested'`);
+  await db.execute(sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS email_error TEXT`);
+  await db.execute(sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMP`);
+  await db.execute(sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS email_attempt_count INTEGER NOT NULL DEFAULT 0`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS notifications_created_at_idx ON notifications (created_at DESC)`);
+  await db.execute(sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS replied_by INTEGER`);
+  await db.execute(sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS reply_email_status TEXT NOT NULL DEFAULT 'not_sent'`);
+  await db.execute(sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS reply_email_error TEXT`);
+  await db.execute(sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS reply_email_sent_at TIMESTAMP`);
+  await db.execute(sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS admin_notify_status TEXT NOT NULL DEFAULT 'not_requested'`);
+  await db.execute(sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS admin_notify_error TEXT`);
+  await db.execute(sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS admin_notified_at TIMESTAMP`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS contacts_created_at_idx ON contacts (created_at DESC)`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS audit_logs_created_at_idx ON audit_logs (created_at DESC)`);
+  logger.info("migration: admin operation tracking columns ready");
   await db.execute(sql`ALTER TABLE email_send_logs ADD COLUMN IF NOT EXISTS attempt_key TEXT`);
   await db.execute(sql`
     CREATE UNIQUE INDEX IF NOT EXISTS email_send_logs_attempt_key_unique
