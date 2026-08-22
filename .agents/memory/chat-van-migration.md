@@ -34,3 +34,8 @@ rental_companies, vehicles, van_applications, van_proposals, van_contracts, van_
 - `/van/:id/proposal` → VanProposal（提案カード）
 - `/mypage` → MyPage（契約情報）
 - `/admin/applications`, `/admin/vehicles`, `/admin/rental-companies`, `/admin/contracts` → 新規
+
+## Neon接続の既定スキーマ
+- Neonの接続ロールによっては、既定の`search_path`に`public`が含まれず、既存のスキーマ未指定SQLがテーブルを見つけられない。
+
+**Why:** Neonのプール接続は起動パラメータでの`search_path`指定を受け付けないため、既存の未修飾SQLとの互換性をロール側で保つ必要がある。

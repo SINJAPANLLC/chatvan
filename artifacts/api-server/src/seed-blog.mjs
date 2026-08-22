@@ -2,17 +2,9 @@
  * ブログ10記事シードスクリプト
  * 実行: node --env-file=../../.env src/seed-blog.mjs (artifacts/api-server から)
  */
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
+import { createSeedClient } from "./lib/seedDatabase.mjs";
 
-// pnpmの仮想ストアからpgを直接ロード
-const pgPath = new URL(
-  "../../../node_modules/.pnpm/pg@8.22.0/node_modules/pg/lib/index.js",
-  import.meta.url
-);
-const { Client } = (await import(pgPath.href)).default;
-
-const client = new Client({ connectionString: process.env.NEON_DATABASE_URL || process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+const client = createSeedClient();
 await client.connect();
 
 const posts = [

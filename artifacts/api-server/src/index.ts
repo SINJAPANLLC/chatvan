@@ -4,7 +4,7 @@ import { seedRequiredAccounts } from "./lib/seed";
 import { startScheduler } from "./lib/blogAutoGen";
 import { startScheduler as startAutoProspect } from "./lib/autoProspect";
 import { startMonthlyBillingScheduler } from "./routes/van";
-import { db } from "@workspace/db";
+import { assertDatabaseReady, db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 
 async function runMigrations() {
@@ -546,6 +546,7 @@ if (Number.isNaN(port) || port <= 0) {
 
 async function startServer() {
   try {
+    await assertDatabaseReady();
     // 契約単位で請求書を取得する経路は contract_id に依存するため、
     // 必須移行が完了するまでHTTPリクエストを受け付けない。
     await runMigrations();

@@ -4,16 +4,9 @@
  * - 新規5記事: 地域特化記事を追加
  * 実行: node --env-file=../../.env src/seed-blog-regional.mjs (artifacts/api-server から)
  */
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
+import { createSeedClient } from "./lib/seedDatabase.mjs";
 
-const pgPath = new URL(
-  "../../../node_modules/.pnpm/pg@8.22.0/node_modules/pg/lib/index.js",
-  import.meta.url
-);
-const { Client } = (await import(pgPath.href)).default;
-
-const client = new Client({ connectionString: process.env.NEON_DATABASE_URL || process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+const client = createSeedClient();
 await client.connect();
 
 /* ─────────────────────────────────────────────
