@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, settingsTable } from "@workspace/db";
 import { blogPostsTable } from "@workspace/db";
-import { like, eq, and } from "drizzle-orm";
+import { like, eq, and, sql as drizzleSql } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/auth";
 import { logAdminAudit } from "../lib/auditLogger";
 
@@ -130,8 +130,8 @@ publicSeoRouter.get("/sitemap.xml", async (_req: Request, res: Response): Promis
     slug:      blogPostsTable.slug,
     updatedAt: blogPostsTable.updatedAt,
   }).from(blogPostsTable)
-    .where(and(eq(blogPostsTable.published, true), eq(blogPostsTable.targetType, "user")))
-    .catch(() => []);
+    .where(and(eq(blogPostsTable.published, true), drizzleSql`${blogPostsTable}.target_type = 'user'`))
+    .catch((): Array<{ slug: string; updatedAt: Date }> => []);
 
   const today = new Date().toISOString().split("T")[0];
 

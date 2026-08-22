@@ -25,8 +25,8 @@ export async function sendEmail(
 ): Promise<{ sent: boolean; reason?: string }> {
   const cfg = createTransport();
   if (!cfg) {
-    console.log(`[EMAIL MOCK] To: ${to}${opts?.bcc ? ` BCC: ${opts.bcc}` : ""}\nSubject: ${subject}\n---\n${html}\n---`);
-    return { sent: false, reason: "SMTP未設定（ログ出力のみ）" };
+    console.warn("[EMAIL] SMTP未設定のためメール送信をスキップしました");
+    return { sent: false, reason: "SMTP未設定" };
   }
   try {
     await cfg.transport.sendMail({ from: cfg.from, to, subject, html, bcc: opts?.bcc });

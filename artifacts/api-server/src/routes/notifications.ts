@@ -147,7 +147,7 @@ router.get("/admin/notifications", requireAdmin, async (req, res): Promise<void>
 
 // POST /admin/shipments/:id/notify-price-approval — 値引き承認通知
 router.post("/admin/shipments/:id/notify-price-approval", requireAdmin, async (req, res): Promise<void> => {
-  const shipmentId = parseInt(req.params.id, 10);
+  const shipmentId = parseInt(String(req.params.id), 10);
   if (isNaN(shipmentId)) { res.status(400).json({ error: "無効なID" }); return; }
 
   const { customPrice, message: customMsg } = req.body as { customPrice?: number; message?: string };

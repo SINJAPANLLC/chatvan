@@ -267,6 +267,10 @@ async function signObjectURL({
     );
   }
 
-  const { signed_url: signedURL } = await response.json();
+  const result = await response.json() as Record<string, unknown>;
+  const signedURL = result['signed_url'];
+  if (typeof signedURL !== 'string') {
+    throw new Error('Unexpected response from sidecar: signed_url is missing or not a string');
+  }
   return signedURL;
 }

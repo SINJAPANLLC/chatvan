@@ -1,9 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, shipmentsTable, conversationsTable, settingsTable } from "@workspace/db";
 import { eq, like } from "drizzle-orm";
-// Zod schemas removed in Chat VAN migration
-type StartAiChatBody = any;
-type SendMessageBody = any;
 import { requireAuth } from "../middlewares/auth";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { calcPriceWithConfig, parsePricingConfig, DEFAULT_CONFIG } from "../lib/pricing";
@@ -301,10 +298,10 @@ async function proposalToDbUpdate(rawProposal: Record<string, any>) {
 // ── Routes ──────────────────────────────────────────────────────────────────
 
 router.post("/ai/start", requireAuth, async (req, res): Promise<void> => {
-  const parsed = StartAiChatBody.safeParse(req.body);
-  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
-
-  const { message } = parsed.data;
+  const message: unknown = req.body?.message;
+  if (typeof message !== "string" || !message.trim()) {
+    res.status(400).json({ error: "message is required" }); return;
+  }
 
   const [shipment] = await db.insert(shipmentsTable).values({
     userId: req.session.userId,
@@ -343,17 +340,24 @@ router.post("/shipments/:id/conversations", requireAuth, async (req, res): Promi
   const id = parseId(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "無効なID" }); return; }
 
-  const parsed = SendMessageBody.safeParse(req.body);
-  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  const rawMessage: unknown = req.body?.message;
+  if (typeof rawMessage !== "string" || !rawMessage.trim()) {
+    res.status(400).json({ error: "message is required" }); return;
+  }
+  const message = rawMessage;
 
   const [shipment] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, id)).limit(1);
   if (!shipment) { res.status(404).json({ error: "案件が見つかりません" }); return; }
 
+  // Authorization: admin can access all; regular user can only message their own shipment
+  const isAdmin = req.session.userRole === "admin";
+  if (!isAdmin && shipment.userId !== req.session.userId) {
+    res.status(403).json({ error: "アクセス権限がありません" }); return;
+  }
+
   const history = await db.select().from(conversationsTable)
     .where(eq(conversationsTable.shipmentId, id))
     .orderBy(conversationsTable.createdAt);
-
-  const { message } = parsed.data;
 
   await db.insert(conversationsTable).values({ shipmentId: id, sender: "user", message });
 
@@ -385,6 +389,14 @@ router.post("/shipments/:id/conversations", requireAuth, async (req, res): Promi
 router.get("/shipments/:id/conversations", requireAuth, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "無効なID" }); return; }
+
+  // Authorization: verify ownership before reading conversation history
+  const [shipment] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, id)).limit(1);
+  if (!shipment) { res.status(404).json({ error: "案件が見つかりません" }); return; }
+  const isAdmin = req.session.userRole === "admin";
+  if (!isAdmin && shipment.userId !== req.session.userId) {
+    res.status(403).json({ error: "アクセス権限がありません" }); return;
+  }
 
   const msgs = await db.select().from(conversationsTable)
     .where(eq(conversationsTable.shipmentId, id))

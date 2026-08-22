@@ -72,8 +72,6 @@ export interface RentalCompany {
   notes?: string | null;
   /** @nullable */
   vehicleCount?: number | null;
-  /** @nullable */
-  fleetSize?: number | null;
   createdAt: string;
 }
 
@@ -352,6 +350,28 @@ export interface PaymentInput {
   contractId?: number;
   amount: number;
   description?: string;
+}
+
+export interface ContractMessage {
+  id: number;
+  contract_id: number;
+  sender_id: number;
+  sender_role: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  /** @nullable */
+  sender_name?: string | null;
+  /** @nullable */
+  sender_role_actual?: string | null;
+}
+
+export interface ContractMessageInput {
+  message: string;
+}
+
+export interface ContractUnreadCount {
+  unread: number;
 }
 
 export type ListVanApplicationsParams = {

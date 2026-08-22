@@ -21,6 +21,9 @@ import type {
 
 import type {
   AuthResponse,
+  ContractMessage,
+  ContractMessageInput,
+  ContractUnreadCount,
   HealthStatus,
   ListPaymentsParams,
   ListVanApplicationsParams,
@@ -2315,6 +2318,232 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getUpdateUserMutationOptions(options));
     }
+
+export const getListContractMessagesUrl = (contractId: number,) => {
+
+
+
+
+  return `/api/contract-chat/${contractId}`
+}
+
+/**
+ * @summary Get contract chat messages (marks unread as read)
+ */
+export const listContractMessages = async (contractId: number, options?: Parameters<typeof customFetch>[1]): Promise<ContractMessage[]> => {
+
+  return customFetch<ContractMessage[]>(getListContractMessagesUrl(contractId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListContractMessagesQueryKey = (contractId: number,) => {
+    return [
+    `/api/contract-chat/${contractId}`
+    ] as const;
+    }
+
+
+export const getListContractMessagesQueryOptions = <TData = Awaited<ReturnType<typeof listContractMessages>>, TError = ErrorType<void>>(contractId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listContractMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListContractMessagesQueryKey(contractId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listContractMessages>>> = ({ signal }) => listContractMessages(contractId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: contractId !== null && contractId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listContractMessages>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListContractMessagesQueryResult = NonNullable<Awaited<ReturnType<typeof listContractMessages>>>
+export type ListContractMessagesQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get contract chat messages (marks unread as read)
+ */
+
+export function useListContractMessages<TData = Awaited<ReturnType<typeof listContractMessages>>, TError = ErrorType<void>>(
+ contractId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listContractMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListContractMessagesQueryOptions(contractId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSendContractMessageUrl = (contractId: number,) => {
+
+
+
+
+  return `/api/contract-chat/${contractId}`
+}
+
+/**
+ * @summary Send a contract chat message
+ */
+export const sendContractMessage = async (contractId: number,
+    contractMessageInput: ContractMessageInput, options?: Parameters<typeof customFetch>[1]): Promise<ContractMessage> => {
+
+  return customFetch<ContractMessage>(getSendContractMessageUrl(contractId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(contractMessageInput)
+  }
+);}
+
+
+
+
+
+export const getSendContractMessageMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendContractMessage>>, TError,{contractId: number;data: BodyType<ContractMessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendContractMessage>>, TError,{contractId: number;data: BodyType<ContractMessageInput>}, TContext> => {
+
+const mutationKey = ['sendContractMessage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendContractMessage>>, {contractId: number;data: BodyType<ContractMessageInput>}> = (props) => {
+          const {contractId,data} = props ?? {};
+
+          return  sendContractMessage(contractId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendContractMessageMutationResult = NonNullable<Awaited<ReturnType<typeof sendContractMessage>>>
+    export type SendContractMessageMutationBody = BodyType<ContractMessageInput>
+    export type SendContractMessageMutationError = ErrorType<void>
+
+    /**
+ * @summary Send a contract chat message
+ */
+export const useSendContractMessage = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendContractMessage>>, TError,{contractId: number;data: BodyType<ContractMessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendContractMessage>>,
+        TError,
+        {contractId: number;data: BodyType<ContractMessageInput>},
+        TContext
+      > => {
+      return useMutation(getSendContractMessageMutationOptions(options));
+    }
+
+export const getGetContractUnreadCountUrl = (contractId: number,) => {
+
+
+
+
+  return `/api/contract-chat/${contractId}/unread`
+}
+
+/**
+ * @summary Get unread message count for a contract chat
+ */
+export const getContractUnreadCount = async (contractId: number, options?: Parameters<typeof customFetch>[1]): Promise<ContractUnreadCount> => {
+
+  return customFetch<ContractUnreadCount>(getGetContractUnreadCountUrl(contractId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetContractUnreadCountQueryKey = (contractId: number,) => {
+    return [
+    `/api/contract-chat/${contractId}/unread`
+    ] as const;
+    }
+
+
+export const getGetContractUnreadCountQueryOptions = <TData = Awaited<ReturnType<typeof getContractUnreadCount>>, TError = ErrorType<void>>(contractId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getContractUnreadCount>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetContractUnreadCountQueryKey(contractId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getContractUnreadCount>>> = ({ signal }) => getContractUnreadCount(contractId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: contractId !== null && contractId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getContractUnreadCount>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetContractUnreadCountQueryResult = NonNullable<Awaited<ReturnType<typeof getContractUnreadCount>>>
+export type GetContractUnreadCountQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get unread message count for a contract chat
+ */
+
+export function useGetContractUnreadCount<TData = Awaited<ReturnType<typeof getContractUnreadCount>>, TError = ErrorType<void>>(
+ contractId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getContractUnreadCount>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetContractUnreadCountQueryOptions(contractId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getListPaymentsUrl = (params?: ListPaymentsParams,) => {
   const normalizedParams = new URLSearchParams();

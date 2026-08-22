@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { useListVanMessages, useSendVanMessage, useGetVanApplication } from '@workspace/api-client-react';
+import { useListVanMessages, getListVanMessagesQueryKey, useSendVanMessage, useGetVanApplication, getGetVanApplicationQueryKey } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowUp, Loader2, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -18,6 +18,7 @@ export default function VanChat() {
 
   const { data: messages, refetch } = useListVanMessages(applicationId, {
     query: {
+      queryKey: getListVanMessagesQueryKey(applicationId),
       enabled: !!applicationId,
       refetchInterval: 2000,
     }
@@ -25,6 +26,7 @@ export default function VanChat() {
 
   const { data: application } = useGetVanApplication(applicationId, {
     query: {
+      queryKey: getGetVanApplicationQueryKey(applicationId),
       enabled: !!applicationId,
       refetchInterval: 2000,
     }

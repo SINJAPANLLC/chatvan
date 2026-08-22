@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { useGetVanApplication, useAcceptVanProposal } from '@workspace/api-client-react';
+import { useGetVanApplication, getGetVanApplicationQueryKey, useAcceptVanProposal } from '@workspace/api-client-react';
 import {
   Loader2, CheckCircle2, ChevronLeft, Calendar, MapPin, JapaneseYen,
   Check, Clock, ChevronRight, Gauge, CarFront,
@@ -97,7 +97,7 @@ export default function VanProposal() {
   const { toast } = useToast();
 
   const { data: application, isLoading, refetch } = useGetVanApplication(applicationId, {
-    query: { enabled: !!applicationId }
+    query: { queryKey: getGetVanApplicationQueryKey(applicationId), enabled: !!applicationId }
   });
 
   const acceptProposal = useAcceptVanProposal();

@@ -2,7 +2,23 @@ import { db, shipmentsTable, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
-const SQUARE_BASE = "https://connect.squareup.com";
+const SQUARE_ENV = process.env.SQUARE_ENVIRONMENT ?? "production";
+const SQUARE_BASE =
+  SQUARE_ENV === "sandbox"
+    ? "https://connect.squareupsandbox.com"
+    : "https://connect.squareup.com";
+
+/**
+ * Returns a description of which Square config values are missing,
+ * without revealing actual secret values.
+ */
+export function getSquareConfigError(): string | null {
+  const missing: string[] = [];
+  if (!process.env.SQUARE_ACCESS_TOKEN) missing.push("SQUARE_ACCESS_TOKEN");
+  if (!process.env.SQUARE_LOCATION_ID) missing.push("SQUARE_LOCATION_ID");
+  if (missing.length === 0) return null;
+  return `Square設定が不完全です。未設定の環境変数: ${missing.join(", ")}`;
+}
 
 export function squareFetch(path: string, method: string, body?: object) {
   return fetch(`${SQUARE_BASE}${path}`, {
@@ -18,6 +34,9 @@ export function squareFetch(path: string, method: string, body?: object) {
 
 /** 登録済みカードでオーソリを実行し squarePaymentId を案件に保存する */
 export async function authorizeOnFile(shipmentId: number): Promise<{ paymentId: string } | { error: string } | { alreadyAuthorized: true }> {
+  const cfgErr = getSquareConfigError();
+  if (cfgErr) return { error: cfgErr };
+
   const [shipment] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, shipmentId)).limit(1);
   if (!shipment) return { error: "案件が見つかりません" };
   if (shipment.squarePaymentId) return { alreadyAuthorized: true };

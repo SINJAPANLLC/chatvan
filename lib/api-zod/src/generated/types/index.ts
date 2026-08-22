@@ -39,3 +39,6 @@ export * from './vanStartResponse';
 export * from './vehicle';
 export * from './vehicleInput';
 export * from './vehicleUpdate';
+export * from './contractMessage';
+export * from './contractMessageInput';
+export * from './contractUnreadCount';

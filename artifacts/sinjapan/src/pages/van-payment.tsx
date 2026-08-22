@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { useGetVanApplication } from '@workspace/api-client-react';
+import { useGetVanApplication, getGetVanApplicationQueryKey } from '@workspace/api-client-react';
 import { Loader2, ChevronLeft, CreditCard, Building2, CheckCircle2, ShieldCheck, FileText as LicenseIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -192,7 +192,7 @@ export default function VanPayment() {
   const cardContainerRef = useRef<HTMLDivElement>(null);
 
   const { data: application, isLoading, refetch } = useGetVanApplication(applicationId, {
-    query: { enabled: !!applicationId, staleTime: 0, refetchOnMount: 'always' },
+    query: { queryKey: getGetVanApplicationQueryKey(applicationId), enabled: !!applicationId, staleTime: 0, refetchOnMount: 'always' },
   });
   const contract = (application as any)?.contract as any;
 

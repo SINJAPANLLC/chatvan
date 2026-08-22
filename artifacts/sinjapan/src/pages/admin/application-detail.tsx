@@ -3,10 +3,12 @@ import 'leaflet/dist/leaflet.css';
 import { useRoute, useLocation } from 'wouter';
 import {
   useGetVanApplication,
+  getGetVanApplicationQueryKey,
   useUpdateVanApplication,
   useListVehicles,
   useSendVanProposal,
   useListVanMessages,
+  getListVanMessagesQueryKey,
 } from '@workspace/api-client-react';
 import {
   Loader2, ChevronLeft, Save, Send, Check, Printer, Bell,
@@ -117,7 +119,7 @@ function createInvoicePdfElement(
     );
     root.append(footer);
   }
-  return root;
+  return root as unknown as HTMLDivElement;
 }
 
 function createInvoicePdfPages(invoice: any): HTMLDivElement[] {
@@ -457,8 +459,8 @@ export default function AdminApplicationDetail() {
 
   const [tab, setTab] = useState<Tab>('overview');
 
-  const { data: application, isLoading, refetch } = useGetVanApplication(id, { query: { enabled: !!id } });
-  const { data: messages } = useListVanMessages(id, { query: { enabled: !!id } });
+  const { data: application, isLoading, refetch } = useGetVanApplication(id, { query: { queryKey: getGetVanApplicationQueryKey(id), enabled: !!id } });
+  const { data: messages } = useListVanMessages(id, { query: { queryKey: getListVanMessagesQueryKey(id), enabled: !!id } });
   const { data: vehiclesData } = useListVehicles({ status: 'available' });
 
   const updateApp = useUpdateVanApplication();
@@ -708,7 +710,7 @@ export default function AdminApplicationDetail() {
       email: application.email || '',
       dob: application.dob || '',
       address: application.address || '',
-      licenseInfo: application.licenseInfo || '',
+      licenseInfo: (application as any).licenseInfo || '',
       insuranceStatus: application.insuranceStatus || '',
       hasBlackNumber: application.hasBlackNumber == null ? '' : String(application.hasBlackNumber),
       hasDeliveryExperience: application.hasDeliveryExperience == null ? '' : String(application.hasDeliveryExperience),
@@ -1109,7 +1111,7 @@ export default function AdminApplicationDetail() {
 
           {/* eKYC サマリーカード */}
           {(() => {
-            const iv = application.identityVerification as any;
+            const iv = (application as any).identityVerification as any;
             if (!iv) return (
               <Section title="本人確認（eKYC）">
                 <p className="text-sm text-muted-foreground py-2 text-center">本人確認書類は未提出です</p>

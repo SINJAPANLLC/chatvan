@@ -617,6 +617,82 @@ paths:
               schema:
                 $ref: "#/components/schemas/User"
 
+  # ─── Contract Chat ──────────────────────────────────────────────────────────
+  /contract-chat/{contractId}:
+    get:
+      operationId: listContractMessages
+      tags: [van]
+      summary: Get contract chat messages (marks unread as read)
+      parameters:
+        - name: contractId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ContractMessage"
+        "401":
+          description: Not authenticated
+        "403":
+          description: Access denied
+    post:
+      operationId: sendContractMessage
+      tags: [van]
+      summary: Send a contract chat message
+      parameters:
+        - name: contractId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContractMessageInput"
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContractMessage"
+        "400":
+          description: Bad request
+        "401":
+          description: Not authenticated
+        "403":
+          description: Access denied
+
+  /contract-chat/{contractId}/unread:
+    get:
+      operationId: getContractUnreadCount
+      tags: [van]
+      summary: Get unread message count for a contract chat
+      parameters:
+        - name: contractId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Unread count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContractUnreadCount"
+        "401":
+          description: Not authenticated
+
   # ─── Payments ────────────────────────────────────────────────────────────────
   /payments:
     get:
@@ -1237,3 +1313,41 @@ components:
           type: number
         description:
           type: string
+
+    # ─── Contract Chat ────────────────────────────────────────────────────────
+    ContractMessage:
+      type: object
+      required: [id, contract_id, sender_id, sender_role, message, is_read, created_at]
+      properties:
+        id:
+          type: integer
+        contract_id:
+          type: integer
+        sender_id:
+          type: integer
+        sender_role:
+          type: string
+        message:
+          type: string
+        is_read:
+          type: boolean
+        created_at:
+          type: string
+        sender_name:
+          type: ["string", "null"]
+        sender_role_actual:
+          type: ["string", "null"]
+
+    ContractMessageInput:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    ContractUnreadCount:
+      type: object
+      required: [unread]
+      properties:
+        unread:
+          type: integer

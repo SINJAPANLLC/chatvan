@@ -4,13 +4,22 @@
  */
 import { Readable } from 'stream';
 import { Router, type IRouter, type Request, type Response } from 'express';
-import { requireAuth, requireAdmin } from '../middlewares/auth';
+import { requireAuth, requireAdmin, requireRentalCompany } from '../middlewares/auth';
 import { ObjectNotFoundError, ObjectStorageService } from '../lib/objectStorage';
 import { db } from '@workspace/db';
 import { sql } from 'drizzle-orm';
 
 const router: IRouter = Router();
 const storage = new ObjectStorageService();
+
+/** Returns true when PRIVATE_OBJECT_DIR is configured. */
+function isPrivateStorageConfigured(): boolean {
+  return !!process.env.PRIVATE_OBJECT_DIR;
+}
+
+function privateStorageUnconfiguredResponse(res: Response): void {
+  res.status(503).json({ error: 'ストレージが設定されていません。PRIVATE_OBJECT_DIR が未設定です。' });
+}
 
 /**
  * POST /storage/uploads/request-url
@@ -25,6 +34,8 @@ router.post(
       res.status(400).json({ error: 'name, size, contentType が必要です' });
       return;
     }
+
+    if (!isPrivateStorageConfigured()) { privateStorageUnconfiguredResponse(res); return; }
 
     try {
       const uploadURL = await storage.getObjectEntityUploadURL();
@@ -44,12 +55,13 @@ const ALLOWED_IMAGE_TYPES = new Set([
 
 /**
  * POST /storage/company-uploads/request-url
- * Auth-required (non-admin): presigned PUT URL for company vehicle photos & documents.
+ * rental_company (or admin): presigned PUT URL for company vehicle photos & documents.
+ * Persists a company upload claim (objectPath → companyId) for ownership enforcement.
  * Allows images and PDFs.
  */
 router.post(
   '/storage/company-uploads/request-url',
-  requireAuth,
+  requireRentalCompany,
   async (req: Request, res: Response): Promise<void> => {
     const { name, contentType } = req.body ?? {};
     if (!name || !contentType) {
@@ -64,9 +76,31 @@ router.post(
       res.status(400).json({ error: '画像（JPEG/PNG/WebP/HEIC）またはPDFのみアップロードできます' });
       return;
     }
+    if (!isPrivateStorageConfigured()) { privateStorageUnconfiguredResponse(res); return; }
+
+    const userId: number | undefined = (req.session as any)?.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
     try {
       const uploadURL = await storage.getObjectEntityUploadURL();
       const objectPath = storage.normalizeObjectEntityPath(uploadURL);
+
+      // Resolve company_id for the uploader (rental_company users have rental_company_id)
+      const userRow = await db.execute(sql`SELECT rental_company_id FROM users WHERE id = ${userId} LIMIT 1`);
+      const companyId: number | null = (userRow as any).rows?.[0]?.rental_company_id
+        ?? (userRow as any)[0]?.rental_company_id
+        ?? null;
+
+      // Persist claim so ownership can be verified on read
+      await db.execute(sql`
+        INSERT INTO upload_claims (object_path, user_id, company_id, content_type)
+        VALUES (${objectPath}, ${userId}, ${companyId}, ${contentType})
+        ON CONFLICT (object_path) DO NOTHING
+      `);
+
       res.json({ uploadURL, objectPath });
     } catch (err) {
       console.error('[storage] company upload URL error:', err);
@@ -99,6 +133,8 @@ router.post(
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
+
+    if (!isPrivateStorageConfigured()) { privateStorageUnconfiguredResponse(res); return; }
 
     try {
       const uploadURL = await storage.getObjectEntityUploadURL();
@@ -152,14 +188,53 @@ router.get(
 /**
  * GET /storage/user-objects/*
  * Serve private object entities for authenticated users (not admin-only).
+ * Only the upload_claim owner or an admin may read the object.
  */
 router.get(
   '/storage/user-objects/*objectPath',
   requireAuth,
   async (req: Request, res: Response): Promise<void> => {
+    if (!isPrivateStorageConfigured()) { privateStorageUnconfiguredResponse(res); return; }
     try {
       const raw = req.params.objectPath;
       const objectPath = '/objects/' + (Array.isArray(raw) ? raw.join('/') : raw);
+
+      const userId: number | undefined = (req.session as any)?.userId;
+      const userRole: string | undefined = (req.session as any)?.userRole;
+
+      // Admin may always access; others must own the upload claim (by user_id or company_id)
+      if (userRole !== 'admin') {
+        if (!userId) {
+          res.status(401).json({ error: 'Unauthorized' });
+          return;
+        }
+
+        // Resolve company_id for rental_company users
+        let companyId: number | null = null;
+        if (userRole === 'rental_company') {
+          const userRow = await db.execute(sql`SELECT rental_company_id FROM users WHERE id = ${userId} LIMIT 1`);
+          companyId = (userRow as any).rows?.[0]?.rental_company_id
+            ?? (userRow as any)[0]?.rental_company_id
+            ?? null;
+        }
+
+        // Grant access if: user uploaded it (personal upload) OR user's company owns it (company upload)
+        const claimRows = await db.execute(sql`
+          SELECT 1 FROM upload_claims
+          WHERE object_path = ${objectPath}
+            AND (
+              user_id = ${userId}
+              OR (${companyId}::int IS NOT NULL AND company_id = ${companyId})
+            )
+          LIMIT 1
+        `);
+        const hasClaim = !!((claimRows as any).rows?.[0] ?? (claimRows as any)[0]);
+        if (!hasClaim) {
+          res.status(403).json({ error: 'Forbidden' });
+          return;
+        }
+      }
+
       const file = await storage.getObjectEntityFile(objectPath);
       const response = await storage.downloadObject(file);
       res.status(response.status);
@@ -188,6 +263,7 @@ router.get(
   '/storage/objects/*objectPath',
   requireAdmin,
   async (req: Request, res: Response): Promise<void> => {
+    if (!isPrivateStorageConfigured()) { privateStorageUnconfiguredResponse(res); return; }
     try {
       const raw = req.params.objectPath;
       const objectPath = '/objects/' + (Array.isArray(raw) ? raw.join('/') : raw);

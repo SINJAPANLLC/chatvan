@@ -43,7 +43,12 @@ router.get("/contract-chat/:contractId", requireAuth, async (req: Request, res: 
     const userId = req.session.userId;
     const userRole = req.session.userRole;
 
-    if (!(await canAccessContract(userId, userRole, contractId))) {
+    if (!Number.isInteger(contractId) || contractId <= 0) {
+      return res.status(400).json({ error: "Invalid contract ID" });
+    }
+
+    if (userId === undefined) return res.status(401).json({ error: "Unauthorized" });
+    if (!(await canAccessContract(userId, userRole ?? "", contractId))) {
       return res.status(403).json({ error: "アクセス権がありません" });
     }
 
@@ -81,9 +86,14 @@ router.post("/contract-chat/:contractId", requireAuth, async (req: Request, res:
     const userRole = req.session.userRole;
     const { message } = req.body;
 
+    if (!Number.isInteger(contractId) || contractId <= 0) {
+      return res.status(400).json({ error: "Invalid contract ID" });
+    }
+
     if (!message?.trim()) return res.status(400).json({ error: "メッセージを入力してください" });
 
-    if (!(await canAccessContract(userId, userRole, contractId))) {
+    if (userId === undefined) return res.status(401).json({ error: "Unauthorized" });
+    if (!(await canAccessContract(userId, userRole ?? "", contractId))) {
       return res.status(403).json({ error: "アクセス権がありません" });
     }
 
@@ -151,6 +161,16 @@ router.get("/contract-chat/:contractId/unread", requireAuth, async (req: Request
   try {
     const contractId = parseInt(String(req.params.contractId));
     const userId = req.session.userId;
+    const userRole = req.session.userRole;
+
+    if (!Number.isInteger(contractId) || contractId <= 0) {
+      return res.status(400).json({ error: "Invalid contract ID" });
+    }
+
+    if (userId === undefined) return res.status(401).json({ error: "Unauthorized" });
+    if (!(await canAccessContract(userId, userRole ?? "", contractId))) {
+      return res.status(403).json({ error: "アクセス権がありません" });
+    }
 
     const raw = await db.execute(sql`
       SELECT COUNT(*) as count FROM contract_messages

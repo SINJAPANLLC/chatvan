@@ -1,14 +1,47 @@
 import { Router, type IRouter } from "express";
 import { db, shipmentsTable, usersTable, carriersTable } from "@workspace/db";
 import { eq, desc, and, gte, lte, inArray, sql } from "drizzle-orm";
-// Zod schemas removed in Chat VAN migration — using req.body directly
-type CreateShipmentBody = any;
-type UpdateShipmentBody = any;
-type UpdateShipmentStatusBody = any;
-type ListShipmentsQueryParams = any;
-type GetShipmentParams = any;
-type UpdateShipmentParams = any;
-type UpdateShipmentStatusParams = any;
+import { z } from "zod";
+import { insertShipmentSchema } from "@workspace/db";
+const CreateShipmentBody = insertShipmentSchema.partial();
+const UpdateShipmentBody = insertShipmentSchema.partial();
+// 一般ユーザー（案件オーナー）が自分で編集してよいフィールドのみを明示的に許可する。
+// status / paymentStatus / 料金・原価 / キャリア・ドライバー割当 / Square・決済ID /
+// キャンセル承認 / userId / 監査タイムスタンプ 等はここに含めない（サーバー側管理項目）。
+const OwnerEditableShipmentBody = insertShipmentSchema
+  .pick({
+    requestText: true,
+    pickupAddress: true,
+    deliveryAddress: true,
+    cargoType: true,
+    cargoQuantity: true,
+    cargoWeight: true,
+    cargoSize: true,
+    pickupDatetime: true,
+    deliveryDeadline: true,
+    vehicleType: true,
+    vehicleSize: true,
+    vehicleBodyType: true,
+    truckCount: true,
+    deliveryType: true,
+    deliveryMethod: true,
+    additionalWork: true,
+    highwayUse: true,
+    desiredPrice: true,
+    notes: true,
+  })
+  .partial()
+  .strict();
+const UpdateShipmentStatusBody = z.object({ status: z.string() });
+const ListShipmentsQueryParams = z.object({
+  userId: z.coerce.number().optional(),
+  status: z.string().optional(),
+  carrierId: z.coerce.number().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+  page: z.coerce.number().optional(),
+  limit: z.coerce.number().optional(),
+});
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { authorizeOnFile } from "../lib/square-authorize";
 import { sendAutoNotification } from "../lib/autoNotify";
@@ -48,7 +81,7 @@ router.get("/shipments", requireAuth, async (req, res): Promise<void> => {
 
   // Non-admins can only see their own shipments
   if (!isAdmin) {
-    conditions.push(eq(shipmentsTable.userId, req.session.userId));
+    conditions.push(eq(shipmentsTable.userId, req.session.userId!));
   } else if (params.userId) {
     conditions.push(eq(shipmentsTable.userId, Number(params.userId)));
   }
@@ -170,20 +203,36 @@ router.patch("/shipments/:id", requireAuth, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "無効なID" }); return; }
 
-  const parsed = UpdateShipmentBody.safeParse(req.body);
+  // Authorization: fetch shipment first to verify ownership
+  const [existing] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, id)).limit(1);
+  if (!existing) { res.status(404).json({ error: "案件が見つかりません" }); return; }
+
+  const isAdmin = req.session.userRole === "admin";
+  if (!isAdmin && existing.userId !== req.session.userId) {
+    res.status(403).json({ error: "アクセス権限がありません" }); return;
+  }
+
+  // Field restriction is applied AFTER ownership verification.
+  // 管理者は従来通り部分更新を許可。一般ユーザー（オーナー）は明示的な許可リストの
+  // フィールドのみに限定し、strict スキーマで未知キー（大文字小文字違い含む）を拒否する。
+  const parsed = isAdmin
+    ? UpdateShipmentBody.safeParse(req.body)
+    : OwnerEditableShipmentBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
 
-  const updates: any = { ...parsed.data, updatedAt: new Date() };
+  const safeData = parsed.data;
+
+  const updates: any = { ...safeData, updatedAt: new Date() };
 
   // 車格・ルート変更時は料金を自動再計算
   const PRICING_FIELDS = ['vehicleSize','vehicleBodyType','truckCount','pickupAddress','deliveryAddress','deliveryType','additionalWork','highwayUse'];
   const hasPricingChange = PRICING_FIELDS.some(f => f in updates);
   if (hasPricingChange && updates.customerPrice == null) {
     // 現在のDBレコードを取得してアドレス等を補完
-    const [cur] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, id));
+    const cur = existing;
     if (cur) {
       const hw = (updates.highwayUse ?? cur.highwayUse) === 'あり' || (updates.highwayUse ?? cur.highwayUse) === true;
       let pricingCfg = DEFAULT_CONFIG;
@@ -212,12 +261,10 @@ router.patch("/shipments/:id", requireAuth, async (req, res): Promise<void> => {
 
   // 請求額・原価のどちらか一方でも変更された場合は粗利を再計算
   if ((updates.customerPrice != null || updates.carrierCost != null) && !hasPricingChange) {
-    const [cur] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, id));
-    if (cur) {
-      const cp = Number(updates.customerPrice ?? cur.customerPrice ?? 0);
-      const cc = Number(updates.carrierCost  ?? cur.carrierCost  ?? 0);
-      updates.grossProfit = (cp - cc).toString();
-    }
+    const cur = existing;
+    const cp = Number(updates.customerPrice ?? cur.customerPrice ?? 0);
+    const cc = Number(updates.carrierCost  ?? cur.carrierCost  ?? 0);
+    updates.grossProfit = (cp - cc).toString();
   }
 
   const [shipment] = await db
@@ -234,6 +281,11 @@ router.patch("/shipments/:id", requireAuth, async (req, res): Promise<void> => {
 router.patch("/shipments/:id/status", requireAuth, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "無効なID" }); return; }
+
+  // Status updates are admin-only; regular users use /cancel-request
+  if (req.session.userRole !== "admin") {
+    res.status(403).json({ error: "管理者権限が必要です" }); return;
+  }
 
   const parsed = UpdateShipmentStatusBody.safeParse(req.body);
   if (!parsed.success) {
@@ -258,7 +310,9 @@ router.patch("/shipments/:id/status", requireAuth, async (req, res): Promise<voi
   const route = shipment.pickupAddress && shipment.deliveryAddress
     ? `${shipment.pickupAddress} → ${shipment.deliveryAddress}`
     : undefined;
-  sendAutoNotification({ shipmentId: id, userId: shipment.userId, status: parsed.data.status, route }).catch(() => {});
+  if (shipment.userId != null) {
+    sendAutoNotification({ shipmentId: id, userId: shipment.userId, status: parsed.data.status, route }).catch(() => {});
+  }
 
   res.json(formatShipment(shipment));
 });
@@ -303,7 +357,9 @@ router.patch("/shipments/:id/cancel-approve", requireAdmin, async (req, res): Pr
 
   if (!shipment) { res.status(404).json({ error: "案件が見つかりません" }); return; }
 
-  sendAutoNotification({ shipmentId: id, userId: shipment.userId, status: "キャンセル" }).catch(() => {});
+  if (shipment.userId != null) {
+    sendAutoNotification({ shipmentId: id, userId: shipment.userId, status: "キャンセル" }).catch(() => {});
+  }
 
   res.json(formatShipment(shipment));
 });
@@ -330,6 +386,15 @@ router.patch("/shipments/:id/cancel-reject", requireAdmin, async (req, res): Pro
 router.get("/shipments/:id/stops", requireAuth, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "無効なID" }); return; }
+
+  // Authorization: verify ownership before reading stops
+  const [shipment] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, id)).limit(1);
+  if (!shipment) { res.status(404).json({ error: "案件が見つかりません" }); return; }
+  const isAdmin = req.session.userRole === "admin";
+  if (!isAdmin && shipment.userId !== req.session.userId) {
+    res.status(403).json({ error: "アクセス権限がありません" }); return;
+  }
+
   const rows = await db.execute(sql`SELECT stops_json FROM shipments WHERE id = ${id}`);
   const raw = (rows.rows?.[0] as any)?.stops_json ?? null;
   res.json({ stops: raw ? JSON.parse(raw) : [] });

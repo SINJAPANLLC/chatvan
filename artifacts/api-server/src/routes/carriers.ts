@@ -1,9 +1,9 @@
 import { Router, type IRouter } from "express";
 import { db, carriersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-// Zod schemas removed in Chat VAN migration
-type CreateCarrierBody = any;
-type UpdateCarrierBody = any;
+import { insertCarrierSchema } from "@workspace/db";
+const CreateCarrierBody = insertCarrierSchema;
+const UpdateCarrierBody = insertCarrierSchema.partial();
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 
 const router: IRouter = Router();

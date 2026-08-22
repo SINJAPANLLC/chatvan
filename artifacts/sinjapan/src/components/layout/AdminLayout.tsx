@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { useGetMe, useLogout } from '@workspace/api-client-react';
+import { getGetMeQueryKey, useGetMe, useLogout } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   LayoutDashboard, Car, Building2, Users, FileText,
   Loader2, ArrowLeft, Bell, Menu, X, MessageSquare,
   Bot, Receipt, TrendingUp, Mail, BookOpen, Search,
   MessageCircle, ScrollText, Activity, ClipboardCheck,
+  Package, Shield, MapPin, AlertTriangle, RotateCcw,
+  CreditCard, UserCheck,
 } from 'lucide-react';
 
 type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
@@ -18,6 +20,7 @@ const NAV_SECTIONS: Section[] = [
     items: [
       { href: '/admin',              label: 'ダッシュボード', icon: LayoutDashboard },
       { href: '/admin/applications', label: '相談一覧',       icon: MessageSquare },
+      { href: '/admin/shipments',    label: '案件一覧',        icon: Package },
     ],
   },
   {
@@ -27,13 +30,25 @@ const NAV_SECTIONS: Section[] = [
       { href: '/admin/rental-companies', label: 'レンタル会社', icon: Building2 },
       { href: '/admin/vehicles',         label: '車両管理',     icon: Car },
       { href: '/admin/company-vehicles', label: '車両審査',     icon: ClipboardCheck },
+      { href: '/admin/screening',        label: '審査管理',     icon: UserCheck },
     ],
   },
   {
     title: '財務',
     items: [
       { href: '/admin/corporate', label: '法人口座審査',   icon: Building2 },
-      { href: '/admin/finance',  label: 'PL・BS・CF',    icon: TrendingUp },
+      { href: '/admin/invoices',  label: '請求書',         icon: Receipt },
+      { href: '/admin/payments',  label: '支払管理',       icon: CreditCard },
+      { href: '/admin/finance',   label: 'PL・BS・CF',    icon: TrendingUp },
+    ],
+  },
+  {
+    title: '運用',
+    items: [
+      { href: '/admin/insurance',  label: '保険管理',   icon: Shield },
+      { href: '/admin/gps',        label: 'GPS追跡',    icon: MapPin },
+      { href: '/admin/incidents',  label: '事故・故障', icon: AlertTriangle },
+      { href: '/admin/recovery',   label: '回収管理',   icon: RotateCcw },
     ],
   },
   {
@@ -57,14 +72,17 @@ const NAV_SECTIONS: Section[] = [
 ];
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { data: user, isLoading } = useGetMe();
+  const { data: user, isLoading } = useGetMe({
+    query: { queryKey: getGetMeQueryKey(), retry: false },
+  });
   const [location, setLocation] = useLocation();
   const logout = useLogout();
   const queryClient = useQueryClient();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   React.useEffect(() => {
-    if (!isLoading && (!user || user.role !== 'admin')) setLocation('/');
+    if (!isLoading && !user) setLocation('/login');
+    else if (!isLoading && user && user.role !== 'admin') setLocation('/');
   }, [user, isLoading, setLocation]);
 
   if (isLoading) {
@@ -74,7 +92,13 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  if (!user || user.role !== 'admin') return null;
+  if (!user || user.role !== 'admin') {
+    return (
+      <div className="min-h-[100dvh] flex items-center justify-center bg-sidebar text-sm text-muted-foreground">
+        ログイン画面へ移動しています…
+      </div>
+    );
+  }
 
   const handleLogout = () => {
     localStorage.removeItem('sinjapan_auth_token');

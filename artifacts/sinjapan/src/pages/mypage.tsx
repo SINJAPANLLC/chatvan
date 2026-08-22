@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useListVanContracts, useGetMe } from '@workspace/api-client-react';
+import { useListVanContracts, getListVanContractsQueryKey, useGetMe } from '@workspace/api-client-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, Car, JapaneseYen, Calendar, CreditCard, ChevronRight, MessageSquare, BadgeCheck, AlertCircle, Clock, FileText, Pencil, ShieldCheck, PlusCircle } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
@@ -190,7 +190,7 @@ export default function MyPage() {
   const [idvStatus, setIdvStatus] = useState<IDVStatus | null>(null);
 
   const { data: contracts, isLoading: isContractsLoading } = useListVanContracts({}, {
-    query: { enabled: !!user }
+    query: { queryKey: getListVanContractsQueryKey({}), enabled: !!user }
   });
 
   React.useEffect(() => {

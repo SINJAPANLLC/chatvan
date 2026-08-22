@@ -1118,3 +1118,48 @@ export const GetPaymentResponse = zod.object({
 })
 
 
+export const ListContractMessagesParams = zod.object({
+  "contractId": zod.coerce.number().int()
+})
+
+export const ListContractMessagesResponse = zod.array(zod.object({
+  "id": zod.number().int(),
+  "contract_id": zod.number().int(),
+  "sender_id": zod.number().int(),
+  "sender_role": zod.string(),
+  "message": zod.string(),
+  "is_read": zod.boolean(),
+  "created_at": zod.string(),
+  "sender_name": zod.string().nullish(),
+  "sender_role_actual": zod.string().nullish()
+}))
+
+export const SendContractMessageBody = zod.object({
+  "message": zod.string()
+})
+
+export const SendContractMessageParams = zod.object({
+  "contractId": zod.coerce.number().int()
+})
+
+export const SendContractMessageResponse = zod.object({
+  "id": zod.number().int(),
+  "contract_id": zod.number().int(),
+  "sender_id": zod.number().int(),
+  "sender_role": zod.string(),
+  "message": zod.string(),
+  "is_read": zod.boolean(),
+  "created_at": zod.string(),
+  "sender_name": zod.string().nullish(),
+  "sender_role_actual": zod.string().nullish()
+})
+
+export const GetContractUnreadCountParams = zod.object({
+  "contractId": zod.coerce.number().int()
+})
+
+export const GetContractUnreadCountResponse = zod.object({
+  "unread": zod.number().int()
+})
+
+

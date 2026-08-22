@@ -34,7 +34,7 @@ function ActiveContractLocationTracker({ enabled }: { enabled: boolean }) {
     let watchId: number | null = null;
     let heartbeatId: number | null = null;
     const token = localStorage.getItem('sinjapan_auth_token');
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
     const stopTracking = () => {
       if (watchId !== null) navigator.geolocation.clearWatch(watchId);
@@ -147,8 +147,9 @@ export function UserLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user) return;
     const token = localStorage.getItem('sinjapan_auth_token');
+    const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
     fetch(apiUrl('/van/my/applications'), {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers: authHeaders,
     })
       .then(r => r.ok ? r.json() : [])
       .then((data: VanApp[]) => setHistory(data))

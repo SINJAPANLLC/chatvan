@@ -465,6 +465,14 @@ async function runMigrations() {
     logger.warn({ err: e.message }, "upload_claims migration (non-fatal)");
   }
 
+  // Add company_id to upload_claims for company-uploaded objects ownership
+  try {
+    await db.execute(sql`ALTER TABLE upload_claims ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCES rental_companies(id)`);
+    logger.info("migration: upload_claims.company_id column ready");
+  } catch (e: any) {
+    logger.warn({ err: e.message }, "upload_claims company_id migration (non-fatal)");
+  }
+
   logger.info("migration: all Chat VAN tables ready");
   // 管理通知・お問い合わせの送信状態を既存データを保持したまま追跡可能にする。
   await db.execute(sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS email_status TEXT NOT NULL DEFAULT 'not_requested'`);

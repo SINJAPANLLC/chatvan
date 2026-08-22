@@ -76,6 +76,12 @@ const AdminBlog             = lazy(() => import('@/pages/admin/blog'));
 const AdminEmailMarketing   = lazy(() => import('@/pages/admin/email-marketing'));
 const AdminSeo              = lazy(() => import('@/pages/admin/seo'));
 const AdminContacts         = lazy(() => import('@/pages/admin/contacts'));
+const AdminShipments        = lazy(() => import('@/pages/admin/shipments'));
+const AdminShipmentDetail   = lazy(() => import('@/pages/admin/shipment-detail'));
+
+// 公開ページ
+const InvoicesList  = lazy(() => import('@/pages/invoices'));
+const MasterCard    = lazy(() => import('@/pages/master-card'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -176,6 +182,12 @@ function Router() {
         <Route path="/admin/contacts">
           <AdminLayout><AdminContacts /></AdminLayout>
         </Route>
+        <Route path="/admin/shipments/:id">
+          <AdminLayout><AdminShipmentDetail /></AdminLayout>
+        </Route>
+        <Route path="/admin/shipments">
+          <AdminLayout><AdminShipments /></AdminLayout>
+        </Route>
 
         {/* 公開ブログ */}
         <Route path="/blog" component={BlogIndex} />
@@ -245,6 +257,9 @@ function Router() {
         <Route path="/invoices/:id">
           <UserLayout><InvoiceDetail /></UserLayout>
         </Route>
+        <Route path="/invoices">
+          <UserLayout><InvoicesList /></UserLayout>
+        </Route>
         <Route path="/settings">
           <UserLayout><Settings /></UserLayout>
         </Route>
@@ -257,6 +272,9 @@ function Router() {
         <Route path="/identity-verification">
           <UserLayout><IdentityVerification /></UserLayout>
         </Route>
+
+        {/* マスターカード（公開トークンページ） */}
+        <Route path="/master-card/:token" component={MasterCard} />
 
         <Route component={NotFound} />
       </Switch>

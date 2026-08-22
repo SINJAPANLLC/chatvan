@@ -27,9 +27,18 @@ import { requireAuth, requireAdmin, optionalAuth } from "../middlewares/auth";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { logUserActivity } from "../lib/userLogger";
 import { randomUUID } from "crypto";
-import { squareFetch } from "../lib/square-authorize";
+import { squareFetch, getSquareConfigError } from "../lib/square-authorize";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 import { notifyUser, notifyAdmins, notifyRcUsers } from "../lib/notifyHelpers";
+import { RC_ALLOWED_CONTRACT_STATUSES } from "../lib/rentalCompanyApplicationAccess";
+import {
+  getCaller,
+  authorizeApplicationOwnerOrAdmin,
+  authorizeContractOwnerOrAdmin,
+  authorizeApplicationLifecycleActor,
+  isInvoiceRequested,
+  activateInvoiceContract,
+} from "../lib/vanLifecycleAuth";
 
 
 const objectStorage = new ObjectStorageService();
@@ -499,10 +508,32 @@ router.post("/van/start", optionalAuth, async (req: Request, res: Response) => {
   }
 });
 
+function canAccessVanMessages(applicationUserId: number | null, userId: number, role: string): boolean {
+  return role === "admin" || (role === "user" && applicationUserId === userId);
+}
+
 // ── GET /van/applications/:id/messages ────────────────────────────────────
-router.get("/van/applications/:id/messages", async (req: Request, res: Response) => {
+router.get("/van/applications/:id/messages", requireAuth, async (req: Request, res: Response) => {
   try {
     const appId = parseInt(String(req.params.id));
+    if (!Number.isInteger(appId) || appId <= 0) {
+      return res.status(400).json({ error: "Invalid application ID" });
+    }
+
+    const userId = req.session.userId;
+    const role = req.session.userRole;
+    if (userId === undefined || !role) {
+      return res.status(401).json({ error: "認証が必要です" });
+    }
+
+    const [application] = await db.select({
+      userId: vanApplicationsTable.userId,
+    }).from(vanApplicationsTable).where(eq(vanApplicationsTable.id, appId));
+    if (!application) return res.status(404).json({ error: "Application not found" });
+    if (!canAccessVanMessages(application.userId, userId, role)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
     const messages = await db.select().from(vanMessagesTable)
       .where(eq(vanMessagesTable.vanApplicationId, appId))
       .orderBy(vanMessagesTable.createdAt);
@@ -520,17 +551,27 @@ router.get("/van/applications/:id/messages", async (req: Request, res: Response)
 });
 
 // ── POST /van/applications/:id/messages ───────────────────────────────────
-router.post("/van/applications/:id/messages", optionalAuth, async (req: Request, res: Response) => {
+router.post("/van/applications/:id/messages", requireAuth, async (req: Request, res: Response) => {
   try {
     const appId = parseInt(String(req.params.id));
+    if (!Number.isInteger(appId) || appId <= 0) return res.status(400).json({ error: "Invalid application ID" });
     const { message } = req.body as { message: string };
     if (!message?.trim()) return res.status(400).json({ error: "message required" });
 
     const [app] = await db.select().from(vanApplicationsTable).where(eq(vanApplicationsTable.id, appId));
     if (!app) return res.status(404).json({ error: "Application not found" });
 
+    const callerUserId = req.session.userId;
+    const callerRole = req.session.userRole;
+    if (callerUserId === undefined || !callerRole) {
+      return res.status(401).json({ error: "認証が必要です" });
+    }
+    if (!canAccessVanMessages(app.userId, callerUserId, callerRole)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
     // ユーザー登録情報を取得
-    const sessionUserId: number | undefined = (req.session as any)?.userId ?? app.userId ?? undefined;
+    const sessionUserId = callerUserId;
     let userInfo: UserInfo | undefined;
     if (sessionUserId) {
       const [u] = await db.select({ name: usersTable.name, email: usersTable.email, phone: usersTable.phone })
@@ -726,11 +767,145 @@ router.get("/van/applications/stats", requireAuth, requireAdmin, async (_req: Re
 });
 
 // ── GET /van/applications/:id ──────────────────────────────────────────────
+//
+// Authorization matrix:
+//   admin          – full DTO (unchanged)
+//   user           – only their own application, full DTO (unchanged)
+//   rental_company – ONLY if there is a van_contract for this application
+//                    whose vehicle belongs to their rental company AND whose
+//                    status is one of: active | payment_issue | return_pending | completed.
+//                    These are the post-activation statuses, meaning the contract
+//                    was explicitly executed (signed, paid, and handed over).
+//                    draft / pending_* / payment_processing / cancelled are all
+//                    pre-commitment or void — a company must not gain read access
+//                    merely because a proposal once listed one of their vehicles.
+//                    Authorised rental_company callers receive a role-scoped minimal
+//                    DTO: no eKYC/identityVerification, no applicant PII, no
+//                    payment-sensitive fields, no competing vehicles.
+//
 router.get("/van/applications/:id", requireAuth, async (req: Request, res: Response) => {
   try {
-    const id = parseInt(String(req.params.id));
+    const id = parseInt(String(req.params.id), 10);
+    if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "Invalid application ID" });
+
+    const callerUserId = req.session.userId;
+    const callerRole = req.session.userRole;
+    if (callerUserId === undefined || !callerRole) {
+      return res.status(401).json({ error: "認証が必要です" });
+    }
+
     const [app] = await db.select().from(vanApplicationsTable).where(eq(vanApplicationsTable.id, id));
     if (!app) return res.status(404).json({ error: "Not found" });
+
+    // ── Authorization ─────────────────────────────────────────────────────
+    if (callerRole === "admin") {
+      // Admin: full access — fall through
+    } else if (callerRole === "user") {
+      // Regular user: only their own application
+      if (app.userId !== callerUserId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+    } else if (callerRole === "rental_company") {
+      // Step 1: resolve the rental company that owns the caller's account.
+      const rcRaw = await db.execute(
+        sql`SELECT rental_company_id FROM users WHERE id = ${callerUserId} LIMIT 1`
+      );
+      const callerRcId: number | null =
+        ((rcRaw as any).rows ?? rcRaw)[0]?.rental_company_id ?? null;
+
+      if (!callerRcId) return res.status(403).json({ error: "Forbidden" });
+
+      // Step 2: require an explicitly activated contract for this application
+      //   whose vehicle belongs to this rental company.
+      //   Conservative status set — only post-payment, genuinely live or
+      //   historical contracts qualify.  A mere proposal listing their vehicle
+      //   is NOT sufficient.  See lib/rentalCompanyApplicationAccess.ts for
+      //   the full rationale and the allowed-status list.
+
+      const rcContractCheck = await db.execute(
+        sql`
+          SELECT vc.id
+          FROM van_contracts vc
+          JOIN vehicles v ON v.id = vc.vehicle_id
+          WHERE vc.application_id = ${id}
+            AND v.rental_company_id  = ${callerRcId}
+            AND vc.status = ANY(ARRAY[${sql.join(
+              RC_ALLOWED_CONTRACT_STATUSES.map((s) => sql`${s}`),
+              sql`, `
+            )}]::text[])
+          LIMIT 1
+        `
+      );
+      const rcContractFound =
+        (((rcContractCheck as any).rows ?? rcContractCheck)[0]?.id ?? null) !== null;
+
+      if (!rcContractFound) return res.status(403).json({ error: "Forbidden" });
+
+      // ── Rental-company scoped minimal DTO ───────────────────────────────
+      // Return only fields genuinely needed for the company's workflow.
+      // Intentionally excluded: applicant PII (name/phone/email/dob/address/
+      // licenseInfo), identityVerification/eKYC, aiSummary, adminNotes,
+      // payment/card-sensitive fields, other companies' proposed vehicles,
+      // and sensitive contract internals (signatureData, specialTerms, etc.).
+      const rcContractRows = await db
+        .select({
+          contract: {
+            id:           vanContractsTable.id,
+            contractNumber: vanContractsTable.contractNumber,
+            status:       vanContractsTable.status,
+            startDate:    vanContractsTable.startDate,
+            plannedEndDate: vanContractsTable.plannedEndDate,
+            vehicleId:    vanContractsTable.vehicleId,
+            createdAt:    vanContractsTable.createdAt,
+            updatedAt:    vanContractsTable.updatedAt,
+          },
+          vehicle: {
+            id:            vehiclesTable.id,
+            maker:         vehiclesTable.maker,
+            model:         vehiclesTable.model,
+            grade:         vehiclesTable.grade,
+            year:          vehiclesTable.year,
+            licensePlate:  vehiclesTable.licensePlate,
+            color:         vehiclesTable.color,
+            prefecture:    vehiclesTable.prefecture,
+            mileage:       vehiclesTable.mileage,
+            status:        vehiclesTable.status,
+          },
+        })
+        .from(vanContractsTable)
+        .innerJoin(vehiclesTable, eq(vanContractsTable.vehicleId, vehiclesTable.id))
+        .where(
+          and(
+            eq(vanContractsTable.applicationId, id),
+            eq(vehiclesTable.rentalCompanyId, callerRcId),
+            inArray(vanContractsTable.status, [...RC_ALLOWED_CONTRACT_STATUSES]),
+          )
+        )
+        .limit(1)
+        .catch(() => []);
+
+      const rcContractRow = rcContractRows[0] ?? null;
+
+      return res.json({
+        // Minimal application fields — workflow-relevant only, no PII
+        id:             app.id,
+        status:         app.status,
+        area:           app.area,
+        prefecture:     app.prefecture,
+        startDate:      app.startDate,
+        durationMonths: app.durationMonths,
+        deliveryType:   app.deliveryType,
+        createdAt:      app.createdAt,
+        updatedAt:      app.updatedAt,
+        // Contract and vehicle for this company only
+        contract: rcContractRow?.contract ?? null,
+        vehicle:  rcContractRow?.vehicle ?? null,
+      });
+    } else {
+      // Unknown role — deny
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    // ── End Authorization ─────────────────────────────────────────────────
 
     let proposedVehicles = null;
     const [proposal] = await db.select().from(vanProposalsTable)
@@ -738,7 +913,10 @@ router.get("/van/applications/:id", requireAuth, async (req: Request, res: Respo
       .orderBy(desc(vanProposalsTable.createdAt)).limit(1);
 
     if (proposal) {
-      const vehicleIds: number[] = JSON.parse(proposal.vehicleIds);
+      const parsedProposalVehicleIds: unknown = (() => { try { return JSON.parse(proposal.vehicleIds); } catch { return []; } })();
+      const vehicleIds = Array.isArray(parsedProposalVehicleIds)
+        ? parsedProposalVehicleIds.filter((v): v is number => typeof v === "number" && Number.isSafeInteger(v) && v > 0)
+        : [];
       if (vehicleIds.length > 0) {
         const rows = await db.select({ vehicle: vehiclesTable, company: rentalCompaniesTable })
           .from(vehiclesTable)
@@ -855,7 +1033,13 @@ router.post("/van/applications/:id/propose", requireAuth, requireAdmin, async (r
 router.post("/van/applications/:id/accept", requireAuth, async (req: Request, res: Response) => {
   try {
     const appId = parseInt(String(req.params.id));
-    const { vehicleId } = req.body as { vehicleId: number };
+    if (!Number.isInteger(appId)) return res.status(400).json({ error: "Invalid application id" });
+
+    // AUTHZ: only the application owner or an admin may accept an application.
+    const caller = getCaller(req);
+    const authz = await authorizeApplicationOwnerOrAdmin(caller, appId);
+    if (!authz.ok) return res.status(authz.status).json({ error: authz.error });
+
     const [app] = await db.update(vanApplicationsTable)
       .set({ status: "application_received", updatedAt: new Date() })
       .where(eq(vanApplicationsTable.id, appId)).returning();
@@ -1061,46 +1245,230 @@ router.get("/van/dashboard/calendar", requireAuth, requireAdmin, async (_req: Re
 });
 
 // ── Contracts ──────────────────────────────────────────────────────────────
+// ── Authorization helper: rental-company minimal contract DTO ────────────────
+// Fields excluded for rental_company callers: userId, signatureData,
+// specialTerms, terminationTerms, returnTerms, platformContractAgreedAt,
+// vehicleContractAgreedAt, termsAgreedAt, notes, applicationId, and any
+// payment/card-sensitive data (paymentMethod, paymentDay, sinJapanFee,
+// optionsFee). This DTO is the single source-of-truth for both list and detail.
+function rcContractDto(
+  contract: typeof vanContractsTable.$inferSelect,
+  vehicle: (typeof vehiclesTable.$inferSelect) | null,
+) {
+  return {
+    id:                       contract.id,
+    contractNumber:           contract.contractNumber,
+    status:                   contract.status,
+    startDate:                contract.startDate,
+    plannedEndDate:           contract.plannedEndDate,
+    minimumTerm:              contract.minimumTerm,
+    monthlyPrice:             contract.monthlyPrice,
+    blackNumberRequested:     contract.blackNumberRequested,
+    insuranceReferralRequested: contract.insuranceReferralRequested,
+    gpsConsent:               contract.gpsConsent,
+    pickupAddress:            (contract as any).pickupAddress ?? null,
+    pickupDatetime:           (contract as any).pickupDatetime ?? null,
+    createdAt:                contract.createdAt,
+    updatedAt:                contract.updatedAt,
+    vehicle: vehicle
+      ? {
+          id:           vehicle.id,
+          maker:        vehicle.maker,
+          model:        vehicle.model,
+          grade:        vehicle.grade,
+          year:         vehicle.year,
+          licensePlate: vehicle.licensePlate,
+          color:        vehicle.color,
+          prefecture:   vehicle.prefecture,
+          mileage:      vehicle.mileage,
+          status:       vehicle.status,
+        }
+      : null,
+  };
+}
+
+// GET /van/contracts  契約一覧
+// Access policy:
+//   admin         — all contracts; caller-supplied userId filter is honoured
+//   user          — only contracts whose userId matches the session; caller-
+//                   supplied userId filter is silently ignored
+//   rental_company — only contracts whose vehicle belongs to the caller's
+//                   rental company AND whose lifecycle status is in the
+//                   RC_ALLOWED_CONTRACT_STATUSES list; caller-supplied
+//                   userId filter is silently ignored; returns minimal DTO
 router.get("/van/contracts", requireAuth, async (req: Request, res: Response) => {
   try {
-    const userId: number | undefined = (req.session as any)?.userId;
-    const user = req.query.userId ? parseInt(req.query.userId as string) : userId;
+    const callerUserId: number = (req.session as any)?.userId;
+    const callerRole: string   = (req.session as any)?.userRole ?? "user";
     const { status } = req.query as { status?: string };
-    const rows = await db.select({ contract: vanContractsTable, vehicle: vehiclesTable, company: rentalCompaniesTable })
-      .from(vanContractsTable)
-      .leftJoin(vehiclesTable, eq(vanContractsTable.vehicleId, vehiclesTable.id))
-      .leftJoin(rentalCompaniesTable, eq(vehiclesTable.rentalCompanyId, rentalCompaniesTable.id))
-      .where(and(user ? eq(vanContractsTable.userId, user) : undefined, status ? eq(vanContractsTable.status, status as any) : undefined))
-      .orderBy(desc(vanContractsTable.createdAt));
-    const ids = rows.map(r => r.contract.id);
-    let paymentMethods: Record<number, string> = {};
-    if (ids.length > 0) {
-      const pmRows = await db.execute(sql`SELECT id, payment_method FROM van_contracts WHERE id = ANY(ARRAY[${sql.raw(ids.join(','))}]::int[])`);
-      for (const r of ((pmRows as any).rows ?? pmRows)) paymentMethods[r.id] = r.payment_method ?? null;
+
+    // ── Authorization & query dispatch ─────────────────────────────────────
+    if (callerRole === "admin") {
+      // Admin: may filter by an arbitrary userId query param (operator-level tool)
+      const filterUserId = req.query.userId ? parseInt(req.query.userId as string) : undefined;
+      const rows = await db
+        .select({ contract: vanContractsTable, vehicle: vehiclesTable, company: rentalCompaniesTable })
+        .from(vanContractsTable)
+        .leftJoin(vehiclesTable, eq(vanContractsTable.vehicleId, vehiclesTable.id))
+        .leftJoin(rentalCompaniesTable, eq(vehiclesTable.rentalCompanyId, rentalCompaniesTable.id))
+        .where(
+          and(
+            filterUserId ? eq(vanContractsTable.userId, filterUserId) : undefined,
+            status ? eq(vanContractsTable.status, status as any) : undefined,
+          ),
+        )
+        .orderBy(desc(vanContractsTable.createdAt));
+
+      const ids = rows.map(r => r.contract.id);
+      let paymentMethods: Record<number, string> = {};
+      if (ids.length > 0) {
+        const pmRows = await db.execute(
+          sql`SELECT id, payment_method FROM van_contracts WHERE id = ANY(ARRAY[${sql.raw(ids.join(","))}]::int[])`,
+        );
+        for (const r of ((pmRows as any).rows ?? pmRows)) paymentMethods[r.id] = r.payment_method ?? null;
+      }
+      return res.json(
+        rows.map(({ contract, vehicle, company }) => ({
+          ...contract,
+          paymentMethod: paymentMethods[contract.id] ?? null,
+          vehicle: vehicle ? { ...vehicle, rentalCompany: company } : null,
+        })),
+      );
+
+    } else if (callerRole === "rental_company") {
+      // rental_company: look up which rental company this user belongs to first
+      const rcRaw = await db.execute(
+        sql`SELECT rental_company_id FROM users WHERE id = ${callerUserId} LIMIT 1`,
+      );
+      const callerRcId: number | null =
+        ((rcRaw as any).rows ?? rcRaw)[0]?.rental_company_id ?? null;
+
+      if (!callerRcId) return res.status(403).json({ error: "Forbidden" });
+
+      // Query: contracts whose vehicle belongs to this company, restricted
+      // to the lifecycle statuses that are relevant for company operations.
+      const rows = await db
+        .select({ contract: vanContractsTable, vehicle: vehiclesTable })
+        .from(vanContractsTable)
+        .innerJoin(vehiclesTable, eq(vanContractsTable.vehicleId, vehiclesTable.id))
+        .where(
+          and(
+            eq(vehiclesTable.rentalCompanyId, callerRcId),
+            inArray(vanContractsTable.status, [...RC_ALLOWED_CONTRACT_STATUSES]),
+            status ? eq(vanContractsTable.status, status as any) : undefined,
+          ),
+        )
+        .orderBy(desc(vanContractsTable.createdAt));
+
+      return res.json(rows.map(({ contract, vehicle }) => rcContractDto(contract, vehicle)));
+
+    } else {
+      // Regular user: only their own contracts; userId query param is ignored
+      const rows = await db
+        .select({ contract: vanContractsTable, vehicle: vehiclesTable, company: rentalCompaniesTable })
+        .from(vanContractsTable)
+        .leftJoin(vehiclesTable, eq(vanContractsTable.vehicleId, vehiclesTable.id))
+        .leftJoin(rentalCompaniesTable, eq(vehiclesTable.rentalCompanyId, rentalCompaniesTable.id))
+        .where(
+          and(
+            eq(vanContractsTable.userId, callerUserId),
+            status ? eq(vanContractsTable.status, status as any) : undefined,
+          ),
+        )
+        .orderBy(desc(vanContractsTable.createdAt));
+
+      const ids = rows.map(r => r.contract.id);
+      let paymentMethods: Record<number, string> = {};
+      if (ids.length > 0) {
+        const pmRows = await db.execute(
+          sql`SELECT id, payment_method FROM van_contracts WHERE id = ANY(ARRAY[${sql.raw(ids.join(","))}]::int[])`,
+        );
+        for (const r of ((pmRows as any).rows ?? pmRows)) paymentMethods[r.id] = r.payment_method ?? null;
+      }
+      return res.json(
+        rows.map(({ contract, vehicle, company }) => ({
+          ...contract,
+          paymentMethod: paymentMethods[contract.id] ?? null,
+          vehicle: vehicle ? { ...vehicle, rentalCompany: company } : null,
+        })),
+      );
     }
-    return res.json(rows.map(({ contract, vehicle, company }) => ({
-      ...contract,
-      paymentMethod: paymentMethods[contract.id] ?? null,
-      vehicle: vehicle ? { ...vehicle, rentalCompany: company } : null,
-    })));
   } catch (err) {
-    console.error("list contracts error:", err);
+    req.log.error({ err }, "list contracts error");
     return res.status(500).json({ error: "Internal error" });
   }
 });
 
+// GET /van/contracts/:id  契約詳細
+// Access policy:
+//   admin         — full DTO for any contract
+//   user          — full DTO only if contract.userId === session userId
+//   rental_company — minimal DTO only if vehicle belongs to caller's company
+//                   AND contract status is in RC_ALLOWED_CONTRACT_STATUSES;
+//                   returns 403 otherwise (no information leak about existence)
 router.get("/van/contracts/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const id = parseInt(String(req.params.id));
-    const [row] = await db.select({ contract: vanContractsTable, vehicle: vehiclesTable, company: rentalCompaniesTable })
-      .from(vanContractsTable)
-      .leftJoin(vehiclesTable, eq(vanContractsTable.vehicleId, vehiclesTable.id))
-      .leftJoin(rentalCompaniesTable, eq(vehiclesTable.rentalCompanyId, rentalCompaniesTable.id))
-      .where(eq(vanContractsTable.id, id));
-    if (!row) return res.status(404).json({ error: "Not found" });
-    return res.json({ ...row.contract, vehicle: { ...row.vehicle, rentalCompany: row.company } });
+    if (!Number.isInteger(id)) return res.status(400).json({ error: "Invalid contract id" });
+
+    const callerUserId: number = (req.session as any)?.userId;
+    const callerRole: string   = (req.session as any)?.userRole ?? "user";
+
+    if (callerRole === "admin") {
+      // Admin: unrestricted — read then return full DTO
+      const [row] = await db
+        .select({ contract: vanContractsTable, vehicle: vehiclesTable, company: rentalCompaniesTable })
+        .from(vanContractsTable)
+        .leftJoin(vehiclesTable, eq(vanContractsTable.vehicleId, vehiclesTable.id))
+        .leftJoin(rentalCompaniesTable, eq(vehiclesTable.rentalCompanyId, rentalCompaniesTable.id))
+        .where(eq(vanContractsTable.id, id));
+      if (!row) return res.status(404).json({ error: "Not found" });
+      return res.json({ ...row.contract, vehicle: row.vehicle ? { ...row.vehicle, rentalCompany: row.company } : null });
+
+    } else if (callerRole === "rental_company") {
+      // Resolve rental company before touching contract data
+      const rcRaw = await db.execute(
+        sql`SELECT rental_company_id FROM users WHERE id = ${callerUserId} LIMIT 1`,
+      );
+      const callerRcId: number | null =
+        ((rcRaw as any).rows ?? rcRaw)[0]?.rental_company_id ?? null;
+
+      if (!callerRcId) return res.status(403).json({ error: "Forbidden" });
+
+      // Single authorized read: contract exists + vehicle belongs to company +
+      // status is in the allowed set — all checked atomically in one query.
+      const [row] = await db
+        .select({ contract: vanContractsTable, vehicle: vehiclesTable })
+        .from(vanContractsTable)
+        .innerJoin(vehiclesTable, eq(vanContractsTable.vehicleId, vehiclesTable.id))
+        .where(
+          and(
+            eq(vanContractsTable.id, id),
+            eq(vehiclesTable.rentalCompanyId, callerRcId),
+            inArray(vanContractsTable.status, [...RC_ALLOWED_CONTRACT_STATUSES]),
+          ),
+        );
+
+      if (!row) return res.status(403).json({ error: "Forbidden" });
+
+      return res.json(rcContractDto(row.contract, row.vehicle));
+
+    } else {
+      // Regular user: read first, then authorize (no info-leak: 403 if not owner)
+      const [row] = await db
+        .select({ contract: vanContractsTable, vehicle: vehiclesTable, company: rentalCompaniesTable })
+        .from(vanContractsTable)
+        .leftJoin(vehiclesTable, eq(vanContractsTable.vehicleId, vehiclesTable.id))
+        .leftJoin(rentalCompaniesTable, eq(vehiclesTable.rentalCompanyId, rentalCompaniesTable.id))
+        .where(eq(vanContractsTable.id, id));
+
+      if (!row) return res.status(404).json({ error: "Not found" });
+      if (row.contract.userId !== callerUserId) return res.status(403).json({ error: "Forbidden" });
+
+      return res.json({ ...row.contract, vehicle: row.vehicle ? { ...row.vehicle, rentalCompany: row.company } : null });
+    }
   } catch (err) {
-    console.error("get contract error:", err);
+    req.log.error({ err }, "get contract error");
     return res.status(500).json({ error: "Internal error" });
   }
 });
@@ -1363,15 +1731,68 @@ router.patch("/van/invoices/:id/status", requireAuth, requireAdmin, async (req: 
     if (!['draft', 'sent', 'pending', 'paid', 'overdue', 'cancelled'].includes(status)) {
       return res.status(400).json({ error: "Invalid status" });
     }
+    // Load the invoice first so that, on payment confirmation, we can advance the
+    // linked contract through the single authoritative activation transition.
+    const invRows = await db.execute(sql`
+      SELECT id, contract_id, user_id FROM invoices WHERE id = ${id} LIMIT 1
+    `);
+    const invoice = ((invRows as any)?.rows ?? invRows ?? [])[0];
+    if (!invoice) return res.status(404).json({ error: "請求書が見つかりません" });
+
     await db.execute(sql`
       UPDATE invoices
       SET status = ${status},
           paid_at = ${status === 'paid' ? sql`NOW()` : sql`NULL`}
       WHERE id = ${id}
     `);
-    return res.json({ ok: true });
+
+    // 入金確認 → 契約を有効化（payment_processing の掛け払い契約のみ）。
+    // これが請求書ライフサイクルにおける唯一の active 遷移。
+    let activated = false;
+    if (status === 'paid' && invoice.contract_id != null) {
+      const result = await activateInvoiceContract(Number(invoice.contract_id));
+      activated = result.activated;
+      if (activated && invoice.user_id != null) {
+        await notifyUser(Number(invoice.user_id), "Chat VAN - 入金確認完了",
+          "ご入金を確認しました。車両のお引渡し手続きへ進みます。");
+      }
+    }
+    return res.json({ ok: true, contractActivated: activated });
   } catch (err) {
     console.error("invoice status update error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// POST /van/contracts/:id/activate-invoice  掛け払い契約の入金確認・有効化（管理者）
+// 請求書払いで payment_processing にある契約を、唯一の権威ある遷移で
+// active（application=delivery_pending / vehicle=rented）へ進める。
+// クライアント入力に基づく直接有効化は許可しない（管理者のみ）。
+router.post("/van/contracts/:id/activate-invoice", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(String(req.params.id));
+    if (!Number.isInteger(id)) return res.status(400).json({ error: "Invalid contract id" });
+
+    const [contract] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.id, id));
+    if (!contract) return res.status(404).json({ error: "Contract not found" });
+    if (contract.paymentMethod !== "invoice") {
+      return res.status(400).json({ error: "この契約は請求書払いではありません" });
+    }
+    if (contract.status !== "payment_processing") {
+      return res.status(400).json({ error: "決済処理中の請求書払い契約のみ有効化できます" });
+    }
+
+    const result = await activateInvoiceContract(id);
+    if (!result.activated) {
+      return res.status(409).json({ error: "契約はすでに処理済みです" });
+    }
+
+    await notifyUser(contract.userId, "Chat VAN - 入金確認完了",
+      "ご入金を確認しました。車両のお引渡し手続きへ進みます。");
+
+    return res.json({ ok: true, status: "active" });
+  } catch (err) {
+    console.error("activate invoice contract error:", err);
     return res.status(500).json({ error: "Internal error" });
   }
 });
@@ -1393,8 +1814,10 @@ router.post("/van/contracts/:id/invoice", requireAuth, requireAdmin, async (req:
     if (contract.payment_method !== "invoice") {
       return res.status(400).json({ error: "この契約は請求書払いではありません" });
     }
-    if (contract.status !== "active") {
-      return res.status(400).json({ error: "利用中の契約のみ請求書を発行できます" });
+    // 掛け払いの初回請求書は入金確認（有効化）前に発行できる必要がある。
+    // payment_processing（承認済み・入金待ち）または active（利用中）を許可する。
+    if (contract.status !== "active" && contract.status !== "payment_processing") {
+      return res.status(400).json({ error: "請求書は決済処理中または利用中の契約のみ発行できます" });
     }
 
     const jstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
@@ -1500,6 +1923,13 @@ router.patch("/van/contracts/:id", requireAuth, requireAdmin, async (req: Reques
 router.post("/van/contracts/:id/agree-platform", requireAuth, async (req: Request, res: Response) => {
   try {
     const id = parseInt(String(req.params.id));
+    if (!Number.isInteger(id)) return res.status(400).json({ error: "Invalid contract id" });
+
+    // AUTHZ: only the contract owner or an admin may record consent/signature state.
+    const caller = getCaller(req);
+    const authz = await authorizeContractOwnerOrAdmin(caller, id);
+    if (!authz.ok) return res.status(authz.status).json({ error: authz.error });
+
     const ipAddress = req.ip;
     const userAgent = req.headers["user-agent"];
     const signatureData = JSON.stringify({ ip: ipAddress, ua: userAgent, agreedAt: new Date().toISOString() });
@@ -1530,6 +1960,13 @@ router.post("/van/contracts/:id/agree-platform", requireAuth, async (req: Reques
 router.post("/van/contracts/:id/agree-vehicle", requireAuth, async (req: Request, res: Response) => {
   try {
     const id = parseInt(String(req.params.id));
+    if (!Number.isInteger(id)) return res.status(400).json({ error: "Invalid contract id" });
+
+    // AUTHZ: only the contract owner or an admin may record consent/signature state.
+    const caller = getCaller(req);
+    const authz = await authorizeContractOwnerOrAdmin(caller, id);
+    if (!authz.ok) return res.status(authz.status).json({ error: authz.error });
+
     const signatureData = JSON.stringify({ ip: req.ip, ua: req.headers["user-agent"], agreedAt: new Date().toISOString() });
 
     const [updated] = await db.update(vanContractsTable).set({
@@ -1630,6 +2067,9 @@ router.post("/van/contracts/:id/sign", requireAuth, async (req: Request, res: Re
 // ── POST /van/contracts/:id/square-charge  Square決済 ─────────────────────
 router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request, res: Response) => {
   try {
+    const cfgErr = getSquareConfigError();
+    if (cfgErr) return res.status(503).json({ error: cfgErr });
+
     const id = parseInt(String(req.params.id));
     const { sourceId } = req.body as { sourceId: string };
     if (!sourceId) return res.status(400).json({ error: "sourceId required" });
@@ -2059,62 +2499,61 @@ router.patch("/van/contracts/:id/options", requireAuth, async (req: Request, res
 router.post("/van/contracts/:id/pay", requireAuth, async (req: Request, res: Response) => {
   try {
     const id = parseInt(String(req.params.id));
-    const { method } = req.body as { method?: string };
+    if (!Number.isInteger(id)) return res.status(400).json({ error: "Invalid contract id" });
 
-    const [contract] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.id, id));
-    if (!contract) return res.status(404).json({ error: "Contract not found" });
+    // AUTHZ: only the contract owner or an admin may initiate payment on it.
+    const caller = getCaller(req);
+    const authz = await authorizeContractOwnerOrAdmin(caller, id);
+    if (!authz.ok) return res.status(authz.status).json({ error: authz.error });
+    const contract = authz.value;
 
-    // invoice 払いは法人口座が承認済み（approved）のみ許可
-    if (method === "invoice") {
-      const [user] = await db.select({ creditStatus: usersTable.creditStatus })
-        .from(usersTable).where(eq(usersTable.id, req.session.userId!)).limit(1);
-      if (!user || user.creditStatus !== "approved") {
-        return res.status(400).json({
-          error: user?.creditStatus === "pending"
-            ? "法人口座は現在審査中です。承認後にご利用いただけます。"
-            : "法人口座の申請が必要です。先に法人情報を入力してください。"
-        });
-      }
+    // Only a contract awaiting payment may be paid through this endpoint.
+    if (contract.status !== "pending_payment") {
+      return res.status(400).json({ error: "この契約は決済待ちの状態ではありません" });
     }
 
-    // 契約をアクティブに・申込は「受け取り待ち」に・支払方法を記録
-    await db.execute(sql`UPDATE van_contracts SET status = 'active', payment_method = ${method ?? 'card'}, updated_at = NOW() WHERE id = ${id}`);
-
-    if (contract.applicationId) {
-      await db.update(vanApplicationsTable)
-        .set({ status: "delivery_pending", updatedAt: new Date() })
-        .where(eq(vanApplicationsTable.id, contract.applicationId));
+    // Derive the payment method server-side. The client may only *opt in* to
+    // invoice billing; every other value is treated as card. Card activation is
+    // NEVER granted here — it must go through the verified Square provider
+    // success path (POST /van/contracts/:id/square-charge). This endpoint only
+    // handles the admin-approved invoice (法人請求書) flow.
+    if (!isInvoiceRequested((req.body as { method?: string })?.method)) {
+      return res.status(400).json({
+        error: "カード決済はカード決済画面（Square）から実行してください。",
+      });
     }
 
-    // 車両を rented に（提案一覧から除外するため）
-    if (contract.vehicleId) {
-      await db.update(vehiclesTable)
-        .set({ status: "rented", updatedAt: new Date() })
-        .where(eq(vehiclesTable.id, contract.vehicleId));
+    // invoice 払いは法人口座が承認済み（approved）のみ許可。
+    // 与信状態は契約名義人（contract.userId）で検証する（呼び出し元IDは信用しない）。
+    const [user] = await db.select({ creditStatus: usersTable.creditStatus })
+      .from(usersTable).where(eq(usersTable.id, contract.userId)).limit(1);
+    if (!user || user.creditStatus !== "approved") {
+      return res.status(400).json({
+        error: user?.creditStatus === "pending"
+          ? "法人口座は現在審査中です。承認後にご利用いただけます。"
+          : "法人口座の申請が必要です。先に法人情報を入力してください。"
+      });
     }
+
+    // 請求書払いは即時アクティブ化しない。管理者が請求書を発行し入金を確認
+    // （PATCH /van/invoices/:id/status, POST /van/contracts/:id/invoice）した
+    // 時点で active / vehicle=rented へ遷移する。ここでは支払方法を記録し、
+    // 契約を payment_processing に進めて管理者の処理待ちキューへ入れるのみ。
+    await db.execute(sql`
+      UPDATE van_contracts
+      SET payment_method = 'invoice', status = 'payment_processing', updated_at = NOW()
+      WHERE id = ${id} AND status = 'pending_payment'
+    `);
 
     // ユーザー通知
-    await notifyUser(contract.userId, "Chat VAN - 受け取り準備完了",
-      method === 'invoice'
-        ? "法人請求書払いの申請を受け付けました。担当者より審査結果をご連絡します。受け取り日時はレンタル会社へお電話ください。"
-        : "お支払いが完了しました。レンタル会社へ連絡して車両を受け取ってください。");
+    await notifyUser(contract.userId, "Chat VAN - 法人請求書払い申請受付",
+      "法人請求書払いの申請を受け付けました。担当者より請求書の発行・受け取り案内をご連絡します。");
 
     // 管理者通知
-    await notifyAdmins("Chat VAN - 決済完了・受け取り待ち",
-      `決済完了（契約ID: ${id} / 支払方法: ${method === 'invoice' ? '法人請求書' : 'カード'}）。車両受け取り待ちです。`);
+    await notifyAdmins("Chat VAN - 法人請求書払い申請",
+      `法人請求書払いの申請を受け付けました（契約ID: ${id}）。請求書発行と入金確認をお願いします。`);
 
-    // 協力会社へ通知（受け取り準備）
-    if (contract.vehicleId) {
-      const vehRcRaw2 = await db.execute(sql`SELECT rental_company_id FROM vehicles WHERE id = ${contract.vehicleId} LIMIT 1`);
-      const rcIdForPickup2 = ((vehRcRaw2 as any).rows ?? vehRcRaw2)[0]?.rental_company_id;
-      if (rcIdForPickup2) {
-        await notifyRcUsers(rcIdForPickup2,
-          "車両の受け取り準備をしてください",
-          `契約番号 ${contract.contractNumber ?? `#${contract.id}`} の${method === 'invoice' ? '法人請求書払い申請' : '決済'}が完了しました。利用者が車両を受け取りに来ます。`);
-      }
-    }
-
-    return res.json({ ok: true });
+    return res.json({ ok: true, paymentMethod: "invoice", status: "payment_processing" });
   } catch (err) {
     console.error("pay error:", err);
     return res.status(500).json({ error: "Internal error" });
@@ -2125,41 +2564,28 @@ router.post("/van/contracts/:id/pay", requireAuth, async (req: Request, res: Res
 router.post("/van/applications/:id/confirm-pickup", requireAuth, async (req: Request, res: Response) => {
   try {
     const appId = parseInt(String(req.params.id));
-    const userId: number | undefined = (req.session as any)?.userId;
+    if (!Number.isInteger(appId)) return res.status(400).json({ error: "Invalid application id" });
     const { pickupPhotos, pickupDocuments } = req.body as {
       pickupPhotos?: string[];
       pickupDocuments?: string[];
     };
 
-    const userRole: string | undefined = (req.session as any)?.userRole;
-    const [app] = await db.select().from(vanApplicationsTable).where(eq(vanApplicationsTable.id, appId));
-    if (!app) return res.status(404).json({ error: "Not found" });
-    const isAdmin = userRole === 'admin';
-    const isOwner = app.userId === userId;
-    if (!isAdmin && !isOwner) {
-      // 協力会社が自社車両の場合も許可
-      if (userRole === 'company') {
-        const [contractForAuth] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.applicationId, appId));
-        const rcRows = await db.execute(sql`SELECT rental_company_id FROM users WHERE id = ${userId} LIMIT 1`);
-        const rcId = (rcRows as any).rows?.[0]?.rental_company_id ?? (rcRows as any)[0]?.rental_company_id;
-        if (contractForAuth?.vehicleId && rcId) {
-          const [veh] = await db.select().from(vehiclesTable).where(eq(vehiclesTable.id, contractForAuth.vehicleId));
-          if (veh?.rentalCompanyId !== rcId) return res.status(403).json({ error: "Forbidden" });
-        } else {
-          return res.status(403).json({ error: "Forbidden" });
-        }
-      } else {
-        return res.status(403).json({ error: "Forbidden" });
-      }
-    }
+    // AUTHZ: admin, the application owner, or the rental_company that owns the
+    // contract vehicle. Uses the established rental_company role (not "company").
+    const authz = await authorizeApplicationLifecycleActor(getCaller(req), appId);
+    if (!authz.ok) return res.status(authz.status).json({ error: authz.error });
+    const app = authz.value.app;
+    // Use the EXACT authorized contract. Never re-query by application_id: for a
+    // rental_company caller this guarantees mutations stay scoped to the
+    // company-owned contract/vehicle rather than an arbitrary application row.
+    const contract = authz.value.contract;
     if (app.status !== "delivery_pending") return res.status(400).json({ error: "受け取り確認は delivery_pending 状態のみ可能です" });
 
     await db.update(vanApplicationsTable)
       .set({ status: "active", updatedAt: new Date() })
       .where(eq(vanApplicationsTable.id, appId));
 
-    // 車両ステータスを貸出中に・写真/書類を保存
-    const [contract] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.applicationId, appId));
+    // 車両ステータスを貸出中に・写真/書類を保存（認可済み契約のみ）
     if (contract) {
       await db.execute(sql`
         UPDATE van_contracts SET
@@ -2175,8 +2601,10 @@ router.post("/van/applications/:id/confirm-pickup", requireAuth, async (req: Req
       }
     }
 
-    await notifyUser(app.userId, "Chat VAN - 受け取り完了",
-      "車両の受け取りが完了しました。ご利用開始です。毎月の自動決済が設定された支払日に実行されます。");
+    if (app.userId != null) {
+      await notifyUser(app.userId, "Chat VAN - 受け取り完了",
+        "車両の受け取りが完了しました。ご利用開始です。毎月の自動決済が設定された支払日に実行されます。");
+    }
 
     await notifyAdmins("Chat VAN - 受け取り完了",
       `申込ID: ${appId} の車両受け取りが完了しました。`);
@@ -2203,12 +2631,14 @@ router.post("/van/applications/:id/confirm-pickup", requireAuth, async (req: Req
 router.post("/van/applications/:id/request-return", requireAuth, async (req: Request, res: Response) => {
   try {
     const appId = parseInt(String(req.params.id));
-    const userId: number | undefined = (req.session as any)?.userId;
+    if (!Number.isInteger(appId)) return res.status(400).json({ error: "Invalid application id" });
     const { reason } = req.body as { reason?: string };
 
-    const [app] = await db.select().from(vanApplicationsTable).where(eq(vanApplicationsTable.id, appId));
-    if (!app) return res.status(404).json({ error: "Not found" });
-    if (app.userId !== userId) return res.status(403).json({ error: "Forbidden" });
+    // AUTHZ: the application owner or an admin. A regular user is restricted to
+    // their own application.
+    const authz = await authorizeApplicationOwnerOrAdmin(getCaller(req), appId);
+    if (!authz.ok) return res.status(authz.status).json({ error: authz.error });
+    const app = authz.value;
     if (!["active", "payment_issue"].includes(app.status)) {
       return res.status(400).json({ error: "利用中または支払い問題の状態のみ解約申請できます" });
     }
@@ -2237,11 +2667,13 @@ router.post("/van/applications/:id/request-return", requireAuth, async (req: Req
       `);
     }
 
-    await db.insert(notificationsTable).values({
-      userId: app.userId,
-      title: "Chat VAN - 解約申請を受け付けました",
-      message: "解約申請を受け付けました。担当者より返却手続きのご連絡をいたします（2〜3営業日以内）。",
-    });
+    if (app.userId != null) {
+      await db.insert(notificationsTable).values({
+        userId: app.userId,
+        title: "Chat VAN - 解約申請を受け付けました",
+        message: "解約申請を受け付けました。担当者より返却手続きのご連絡をいたします（2〜3営業日以内）。",
+      });
+    }
 
     const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
     for (const admin of admins) {
@@ -2282,33 +2714,21 @@ router.post("/van/applications/:id/confirm-return", requireAuth, async (req: Req
       returnDocuments?: string[];
     };
 
-    const userRole2: string | undefined = (req.session as any)?.userRole;
-    const [app] = await db.select().from(vanApplicationsTable).where(eq(vanApplicationsTable.id, appId));
-    if (!app) return res.status(404).json({ error: "Not found" });
-    const isAdmin2 = userRole2 === 'admin';
-    const isOwner2 = app.userId === userId;
-    if (!isAdmin2 && !isOwner2) {
-      if (userRole2 === 'company') {
-        const [contractForAuth2] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.applicationId, appId));
-        const rcRows2 = await db.execute(sql`SELECT rental_company_id FROM users WHERE id = ${userId} LIMIT 1`);
-        const rcId2 = (rcRows2 as any).rows?.[0]?.rental_company_id ?? (rcRows2 as any)[0]?.rental_company_id;
-        if (contractForAuth2?.vehicleId && rcId2) {
-          const [veh2] = await db.select().from(vehiclesTable).where(eq(vehiclesTable.id, contractForAuth2.vehicleId));
-          if (veh2?.rentalCompanyId !== rcId2) return res.status(403).json({ error: "Forbidden" });
-        } else {
-          return res.status(403).json({ error: "Forbidden" });
-        }
-      } else {
-        return res.status(403).json({ error: "Forbidden" });
-      }
-    }
+    // AUTHZ: admin, the application owner, or the rental_company that owns the
+    // contract vehicle. Uses the established rental_company role (not "company").
+    const authz = await authorizeApplicationLifecycleActor(getCaller(req), appId);
+    if (!authz.ok) return res.status(authz.status).json({ error: authz.error });
+    const app = authz.value.app;
+    // Use the EXACT authorized contract. Never re-query by application_id: for a
+    // rental_company caller this guarantees mutations stay scoped to the
+    // company-owned contract/vehicle rather than an arbitrary application row.
+    const contract = authz.value.contract;
     if (app.status !== "return_pending") return res.status(400).json({ error: "返却確認は return_pending 状態のみ可能です" });
 
     await db.update(vanApplicationsTable)
       .set({ status: "completed", updatedAt: new Date() })
       .where(eq(vanApplicationsTable.id, appId));
 
-    const [contract] = await db.select().from(vanContractsTable).where(eq(vanContractsTable.applicationId, appId));
     if (contract) {
       await db.execute(sql`
         UPDATE van_contracts SET
@@ -2325,11 +2745,13 @@ router.post("/van/applications/:id/confirm-return", requireAuth, async (req: Req
       }
     }
 
-    await db.insert(notificationsTable).values({
-      userId: app.userId,
-      title: "Chat VAN - 返却完了",
-      message: "車両の返却が完了しました。ご利用ありがとうございました。",
-    });
+    if (app.userId != null) {
+      await db.insert(notificationsTable).values({
+        userId: app.userId,
+        title: "Chat VAN - 返却完了",
+        message: "車両の返却が完了しました。ご利用ありがとうございました。",
+      });
+    }
 
     const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
     for (const admin of admins) {
@@ -2906,8 +3328,12 @@ router.get("/van/gps-devices", requireAuth, requireAdmin, async (req: Request, r
 router.post("/van/gps-devices", requireAuth, requireAdmin, async (req: Request, res: Response) => {
   try {
     const b = req.body;
+    const vehicleId = b.vehicle_id ? parseInt(b.vehicle_id) : null;
+    if (vehicleId == null || isNaN(vehicleId)) {
+      return res.status(400).json({ error: "vehicle_id は必須です" });
+    }
     const [result] = await db.insert(gpsDevicesTable).values({
-      vehicleId: b.vehicle_id ? parseInt(b.vehicle_id) : undefined,
+      vehicleId,
       provider: b.provider,
       deviceIdentifier: b.device_identifier,
       status: 'active',

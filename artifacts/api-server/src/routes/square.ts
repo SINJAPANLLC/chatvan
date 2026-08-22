@@ -1,9 +1,10 @@
 import { Router, type IRouter } from "express";
-import { db, shipmentsTable, usersTable } from "@workspace/db";
+import { db, shipmentsTable, usersTable, notificationsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { randomUUID } from "crypto";
-import { squareFetch, authorizeOnFile } from "../lib/square-authorize";
+import { squareFetch, authorizeOnFile, getSquareConfigError } from "../lib/square-authorize";
+import { sendEmail, buildEmailHtml } from "../lib/email";
 
 const SQUARE_ERROR_MESSAGES: Record<string, string> = {
   INVALID_CARD_DATA:              "カード情報が無効です。入力内容をご確認ください。",
@@ -30,6 +31,9 @@ const router: IRouter = Router();
 
 // POST /square/register-card — 依頼承認時にカードを顧客として登録（Card on File）
 router.post("/square/register-card", requireAuth, async (req, res): Promise<void> => {
+  const cfgErr = getSquareConfigError();
+  if (cfgErr) { res.status(503).json({ error: cfgErr }); return; }
+
   const { sourceId } = req.body;
   if (!sourceId) { res.status(400).json({ error: "sourceId は必須です" }); return; }
 
@@ -89,6 +93,9 @@ router.post("/square/register-card", requireAuth, async (req, res): Promise<void
 
 // POST /square/authorize-on-file/:shipmentId — 配車確定時に登録済みカードでオーソリ
 router.post("/square/authorize-on-file/:shipmentId", requireAdmin, async (req, res): Promise<void> => {
+  const cfgErr = getSquareConfigError();
+  if (cfgErr) { res.status(503).json({ error: cfgErr }); return; }
+
   const shipmentId = Number(req.params.shipmentId);
   if (isNaN(shipmentId)) { res.status(400).json({ error: "無効なID" }); return; }
 
@@ -100,6 +107,9 @@ router.post("/square/authorize-on-file/:shipmentId", requireAdmin, async (req, r
 // POST /square/authorize
 // proposal画面：カードトークンで1円オーソリ（カード有効性確認のみ、即void）
 router.post("/square/authorize", requireAuth, async (req, res): Promise<void> => {
+  const cfgErr = getSquareConfigError();
+  if (cfgErr) { res.status(503).json({ error: cfgErr }); return; }
+
   const { shipmentId, sourceId } = req.body;
   if (!shipmentId || !sourceId) {
     res.status(400).json({ error: "shipmentId と sourceId は必須です" });
@@ -108,6 +118,13 @@ router.post("/square/authorize", requireAuth, async (req, res): Promise<void> =>
 
   const [shipment] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, Number(shipmentId))).limit(1);
   if (!shipment) { res.status(404).json({ error: "案件が見つかりません" }); return; }
+
+  // 管理者または案件の所有者のみ許可
+  const isAdmin = req.session.userRole === "admin";
+  if (!isAdmin && shipment.userId !== req.session.userId) {
+    res.status(403).json({ error: "権限がありません" });
+    return;
+  }
 
   // 1円でカード有効性確認（オーソリのみ）
   const squareRes = await squareFetch("/v2/payments", "POST", {
@@ -143,6 +160,9 @@ router.post("/square/authorize", requireAuth, async (req, res): Promise<void> =>
 // POST /square/charge
 // payment画面：配送完了後に実金額を即時決済（オーソリ＋キャプチャ同時）
 router.post("/square/charge", requireAuth, async (req, res): Promise<void> => {
+  const cfgErr = getSquareConfigError();
+  if (cfgErr) { res.status(503).json({ error: cfgErr }); return; }
+
   const { shipmentId, sourceId } = req.body;
   if (!shipmentId || !sourceId) {
     res.status(400).json({ error: "shipmentId と sourceId は必須です" });
@@ -151,6 +171,13 @@ router.post("/square/charge", requireAuth, async (req, res): Promise<void> => {
 
   const [shipment] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, Number(shipmentId))).limit(1);
   if (!shipment) { res.status(404).json({ error: "案件が見つかりません" }); return; }
+
+  // 管理者または案件の所有者のみ許可
+  const isAdmin = req.session.userRole === "admin";
+  if (!isAdmin && shipment.userId !== req.session.userId) {
+    res.status(403).json({ error: "権限がありません" });
+    return;
+  }
 
   // 税込み請求金額（消費税10%）
   const baseAmount = Number(shipment.customerPrice) || 0;
@@ -196,7 +223,10 @@ router.post("/square/charge", requireAuth, async (req, res): Promise<void> => {
 
 // POST /square/capture/:paymentId — 納品完了後に管理者がキャプチャ
 router.post("/square/capture/:squarePaymentId", requireAdmin, async (req, res): Promise<void> => {
-  const { squarePaymentId } = req.params;
+  const cfgErr = getSquareConfigError();
+  if (cfgErr) { res.status(503).json({ error: cfgErr }); return; }
+
+  const squarePaymentId = String(req.params.squarePaymentId);
 
   const squareRes = await squareFetch(`/v2/payments/${squarePaymentId}/complete`, "POST", {});
   const data = await squareRes.json() as any;
@@ -244,7 +274,10 @@ router.post("/square/capture/:squarePaymentId", requireAdmin, async (req, res): 
 
 // POST /square/cancel/:squarePaymentId — キャンセル
 router.post("/square/cancel/:squarePaymentId", requireAdmin, async (req, res): Promise<void> => {
-  const { squarePaymentId } = req.params;
+  const cfgErr = getSquareConfigError();
+  if (cfgErr) { res.status(503).json({ error: cfgErr }); return; }
+
+  const squarePaymentId = String(req.params.squarePaymentId);
 
   const squareRes = await squareFetch(`/v2/payments/${squarePaymentId}/cancel`, "POST", {});
   const data = await squareRes.json() as any;

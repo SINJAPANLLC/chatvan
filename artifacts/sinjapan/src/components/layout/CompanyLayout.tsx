@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { useGetMe, useLogout } from '@workspace/api-client-react';
+import { getGetMeQueryKey, useGetMe, useLogout } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   LayoutDashboard, Car, FileText, TrendingUp,
-  Bell, Settings, MessageSquare,
+  Bell, Settings, MessageSquare, MapPin,
   Loader2, ArrowLeft, Menu, X,
 } from 'lucide-react';
 
@@ -12,6 +12,7 @@ const navItems = [
   { href: '/company',               label: 'ダッシュボード', icon: LayoutDashboard },
   { href: '/company/vehicles',      label: '車両登録',       icon: Car },
   { href: '/company/contracts',     label: '契約',           icon: FileText },
+  { href: '/company/gps',           label: 'GPS',            icon: MapPin },
   { href: '/company/settlements',   label: '売上',           icon: TrendingUp },
   { href: '/company/notifications', label: '通知',           icon: Bell },
   { href: '/company/settings',      label: '設定',           icon: Settings },
@@ -19,16 +20,17 @@ const navItems = [
 ];
 
 export function CompanyLayout({ children }: { children: React.ReactNode }) {
-  const { data: user, isLoading } = useGetMe();
+  const { data: user, isLoading } = useGetMe({
+    query: { queryKey: getGetMeQueryKey(), retry: false },
+  });
   const [location, setLocation] = useLocation();
   const logout = useLogout();
   const queryClient = useQueryClient();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   React.useEffect(() => {
-    if (!isLoading && (!user || (user.role !== 'rental_company' && user.role !== 'admin'))) {
-      setLocation('/');
-    }
+    if (!isLoading && !user) setLocation('/login');
+    else if (!isLoading && user && user.role !== 'rental_company' && user.role !== 'admin') setLocation('/');
   }, [user, isLoading, setLocation]);
 
   if (isLoading) {
@@ -38,7 +40,13 @@ export function CompanyLayout({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  if (!user || (user.role !== 'rental_company' && user.role !== 'admin')) return null;
+  if (!user || (user.role !== 'rental_company' && user.role !== 'admin')) {
+    return (
+      <div className="min-h-[100dvh] flex items-center justify-center bg-sidebar text-sm text-muted-foreground">
+        ログイン画面へ移動しています…
+      </div>
+    );
+  }
 
   const handleLogout = () => {
     localStorage.removeItem('sinjapan_auth_token');

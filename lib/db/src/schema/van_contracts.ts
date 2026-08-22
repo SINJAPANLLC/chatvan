@@ -49,6 +49,8 @@ export const vanContractsTable = pgTable("van_contracts", {
   monthlyPrice: numeric("monthly_price", { precision: 10, scale: 2 }).notNull(),
   sinJapanFee: numeric("sin_japan_fee", { precision: 10, scale: 2 }).default("0"),
   paymentDay: integer("payment_day").default(1),
+  // 決済方法（card / invoice）。Neonの既存カラムと請求処理で共有する。
+  paymentMethod: text("payment_method"),
   status: vanContractStatusEnum("status").notNull().default("draft"),
   // 2本の契約書の同意記録
   platformContractAgreedAt: timestamp("platform_contract_agreed_at"),

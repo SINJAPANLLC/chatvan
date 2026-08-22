@@ -13,6 +13,11 @@ const tok = () => localStorage.getItem('sinjapan_auth_token') ?? '';
 
 const MAX_PHOTOS = 6;
 const PHOTO_LABELS = ['前面', '後面', '左側面', '右側面', '内装', 'その他'];
+
+/** Convert an objectPath like /objects/uuid to a user-objects URL (ownership-aware endpoint). */
+function objectUrl(objectPath: string): string {
+  return API(`/storage/user-objects/${objectPath.replace(/^\/objects\//, '')}`);
+}
 type DocType = 'shaken' | 'kensakusho' | 'jibaiseki' | 'ninniHoken';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -524,7 +529,7 @@ export default function CompanyVehicles() {
                     <div className="relative aspect-video rounded-lg overflow-hidden border border-border bg-muted">
                       {path ? (
                         <>
-                          <img src={API(`/storage${path}`)} alt="" className="w-full h-full object-cover" />
+                          <img src={objectUrl(path)} alt="" className="w-full h-full object-cover" />
                           <button type="button"
                             onClick={() => setPhotoPaths(prev => { const n = [...prev]; n[i] = null; return n; })}
                             className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 hover:bg-black/80">
@@ -559,7 +564,7 @@ export default function CompanyVehicles() {
                   {path ? (
                     <div className="flex-1 flex items-center gap-2 min-w-0">
                       <span className="text-xs text-muted-foreground truncate flex-1">{path.split('/').pop()}</span>
-                      <a href={API(`/storage${path}`)} target="_blank" rel="noopener noreferrer"
+                      <a href={objectUrl(path)} target="_blank" rel="noopener noreferrer"
                         className="shrink-0 p-1.5 text-muted-foreground hover:text-foreground"><ExternalLink className="h-3.5 w-3.5" /></a>
                       <button type="button" onClick={() => onSet(null)}
                         className="shrink-0 p-1.5 text-muted-foreground hover:text-destructive"><X className="h-3.5 w-3.5" /></button>

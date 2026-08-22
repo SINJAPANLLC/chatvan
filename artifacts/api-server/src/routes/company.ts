@@ -40,7 +40,7 @@ async function getMyCompanyId(userId: number): Promise<number | null> {
 // ── GET /company/me ─────────────────────────────────────────────────────────
 router.get("/company/me", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
-    const userId = req.session.userId;
+    const userId = req.session.userId!;
     const raw = await db.execute(sql`
       SELECT u.id, u.email, u.name, u.phone, u.role, u.rental_company_id,
         rc.name as company_name, rc.corporate_name, rc.contact_name, rc.phone as company_phone,
@@ -62,8 +62,8 @@ router.get("/company/me", requireAuth, requireRentalCompany, async (req: Request
 // ── GET /company/dashboard ──────────────────────────────────────────────────
 router.get("/company/dashboard", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
-    const userId = req.session.userId;
-    const userRole = req.session.userRole;
+    const userId = req.session.userId!;
+    const userRole = req.session.userRole!;
     const rcId = userRole === "admin" ? null : await getMyCompanyId(userId);
     if (!rcId && userRole !== "admin") return res.status(403).json({ error: "会社が紐付けられていません" });
 
@@ -130,7 +130,7 @@ async function resolveRcId(userId: number, userRole: string): Promise<number | n
 // ── GET /company/vehicles ───────────────────────────────────────────────────
 router.get("/company/vehicles", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
-    const rcId = await resolveRcId(req.session.userId, req.session.userRole);
+    const rcId = await resolveRcId(req.session.userId!, req.session.userRole!);
     if (!rcId && req.session.userRole !== "admin") return res.json([]);
     const rows = rcId
       ? await db.select().from(vehiclesTable).where(eq(vehiclesTable.rentalCompanyId, rcId)).orderBy(sql`created_at DESC`)
@@ -144,8 +144,8 @@ router.get("/company/vehicles", requireAuth, requireRentalCompany, async (req: R
 router.patch("/company/vehicles/:id", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
     const id = parseInt(String(req.params.id));
-    const userId = req.session.userId;
-    const userRole = req.session.userRole;
+    const userId = req.session.userId!;
+    const userRole = req.session.userRole!;
     const rcId = await resolveRcId(userId, userRole);
 
     if (rcId !== null) {
@@ -205,7 +205,7 @@ router.patch("/company/vehicles/:id", requireAuth, requireRentalCompany, async (
 // ── GET /company/contracts ──────────────────────────────────────────────────
 router.get("/company/contracts", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
-    const rcId = await resolveRcId(req.session.userId, req.session.userRole);
+    const rcId = await resolveRcId(req.session.userId!, req.session.userRole!);
     if (!rcId && req.session.userRole !== "admin") return res.json([]);
     const raw = rcId
       ? await db.execute(sql`
@@ -258,7 +258,7 @@ router.get("/company/contracts", requireAuth, requireRentalCompany, async (req: 
 // ── GET /company/insurance ──────────────────────────────────────────────────
 router.get("/company/insurance", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
-    const rcId = await resolveRcId(req.session.userId, req.session.userRole);
+    const rcId = await resolveRcId(req.session.userId!, req.session.userRole!);
     if (!rcId && req.session.userRole !== "admin") return res.json([]);
     const raw = rcId
       ? await db.execute(sql`
@@ -283,7 +283,7 @@ router.get("/company/insurance", requireAuth, requireRentalCompany, async (req: 
 // ── GET /company/gps ────────────────────────────────────────────────────────
 router.get("/company/gps", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
-    const rcId = await resolveRcId(req.session.userId, req.session.userRole);
+    const rcId = await resolveRcId(req.session.userId!, req.session.userRole!);
     if (!rcId && req.session.userRole !== "admin") return res.json([]);
     const raw = rcId
       ? await db.execute(sql`
@@ -359,7 +359,7 @@ router.post("/company/register", async (req: Request, res: Response) => {
 // ── POST /company/vehicles ── 協力会社が車両を登録申請 ──────────────────────
 router.post("/company/vehicles", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
-    const rcId = await getMyCompanyId(req.session.userId);
+    const rcId = await getMyCompanyId(req.session.userId!);
     if (!rcId) {
       const isAdmin = req.session.userRole === "admin";
       return res.status(403).json({
@@ -422,7 +422,7 @@ router.post("/company/vehicles", requireAuth, requireRentalCompany, async (req: 
 // ── GET /company/settlements ── 支払い明細（invoices ベース）──────────────────
 router.get("/company/settlements", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
-    const rcId = await resolveRcId(req.session.userId, req.session.userRole);
+    const rcId = await resolveRcId(req.session.userId!, req.session.userRole!);
     if (!rcId && req.session.userRole !== "admin") return res.json([]);
 
     // 全アクティブ契約を月ごとに展開し、invoiceがあれば紐づける
@@ -486,7 +486,7 @@ router.get("/company/settlements", requireAuth, requireRentalCompany, async (req
 router.get("/company/contracts/:id/incidents", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
     const contractId = Number(req.params.id);
-    const rcId = await resolveRcId(req.session.userId, req.session.userRole);
+    const rcId = await resolveRcId(req.session.userId!, req.session.userRole!);
     // 自社契約かチェック
     const contractCheck = await db.execute(sql`
       SELECT vc.id FROM van_contracts vc
@@ -524,7 +524,7 @@ router.get("/company/notifications", requireAuth, requireRentalCompany, async (r
     const raw = await db.execute(sql`
       SELECT id, title, message, read_status as read, created_at
       FROM notifications
-      WHERE user_id = ${req.session.userId}
+      WHERE user_id = ${req.session.userId!}
       ORDER BY created_at DESC
       LIMIT 100
     `);
@@ -539,7 +539,7 @@ router.get("/company/notifications", requireAuth, requireRentalCompany, async (r
 router.patch("/company/notifications/:id/read", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
     const id = parseInt(String(req.params.id));
-    await db.execute(sql`UPDATE notifications SET read_status = true WHERE id = ${id} AND user_id = ${req.session.userId}`);
+    await db.execute(sql`UPDATE notifications SET read_status = true WHERE id = ${id} AND user_id = ${req.session.userId!}`);
     return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ error: "Internal error" });
@@ -549,7 +549,7 @@ router.patch("/company/notifications/:id/read", requireAuth, requireRentalCompan
 // ── PATCH /company/notifications/read-all ────────────────────────────────────
 router.patch("/company/notifications/read-all", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
-    await db.execute(sql`UPDATE notifications SET read_status = true WHERE user_id = ${req.session.userId}`);
+    await db.execute(sql`UPDATE notifications SET read_status = true WHERE user_id = ${req.session.userId!}`);
     return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ error: "Internal error" });
@@ -559,7 +559,7 @@ router.patch("/company/notifications/read-all", requireAuth, requireRentalCompan
 // ── GET /company/settings ── 会社プロフィール取得 ────────────────────────────
 router.get("/company/settings", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
-    const rcId = await getMyCompanyId(req.session.userId);
+    const rcId = await getMyCompanyId(req.session.userId!);
     if (!rcId) return res.status(403).json({ error: "会社が紐付けられていません" });
     const [company] = await db.select().from(rentalCompaniesTable).where(eq(rentalCompaniesTable.id, rcId));
     return company ? res.json(company) : res.status(404).json({ error: "Not found" });
@@ -571,7 +571,7 @@ router.get("/company/settings", requireAuth, requireRentalCompany, async (req: R
 // ── PATCH /company/settings ── 会社プロフィール更新 ─────────────────────────
 router.patch("/company/settings", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
-    const rcId = await getMyCompanyId(req.session.userId);
+    const rcId = await getMyCompanyId(req.session.userId!);
     if (!rcId) return res.status(403).json({ error: "会社が紐付けられていません" });
     const { name, corporateName, contactName, phone, email, address, serviceAreas, fleetSize, notes,
             businessHours,
@@ -616,7 +616,7 @@ router.patch("/company/settings", requireAuth, requireRentalCompany, async (req:
 // 協力会社 → Admin への問い合わせ通知
 router.post("/company/notify-admin", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
-    const userId = req.session.userId;
+    const userId = req.session.userId!;
     const { message } = req.body;
     const rawUser = await db.execute(sql`SELECT name, rental_company_id FROM users WHERE id = ${userId}`);
     const user = toRow(rawUser) as any;

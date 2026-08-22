@@ -63,7 +63,7 @@ router.post("/admin/blog", requireAdmin, async (req, res): Promise<void> => {
   const duplicate = ((duplicateResult as any)?.rows ?? duplicateResult ?? [])[0];
   if (duplicate) { res.status(409).json({ error: "同じスラッグの記事がすでにあります" }); return; }
   const type = targetType ?? "user";
-  const [post] = await db.execute(drizzleSql`
+  const insertResult = await db.execute(drizzleSql`
     INSERT INTO blog_posts (slug, title, excerpt, content, category, tags, meta_title, meta_description, published, published_at, target_type)
     VALUES (
       ${slug}, ${title}, ${excerpt ?? ""}, ${content},
@@ -75,12 +75,13 @@ router.post("/admin/blog", requireAdmin, async (req, res): Promise<void> => {
     )
     RETURNING *
   `);
+  const post = ((insertResult as any)?.rows ?? insertResult ?? [])[0];
   res.json(fmt(post as any));
 });
 
 // 更新
 router.patch("/admin/blog/:id", requireAdmin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   const { slug, title, excerpt, content, category, tags, metaTitle, metaDescription, published } = req.body;
   const [current] = await db.select().from(blogPostsTable).where(eq(blogPostsTable.id, id)).limit(1);
   if (!current) { res.status(404).json({ error: "記事が見つかりません" }); return; }
@@ -113,7 +114,7 @@ router.patch("/admin/blog/:id", requireAdmin, async (req, res): Promise<void> =>
 
 // 削除
 router.delete("/admin/blog/:id", requireAdmin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   await db.delete(blogPostsTable).where(eq(blogPostsTable.id, id));
   res.json({ ok: true });
 });

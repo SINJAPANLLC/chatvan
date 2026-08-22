@@ -94,7 +94,8 @@ export function PublicSeo() {
       script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(settings.gaTag)}`;
       document.head.appendChild(script);
       window.dataLayer = window.dataLayer || [];
-      window.gtag = window.gtag || function gtag(...args: unknown[]) { window.dataLayer.push(args); };
+      const dataLayer = window.dataLayer;
+      window.gtag = window.gtag || function gtag(...args: unknown[]) { dataLayer.push(args); };
       window.gtag("js", new Date());
       window.gtag("config", settings.gaTag);
     }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useListUsers } from '@workspace/api-client-react';
+import type { User } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Search, X, Save, ChevronRight, Trash2, UserPlus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -9,6 +10,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+
+/** Narrow view of backend user — the generated User type omits fields the server actually returns. */
+type BackendUser = User & {
+  companyName?: string | null;
+  billingAddress?: string | null;
+  creditStatus?: string | null;
+  creditLimit?: string | number | null;
+  creditUsed?: string | number | null;
+  paymentTerms?: string | null;
+  corporateNumber?: string | null;
+  preferredPaymentMethod?: string | null;
+  cardHolderName?: string | null;
+  cardBrand?: string | null;
+  cardLast4?: string | null;
+  cardExpiry?: string | null;
+};
 
 function roleLabel(role: string) {
   if (role === 'admin') return '管理者';
@@ -55,12 +72,13 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 export default function AdminCustomers() {
-  const { data: users, isLoading } = useListUsers();
+  const { data: rawUsers, isLoading } = useListUsers();
+  const users = rawUsers as BackendUser[] | undefined;
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState<any>(null);
+  const [selected, setSelected] = useState<BackendUser | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
@@ -126,6 +144,7 @@ export default function AdminCustomers() {
   });
 
   const handleSave = async () => {
+    if (!selected) return;
     setSaving(true);
     try {
       const token = localStorage.getItem('sinjapan_auth_token');
@@ -274,7 +293,7 @@ export default function AdminCustomers() {
               ) : !filtered?.length ? (
                 <tr><td colSpan={8} className="py-16 text-center text-muted-foreground text-sm">ユーザーが見つかりません</td></tr>
               ) : filtered.map(user => {
-                const credit = creditBadge((user as any).creditStatus || 'none');
+                const credit = creditBadge(user.creditStatus || 'none');
                 return (
                   <tr
                     key={user.id}
@@ -299,7 +318,7 @@ export default function AdminCustomers() {
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-muted-foreground text-xs">
-                      {format(new Date(user.createdAt), 'yyyy/MM/dd')}
+                      {user.createdAt ? format(new Date(user.createdAt), 'yyyy/MM/dd') : '—'}
                     </td>
                     <td className="px-5 py-3.5">
                       <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -413,7 +432,7 @@ export default function AdminCustomers() {
                         {roleLabel(selected.role)}
                       </span>
                     } />
-                    <InfoRow label="登録日" value={format(new Date(selected.createdAt), 'yyyy/MM/dd HH:mm')} />
+                    <InfoRow label="登録日" value={selected.createdAt ? format(new Date(selected.createdAt), 'yyyy/MM/dd HH:mm') : '—'} />
                   </div>
 
                   <div>

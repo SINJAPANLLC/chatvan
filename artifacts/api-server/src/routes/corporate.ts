@@ -94,7 +94,7 @@ router.get("/admin/corporate", requireAdmin, async (_req, res): Promise<void> =>
 
 // PATCH /admin/corporate/:userId/approve — 承認 + 与信枠設定
 router.patch("/admin/corporate/:userId/approve", requireAdmin, async (req, res): Promise<void> => {
-  const userId = parseInt(req.params.userId, 10);
+  const userId = parseInt(String(req.params.userId), 10);
   const { creditLimit, paymentTerms } = req.body;
 
   if (!creditLimit || isNaN(Number(creditLimit))) {
@@ -114,14 +114,14 @@ router.patch("/admin/corporate/:userId/approve", requireAdmin, async (req, res):
 
 // PATCH /admin/corporate/:userId/reject — 却下
 router.patch("/admin/corporate/:userId/reject", requireAdmin, async (req, res): Promise<void> => {
-  const userId = parseInt(req.params.userId, 10);
+  const userId = parseInt(String(req.params.userId), 10);
   await db.update(usersTable).set({ creditStatus: "rejected" }).where(eq(usersTable.id, userId));
   res.json({ message: "却下しました" });
 });
 
 // PATCH /admin/corporate/:userId/suspend — 停止
 router.patch("/admin/corporate/:userId/suspend", requireAdmin, async (req, res): Promise<void> => {
-  const userId = parseInt(req.params.userId, 10);
+  const userId = parseInt(String(req.params.userId), 10);
   await db.update(usersTable).set({
     creditStatus: "suspended",
     preferredPaymentMethod: "card",
@@ -131,7 +131,7 @@ router.patch("/admin/corporate/:userId/suspend", requireAdmin, async (req, res):
 
 // PATCH /admin/corporate/:userId/info — 会社情報編集
 router.patch("/admin/corporate/:userId/info", requireAdmin, async (req, res): Promise<void> => {
-  const userId = parseInt(req.params.userId, 10);
+  const userId = parseInt(String(req.params.userId), 10);
   const { companyName, email, corporateNumber, paymentTerms } = req.body;
   await db.update(usersTable).set({
     ...(companyName    !== undefined && { companyName }),
@@ -144,7 +144,7 @@ router.patch("/admin/corporate/:userId/info", requireAdmin, async (req, res): Pr
 
 // PATCH /admin/corporate/:userId/credit-limit — 与信枠変更
 router.patch("/admin/corporate/:userId/credit-limit", requireAdmin, async (req, res): Promise<void> => {
-  const userId = parseInt(req.params.userId, 10);
+  const userId = parseInt(String(req.params.userId), 10);
   const { creditLimit } = req.body;
   if (!creditLimit || isNaN(Number(creditLimit))) {
     res.status(400).json({ error: "creditLimit を指定してください" });

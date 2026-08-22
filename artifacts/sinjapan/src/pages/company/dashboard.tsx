@@ -88,17 +88,28 @@ function ActionPanel({ stats }: { stats: any }) {
 function NotificationsPanel() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
+  const loadNotifications = () => {
+    setLoading(true);
+    setError(false);
     fetch(API('/company/notifications'), { headers: authHeader() })
-      .then(r => r.ok ? r.json() : [])
+      .then(r => {
+        if (!r.ok) throw new Error('fetch failed');
+        return r.json();
+      })
       .then(d => setNotifications(Array.isArray(d) ? d.slice(0, 20) : []))
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { loadNotifications(); }, []);
 
   const markRead = async (id: number) => {
-    await fetch(API(`/company/notifications/${id}/read`), { method: 'PATCH', headers: authHeader() });
-    setNotifications(ns => ns.map(n => n.id === id ? { ...n, read: true } : n));
+    const res = await fetch(API(`/company/notifications/${id}/read`), { method: 'PATCH', headers: authHeader() });
+    if (res.ok) {
+      setNotifications(ns => ns.map(n => n.id === id ? { ...n, read: true } : n));
+    }
   };
 
   const unread = notifications.filter(n => !n.read).length;
@@ -117,6 +128,13 @@ function NotificationsPanel() {
       <CardContent className="flex-1 overflow-y-auto max-h-72 space-y-1 pr-1">
         {loading ? (
           <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+        ) : error ? (
+          <div className="flex flex-col items-center gap-2 py-8">
+            <p className="text-xs text-muted-foreground">通知の取得に失敗しました。</p>
+            <button onClick={loadNotifications} className="flex items-center gap-1 text-xs text-primary hover:underline">
+              <RotateCcw className="h-3 w-3" />再試行
+            </button>
+          </div>
         ) : notifications.length === 0 ? (
           <p className="text-xs text-muted-foreground text-center py-8">通知はありません</p>
         ) : notifications.map(n => (
@@ -231,11 +249,16 @@ function SetupChecklist({ me, stats }: { me: any; stats: any }) {
 function CalendarCard() {
   const [contracts, setContracts] = useState<any[]>([]);
   const [current, setCurrent] = useState(new Date());
+  const [calError, setCalError] = useState(false);
 
   useEffect(() => {
     fetch(API('/company/contracts'), { headers: authHeader() })
-      .then(r => r.ok ? r.json() : [])
-      .then(d => setContracts(Array.isArray(d) ? d : []));
+      .then(r => {
+        if (!r.ok) throw new Error('fetch failed');
+        return r.json();
+      })
+      .then(d => setContracts(Array.isArray(d) ? d : []))
+      .catch(() => setCalError(true));
   }, []);
 
   // 契約データからイベント日を収集（start_date = 受け取り日、planned_end_date = 返却日）
@@ -281,47 +304,53 @@ function CalendarCard() {
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-1">
-        {/* 曜日ヘッダー */}
-        <div className="grid grid-cols-7 mb-1">
-          {['日','月','火','水','木','金','土'].map(w => (
-            <div key={w} className="text-center text-[10px] font-medium text-muted-foreground py-1">{w}</div>
-          ))}
-        </div>
-        {/* 日付グリッド */}
-        <div className="grid grid-cols-7 gap-y-1">
-          {Array(startPad).fill(null).map((_, i) => <div key={`pad-${i}`} />)}
-          {days.map(day => {
-            const dayEvents = eventsOnDay(day);
-            const isToday   = isSameDay(day, today);
-            const inMonth   = isSameMonth(day, current);
-            return (
-              <div key={day.toISOString()}
-                className={`relative flex flex-col items-center py-1 rounded-lg group ${dayEvents.length > 0 ? 'cursor-pointer hover:bg-muted/60' : ''}`}
-                title={dayEvents.map(e => `${e.label}（${e.type === 'pickup' ? '受け取り' : '返却'}）`).join('\n')}>
-                <span className={`text-xs w-6 h-6 flex items-center justify-center rounded-full font-medium
-                  ${isToday ? 'bg-foreground text-background' : inMonth ? 'text-foreground' : 'text-muted-foreground'}`}>
-                  {format(day, 'd')}
-                </span>
-                {dayEvents.length > 0 && (
-                  <div className="flex gap-0.5 mt-0.5">
-                    {dayEvents.slice(0, 3).map((e, i) => (
-                      <span key={i} className={`h-1 w-1 rounded-full ${e.type === 'pickup' ? 'bg-blue-500' : 'bg-orange-400'}`} />
-                    ))}
+        {calError ? (
+          <p className="text-xs text-muted-foreground text-center py-8">スケジュールの取得に失敗しました。</p>
+        ) : (
+          <>
+            {/* 曜日ヘッダー */}
+            <div className="grid grid-cols-7 mb-1">
+              {['日','月','火','水','木','金','土'].map(w => (
+                <div key={w} className="text-center text-[10px] font-medium text-muted-foreground py-1">{w}</div>
+              ))}
+            </div>
+            {/* 日付グリッド */}
+            <div className="grid grid-cols-7 gap-y-1">
+              {Array(startPad).fill(null).map((_, i) => <div key={`pad-${i}`} />)}
+              {days.map(day => {
+                const dayEvents = eventsOnDay(day);
+                const isToday   = isSameDay(day, today);
+                const inMonth   = isSameMonth(day, current);
+                return (
+                  <div key={day.toISOString()}
+                    className={`relative flex flex-col items-center py-1 rounded-lg group ${dayEvents.length > 0 ? 'cursor-pointer hover:bg-muted/60' : ''}`}
+                    title={dayEvents.map(e => `${e.label}（${e.type === 'pickup' ? '受け取り' : '返却'}）`).join('\n')}>
+                    <span className={`text-xs w-6 h-6 flex items-center justify-center rounded-full font-medium
+                      ${isToday ? 'bg-foreground text-background' : inMonth ? 'text-foreground' : 'text-muted-foreground'}`}>
+                      {format(day, 'd')}
+                    </span>
+                    {dayEvents.length > 0 && (
+                      <div className="flex gap-0.5 mt-0.5">
+                        {dayEvents.slice(0, 3).map((e, i) => (
+                          <span key={i} className={`h-1 w-1 rounded-full ${e.type === 'pickup' ? 'bg-blue-500' : 'bg-orange-400'}`} />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
+                );
+              })}
+            </div>
+            {/* 凡例 */}
+            <div className="flex gap-4 mt-3 pt-3 border-t border-border/50">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span className="h-2 w-2 rounded-full bg-blue-500 shrink-0" />受け取り
               </div>
-            );
-          })}
-        </div>
-        {/* 凡例 */}
-        <div className="flex gap-4 mt-3 pt-3 border-t border-border/50">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="h-2 w-2 rounded-full bg-blue-500 shrink-0" />受け取り
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="h-2 w-2 rounded-full bg-orange-400 shrink-0" />返却
-          </div>
-        </div>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span className="h-2 w-2 rounded-full bg-orange-400 shrink-0" />返却
+              </div>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );

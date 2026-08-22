@@ -57,7 +57,8 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { email, password, name, companyName, phone } = parsed.data;
+  const { email, password, name, phone } = parsed.data;
+  const companyName: string | undefined = typeof req.body?.companyName === "string" ? req.body.companyName : undefined;
 
   const [existing] = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
   if (existing) {
@@ -170,7 +171,7 @@ router.post("/auth/logout", async (req, res): Promise<void> => {
 });
 
 router.get("/auth/me", requireAuth, async (req, res): Promise<void> => {
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId)).limit(1);
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!)).limit(1);
   if (!user) {
     res.status(401).json({ error: "ユーザーが見つかりません" });
     return;
@@ -192,7 +193,7 @@ router.patch("/auth/me", requireAuth, async (req, res): Promise<void> => {
     newPassword?: string;
   };
 
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId)).limit(1);
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!)).limit(1);
   if (!user) {
     res.status(401).json({ error: "ユーザーが見つかりません" });
     return;

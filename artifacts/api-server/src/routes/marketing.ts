@@ -50,11 +50,12 @@ router.get("/admin/prospects/send-history", requireAdmin, async (req, res): Prom
 router.post("/admin/prospects", requireAdmin, async (req, res): Promise<void> => {
   const { companyName, contactName, email, phone, industry, prefecture, notes, prospectType } = req.body;
   if (!companyName || !email) { res.status(400).json({ error: "会社名とメールアドレスは必須です" }); return; }
-  const [row] = await db.execute(drizzleSql`
+  const insertResult = await db.execute(drizzleSql`
     INSERT INTO prospects (company_name, contact_name, email, phone, industry, prefecture, notes, prospect_type)
     VALUES (${companyName}, ${contactName ?? null}, ${email}, ${phone ?? null}, ${industry ?? null}, ${prefecture ?? null}, ${notes ?? null}, ${prospectType ?? 'user'})
     RETURNING *
   `);
+  const row = ((insertResult as any)?.rows ?? insertResult ?? [])[0];
   res.json((row as any));
 });
 

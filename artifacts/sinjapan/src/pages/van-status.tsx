@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { useGetVanApplication } from '@workspace/api-client-react';
+import { useGetVanApplication, getGetVanApplicationQueryKey } from '@workspace/api-client-react';
 import {
   Loader2, CheckCircle2, Clock, FileText, CreditCard, Truck, XCircle,
   ChevronLeft, MapPin, ScanFace, AlertCircle, Phone, CalendarDays,
@@ -146,7 +146,7 @@ export default function VanStatus() {
   const [returnSubmitting, setReturnSubmitting] = useState(false);
 
   const { data: application, isLoading, refetch } = useGetVanApplication(applicationId, {
-    query: { enabled: !!applicationId },
+    query: { queryKey: getGetVanApplicationQueryKey(applicationId), enabled: !!applicationId },
   });
 
   const fetchEkyc = useCallback(() => {

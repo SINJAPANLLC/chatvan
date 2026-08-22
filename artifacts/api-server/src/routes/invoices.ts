@@ -26,7 +26,7 @@ router.get("/invoices", requireAuth, async (req, res): Promise<void> => {
 
 // GET /invoices/:id — 請求書詳細（明細付き）
 router.get("/invoices/:id", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   const [invoice] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, id)).limit(1);
   if (!invoice) { res.status(404).json({ error: "請求書が見つかりません" }); return; }
   if (invoice.userId !== req.session.userId && req.session.userRole !== "admin") {
@@ -166,14 +166,14 @@ router.post("/admin/invoices/generate", requireAdmin, async (req, res): Promise<
 
 // PATCH /admin/invoices/:id/send — 送付済みに更新
 router.patch("/admin/invoices/:id/send", requireAdmin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   await db.update(invoicesTable).set({ status: "sent" }).where(eq(invoicesTable.id, id));
   res.json({ ok: true });
 });
 
 // PATCH /admin/invoices/:id/paid — 入金済みに更新
 router.patch("/admin/invoices/:id/paid", requireAdmin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   const [invoice] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, id)).limit(1);
   if (!invoice) { res.status(404).json({ error: "請求書なし" }); return; }
 

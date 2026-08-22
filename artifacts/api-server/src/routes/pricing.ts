@@ -1,9 +1,9 @@
 import { Router, type IRouter } from "express";
 import { db, pricingRulesTable, settingsTable } from "@workspace/db";
 import { eq, like } from "drizzle-orm";
-// Zod schemas removed in Chat VAN migration
-type CreatePricingRuleBody = any;
-type UpdatePricingRuleBody = any;
+import { insertPricingRuleSchema } from "@workspace/db";
+const CreatePricingRuleBody = insertPricingRuleSchema;
+const UpdatePricingRuleBody = insertPricingRuleSchema.partial();
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { parsePricingConfig, serializePricingConfig, DEFAULT_CONFIG, calcPriceWithConfig } from "../lib/pricing";
 

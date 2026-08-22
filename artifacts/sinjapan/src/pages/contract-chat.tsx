@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useLocation } from 'wouter';
-import { useGetMe } from '@workspace/api-client-react';
+import { useGetMe, useListContractMessages, getListContractMessagesQueryKey, useSendContractMessage } from '@workspace/api-client-react';
 import {
   ArrowLeft, AlertTriangle, Car, Wrench, ShieldAlert,
   HelpCircle, Phone, ChevronDown, ChevronUp, Loader2,
@@ -81,9 +81,10 @@ function ReportSheet({
   const [values, setValues] = useState<Record<string, string>>({});
   const [photos, setPhotos] = useState<{ file: File; preview: string; path?: string }[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const sendMessage = useSendContractMessage();
 
   const set = (id: string, v: string) => setValues(prev => ({ ...prev, [id]: v }));
 
@@ -99,7 +100,6 @@ function ReportSheet({
   const handleSubmit = async () => {
     const required = fields.filter(f => f.required);
     if (required.some(f => !values[f.id]?.trim())) return alert('必須項目を入力してください');
-    setSending(true);
     setUploading(true);
     try {
       // 写真アップロード
@@ -121,14 +121,18 @@ function ReportSheet({
         lines.push(uploadedPaths.join('\n'));
       }
 
-      const r = await fetch(API(`/contract-chat/${contractId}`), {
-        method: 'POST',
-        headers: { ...hdrs(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: lines.join('\n') }),
-      });
-      if (r.ok) { setDone(true); setTimeout(() => { onSent(); onClose(); }, 1800); }
-    } finally { setSending(false); }
+      sendMessage.mutate(
+        { contractId, data: { message: lines.join('\n') } },
+        {
+          onSuccess: () => { setDone(true); setTimeout(() => { onSent(); onClose(); }, 1800); },
+        },
+      );
+    } catch {
+      setUploading(false);
+    }
   };
+
+  const sending = sendMessage.isPending || uploading;
 
   if (done) {
     return (
@@ -278,19 +282,15 @@ export default function ContractChat() {
   const [, setLocation] = useLocation();
   const { data: me } = useGetMe();
 
-  const [messages, setMessages]     = useState<any[]>([]);
-  const [loading, setLoading]       = useState(true);
   const [showEmergency, setShowEmergency] = useState(true);
   const [activeCategory, setActiveCategory] = useState<CategoryId | null>(null);
   const [rentalCompany, setRentalCompany]   = useState<any>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const pollRef   = useRef<ReturnType<typeof setInterval>>();
 
-  const load = async () => {
-    const r = await fetch(API(`/contract-chat/${contractId}`), { headers: hdrs() });
-    if (r.ok) setMessages(await r.json());
-    setLoading(false);
-  };
+  const { data: messages = [], isLoading: loading, refetch: refetchMessages } = useListContractMessages(
+    contractId,
+    { query: { queryKey: getListContractMessagesQueryKey(contractId), refetchInterval: 5000 } },
+  );
 
   useEffect(() => {
     // レンタル会社情報をコントラクトから取得
@@ -298,12 +298,6 @@ export default function ContractChat() {
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.vehicle?.rentalCompany) setRentalCompany(d.vehicle.rentalCompany); })
       .catch(() => {});
-  }, [contractId]);
-
-  useEffect(() => {
-    load();
-    pollRef.current = setInterval(load, 5000);
-    return () => clearInterval(pollRef.current);
   }, [contractId]);
 
   useEffect(() => {
@@ -429,7 +423,7 @@ export default function ContractChat() {
                 const date = new Date(msg.created_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
                 return (
                   <div key={msg.id} className="px-4 py-3 rounded-xl bg-card border border-border">
-                    <p className="text-xs text-muted-foreground font-medium mb-1">{ROLE_LABELS[msg.sender_role_actual] ?? '担当者'}</p>
+                    <p className="text-xs text-muted-foreground font-medium mb-1">{ROLE_LABELS[msg.sender_role_actual ?? ''] ?? '担当者'}</p>
                     <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
                     <p className="text-xs text-muted-foreground mt-1">{date}</p>
                   </div>
@@ -448,7 +442,7 @@ export default function ContractChat() {
           category={activeCategory}
           contractId={contractId}
           onClose={() => setActiveCategory(null)}
-          onSent={load}
+          onSent={refetchMessages}
         />
       )}
     </div>

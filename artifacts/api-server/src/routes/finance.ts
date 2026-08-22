@@ -143,7 +143,7 @@ router.get("/admin/finance/card-payments", requireAdmin, async (_req, res): Prom
 
 // PATCH /admin/finance/card-payments/:id/reconcile — shipmentのステータスを入金確認済みに
 router.patch("/admin/finance/card-payments/:id/reconcile", requireAdmin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   await db.update(shipmentsTable).set({ paymentStatus: "入金確認済み", updatedAt: new Date() }).where(eq(shipmentsTable.id, id));
   res.json({ ok: true });
 });

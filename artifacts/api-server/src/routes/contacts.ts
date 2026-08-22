@@ -119,7 +119,7 @@ router.get("/admin/contacts", requireAdmin, async (req, res): Promise<void> => {
 
 // ── 管理：返信 ────────────────────────────────────────────────────────────────
 router.post("/admin/contacts/:id/reply", requireAdmin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   const body = normalizeText(req.body?.body);
   if (!Number.isInteger(id)) { res.status(400).json({ error: "無効なお問い合わせIDです" }); return; }
   if (!body) { res.status(400).json({ error: "返信内容を入力してください" }); return; }
@@ -179,7 +179,7 @@ router.post("/admin/contacts/:id/reply", requireAdmin, async (req, res): Promise
 
 // ── 管理：失敗または未送信の返信を再送 ──────────────────────────────────────────
 router.post("/admin/contacts/:id/reply/resend", requireAdmin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (!Number.isInteger(id)) { res.status(400).json({ error: "無効なお問い合わせIDです" }); return; }
   const [contact] = await db.select().from(contactsTable).where(eq(contactsTable.id, id)).limit(1);
   if (!contact?.replyBody) { res.status(404).json({ error: "再送できる返信内容がありません" }); return; }

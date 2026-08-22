@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { useGetVanApplication } from '@workspace/api-client-react';
+import { useGetVanApplication, getGetVanApplicationQueryKey } from '@workspace/api-client-react';
 import { Loader2, ChevronLeft, MapPin, Phone, Clock, AlertCircle, Truck, Copy, ExternalLink, CalendarDays, CheckCircle2, Camera, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -66,7 +66,7 @@ export default function VanPickup() {
   const [done, setDone] = useState(false);
 
   const { data: application, isLoading } = useGetVanApplication(applicationId, {
-    query: { enabled: !!applicationId },
+    query: { queryKey: getGetVanApplicationQueryKey(applicationId), enabled: !!applicationId },
   });
 
   const copy = (text: string, label: string) => {

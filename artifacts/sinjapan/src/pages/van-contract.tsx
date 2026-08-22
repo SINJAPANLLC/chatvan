@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { useGetVanApplication } from '@workspace/api-client-react';
+import { useGetVanApplication, getGetVanApplicationQueryKey } from '@workspace/api-client-react';
 import { Loader2, ChevronLeft, FileText, CheckCircle2, Clock, PenLine, RotateCcw, ChevronDown, MapPin, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -398,7 +398,7 @@ export default function VanContract() {
   const [gpsConsent, setGpsConsent] = useState(false);
 
   const { data: application, isLoading } = useGetVanApplication(applicationId, {
-    query: { enabled: !!applicationId, refetchInterval: 5000 },
+    query: { queryKey: getGetVanApplicationQueryKey(applicationId), enabled: !!applicationId, refetchInterval: 5000 },
   });
 
   const contract = (application as any)?.contract as any;

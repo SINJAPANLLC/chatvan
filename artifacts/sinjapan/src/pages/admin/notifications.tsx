@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useListUsers } from '@workspace/api-client-react';
+import type { User as ApiUser } from '@workspace/api-client-react';
 import {
   Loader2, Send, Users, User, History, ChevronDown, ChevronUp,
   Mail, CheckCheck, Settings, Wrench, Calendar, Clock, AlertTriangle, Info
@@ -31,10 +32,16 @@ const TEMPLATES = [
 
 type SendTarget = 'all' | 'select';
 
+/** Narrow view of backend user — the generated User type omits fields the server actually returns. */
+type BackendUser = ApiUser & {
+  companyName?: string | null;
+};
+
 // ── 送信フォーム ───────────────────────────────────────────────────────────────
 function SendForm({ onSent }: { onSent: () => void }) {
   const { toast } = useToast();
-  const { data: users } = useListUsers();
+  const { data: rawUsers } = useListUsers();
+  const users = rawUsers as BackendUser[] | undefined;
   const [target, setTarget] = useState<SendTarget>('all');
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [templateIdx, setTemplateIdx] = useState(0);
