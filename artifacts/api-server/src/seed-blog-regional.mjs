@@ -13,7 +13,7 @@ const pgPath = new URL(
 );
 const { Client } = (await import(pgPath.href)).default;
 
-const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+const client = new Client({ connectionString: process.env.NEON_DATABASE_URL || process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 await client.connect();
 
 /* ─────────────────────────────────────────────
