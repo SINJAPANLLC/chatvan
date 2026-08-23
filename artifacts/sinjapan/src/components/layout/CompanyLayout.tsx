@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 const navItems = [
-  { href: '/company',               label: 'ダッシュボード', icon: LayoutDashboard },
+  { href: '/company/dashboard',               label: 'ダッシュボード', icon: LayoutDashboard },
   { href: '/company/vehicles',      label: '車両登録',       icon: Car },
   { href: '/company/contracts',     label: '契約',           icon: FileText },
   { href: '/company/gps',           label: 'GPS',            icon: MapPin },
@@ -60,7 +60,7 @@ export function CompanyLayout({ children }: { children: React.ReactNode }) {
   const NavContent = () => (
     <div className="flex flex-col h-full">
       <div className="h-16 flex items-center justify-between px-6 border-b border-border shrink-0">
-        <Link href="/company" onClick={() => setMobileOpen(false)} className="flex items-center gap-2">
+        <Link href="/company/dashboard" onClick={() => setMobileOpen(false)} className="flex items-center gap-2">
           <img src="/logo.png" alt="Chat VAN" className="h-9 w-auto" />
           <span className="text-xs font-medium text-muted-foreground">協力会社</span>
         </Link>
@@ -71,7 +71,7 @@ export function CompanyLayout({ children }: { children: React.ReactNode }) {
 
       <nav className="flex-1 py-4 px-3 space-y-0.5 overflow-y-auto">
         {navItems.map((item) => {
-          const isActive = location === item.href || (item.href !== '/company' && location.startsWith(item.href));
+          const isActive = location === item.href || (item.href !== '/company/dashboard' && location.startsWith(item.href));
           return (
             <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}>
               <div className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
@@ -116,7 +116,7 @@ export function CompanyLayout({ children }: { children: React.ReactNode }) {
           <button onClick={() => setMobileOpen(true)} className="text-muted-foreground hover:text-foreground">
             <Menu className="h-5 w-5" />
           </button>
-          <Link href="/company" className="flex items-center gap-2">
+          <Link href="/company/dashboard" className="flex items-center gap-2">
             <img src="/logo.png" alt="Chat VAN" className="h-9 w-auto" />
             <span className="text-xs text-muted-foreground">協力会社</span>
           </Link>
