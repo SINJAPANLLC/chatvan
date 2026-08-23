@@ -211,7 +211,7 @@ function Router() {
         <Route path="/contract-chat/:id" component={ContractChat} />
 
         {/* 協力会社ポータル */}
-        <Route path="/company">
+        <Route path="/company/dashboard">
           <CompanyLayout><CompanyDashboard /></CompanyLayout>
         </Route>
         <Route path="/company/vehicles">
