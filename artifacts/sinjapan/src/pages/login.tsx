@@ -28,7 +28,7 @@ export default function Login() {
   React.useEffect(() => {
     if (!isLoading && user) {
       if (user.role === 'admin') setLocation('/admin');
-      else if (user.role === 'rental_company') setLocation('/company');
+      else if (user.role === 'rental_company') setLocation('/company/dashboard');
       else setLocation('/');
     }
   }, [user, isLoading, setLocation]);
@@ -48,7 +48,7 @@ export default function Login() {
       // キャッシュにユーザーを即セット（遷移先で isLoading=false&&user=null になるのを防ぐ）
       queryClient.setQueryData(getGetMeQueryKey(), res.user);
       if (res.user.role === 'admin') setLocation('/admin');
-      else if (res.user.role === 'rental_company') setLocation('/company');
+      else if (res.user.role === 'rental_company') setLocation('/company/dashboard');
       else setLocation('/');
     } catch (err) {
       toast({
