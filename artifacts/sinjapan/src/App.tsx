@@ -13,6 +13,9 @@ import { AdminLayout } from '@/components/layout/AdminLayout';
 import { CompanyLayout } from '@/components/layout/CompanyLayout';
 import { PublicSeo } from '@/components/seo/PublicSeo';
 
+// Landing Page
+const LP = lazy(() => import('@/pages/lp'));
+
 // User Pages
 const Home          = lazy(() => import('@/pages/home'));
 const VanChat       = lazy(() => import('@/pages/van-chat'));
@@ -101,6 +104,7 @@ function Router() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Switch>
+        <Route path="/lp" component={LP} />
         <Route path="/login" component={Login} />
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/register" component={Register} />
