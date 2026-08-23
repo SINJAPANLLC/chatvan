@@ -319,8 +319,8 @@ export default function LP() {
           <span className="text-black/[0.025] font-black leading-none" style={{ fontSize: 'clamp(6rem, 20vw, 20rem)' }}>START</span>
         </div>
         <div className="relative z-10 max-w-xl mx-auto">
-          <h2 className="font-black tracking-tight leading-tight mb-4" style={{ fontSize: 'clamp(2rem, 6vw, 4.5rem)' }}>
-            まず、チャットで<br />相談してみよう。
+          <h2 className="font-black tracking-tight leading-tight mb-4" style={{ fontSize: 'clamp(1.8rem, 4vw, 2.8rem)' }}>
+            まず、チャットで相談してみよう。
           </h2>
           <p className="text-black/35 text-sm mb-12">登録無料&emsp;|&emsp;最短即日&emsp;|&emsp;しつこい営業なし</p>
           <Link href="/register">
