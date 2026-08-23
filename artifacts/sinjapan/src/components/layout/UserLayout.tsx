@@ -176,7 +176,7 @@ export function UserLayout({ children }: { children: React.ReactNode }) {
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 pt-4 pb-2">
         <Link href="/" onClick={onClose} className="px-2">
-          <img src="/logo.png" alt="Chat VAN" className="h-12 w-auto" />
+          <img src="/logo.png" alt="Chat VAN" className="h-9 w-auto" />
         </Link>
         {!onClose && (
           <button
@@ -334,7 +334,7 @@ export function UserLayout({ children }: { children: React.ReactNode }) {
           )}
 
           <Link href="/" className={`${isLoggedIn && sidebarOpen ? 'md:hidden' : ''}`}>
-            <img src="/logo.png" alt="Chat VAN" className="h-12 w-auto" />
+            <img src="/logo.png" alt="Chat VAN" className="h-9 w-auto" />
           </Link>
 
           <div className="flex-1" />
