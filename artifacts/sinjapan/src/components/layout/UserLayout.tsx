@@ -243,7 +243,7 @@ export function UserLayout({ children }: { children: React.ReactNode }) {
               </button>
             </Link>
             {(user?.role === 'rental_company' || user?.role === 'admin') && (
-              <Link href="/company" onClick={onClose}>
+              <Link href={user?.role === 'admin' ? '/admin/rental-companies' : '/company'} onClick={onClose}>
                 <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
                   <Building2 className="h-4 w-4 shrink-0" />
                   協力会社
