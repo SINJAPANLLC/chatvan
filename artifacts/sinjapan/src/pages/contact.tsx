@@ -158,7 +158,6 @@ export default function Contact() {
         <p>〒243-0303 神奈川県愛甲郡愛川町中津7287</p>
         <p>TEL 046-212-2325　FAX 046-212-2326</p>
         <p><a href="mailto:info@chat-van.com" className="hover:underline">info@chat-van.com</a></p>
-        <p><a href="https://x.com/Kazuya8008" target="_blank" rel="noopener noreferrer" className="hover:underline">X: @Kazuya8008</a></p>
       </div>
     </div>
   );
