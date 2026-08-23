@@ -46,8 +46,8 @@ pm2 stop "${PM2_NAME}" 2>/dev/null || true
 sleep 3
 fuser -k 4820/tcp 2>/dev/null || true
 sleep 2
-pm2 start "${APP_DIR}/deploy/ecosystem.config.cjs" --env production
-log "  → pm2 start 完了"
+pm2 reload "${PM2_NAME}" --update-env 2>/dev/null || pm2 start "${APP_DIR}/deploy/ecosystem.config.cjs" --env production
+log "  → pm2 reload/start 完了"
 
 # PM2 リストを表示
 pm2 list
