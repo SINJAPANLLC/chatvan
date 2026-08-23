@@ -1,0 +1,51 @@
+
+pm2 logs chatvan-api --lines 10 --nostream
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [chatvan-api](ids: [ 0 ])
+[PM2] [chatvan-api](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 5  │ aiagent            │ fork     │ 0    │ online    │ 0%       │ 107.0mb  │
+│ 15 │ chatlogi-api       │ fork     │ 4383 │ online    │ 107.7%   │ 91.0mb   │
+│ 0  │ chatvan-api        │ fork     │ 62   │ online    │ 0%       │ 19.1mb   │
+│ 4  │ keimatch           │ fork     │ 0    │ online    │ 0%       │ 168.0mb  │
+│ 13 │ keisaiyou          │ fork     │ 0    │ online    │ 0%       │ 147.2mb  │
+│ 3  │ menz-esthe-town    │ fork     │ 0    │ online    │ 0%       │ 141.1mb  │
+│ 12 │ onlyu              │ fork     │ 0    │ online    │ 0%       │ 113.0mb  │
+│ 8  │ sinjapan-crm-api   │ fork     │ 523  │ online    │ 0%       │ 85.1mb   │
+│ 1  │ sinjapan-manager   │ fork     │ 0    │ online    │ 0%       │ 54.5mb   │
+│ 2  │ sinjapan-onlinesc… │ fork     │ 0    │ online    │ 0%       │ 89.7mb   │
+│ 14 │ sinjapan-sales-api │ fork     │ 0    │ online    │ 0%       │ 220.1mb  │
+│ 6  │ sinjapanai         │ fork     │ 0    │ online    │ 0%       │ 92.6mb   │
+│ 7  │ sinjapanailive-api │ fork     │ 0    │ online    │ 0%       │ 92.1mb   │
+│ 10 │ sinjapanaisite-api │ fork     │ 0    │ online    │ 0%       │ 93.0mb   │
+│ 11 │ tiktokshindan      │ fork     │ 0    │ online    │ 0%       │ 79.2mb   │
+│ 9  │ tramatch           │ fork     │ 0    │ online    │ 0%       │ 212.8mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+host metrics | cpu: 36.1% | ram usage: 19.6% | eth0: ⇓ 0.065mb/s ⇑ 0.01mb/s |
+[TAILING] Tailing last 10 lines for [chatvan-api] process (change the value wit…
+/var/log/pm2/chatvan-api-err.log last 10 lines:
+0|chatvan- | 2026-08-23 03:59:41 +00:00: (Use `node --trace-warnings ...` to show where the warning was created)
+0|chatvan- | 2026-08-23 03:59:53 +00:00: (node:661531) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+0|chatvan- | 2026-08-23 03:59:53 +00:00: In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+0|chatvan- | 2026-08-23 03:59:53 +00:00: 
+0|chatvan- | 2026-08-23 03:59:53 +00:00: To prepare for this change:
+0|chatvan- | 2026-08-23 03:59:53 +00:00: - If you want the current behavior, explicitly use 'sslmode=verify-full'
+0|chatvan- | 2026-08-23 03:59:53 +00:00: - If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+0|chatvan- | 2026-08-23 03:59:53 +00:00: 
+0|chatvan- | 2026-08-23 03:59:53 +00:00: See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+0|chatvan- | 2026-08-23 03:59:53 +00:00: (Use `node --trace-warnings ...` to show where the warning was created)
+
+/var/log/pm2/chatvan-api-out.log last 10 lines:
+0|chatvan- | evel":30,"time":1787457580082,"pid":660144,"hostname":"srv1087935","msg":"migration: blog_posts target_type column ready"}
+0|chatvan- | 2026-08-23 03:59:40 +00:00: {"level":30,"time":1787457580328,"pid":660144,"hostname":"srv1087935","msg":"migration: vehicles.rejection_reason column ready"}
+0|chatvan- | 2026-08-23 03:59:40 +00:00: {"level":50,"time":1787457580824,"pid":660144,"hostname":"srv1087935","err":{"type":"Error","message":"listen EADDRINUSE: address already in use :::4820","stack":"Error: listen EADDRINUSE: address already in use :::4820\n    at Server.setupListenHandle [as _listen2] (node:net:1908:16)\n    at listenInCluster (node:net:1965:12)\n    at Server.listen (node:net:2067:7)\n    at Function.listen (/var/www/chatvan/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:605:24)\n    at startServer (/var/www/chatvan/artifacts/api-server/src/index.ts:567:7)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)","code":"EADDRINUSE","errno":-98,"syscall":"listen","address":"::","port":4820},"msg":"Error listening on port"}
+0|chatvan- | 2026-08-23 03:59:44 +00:00: {"level":30,"time":1787457584562,"pid":661171,"hostname":"srv1087935","msg":"migration: master_card_data / stops_json columns ready"}
+0|chatvan- | 2026-08-23 03:59:46 +00:00: {"level":30,"time":1787457586080,"pid":661171,"hostname":"srv1087935","msg":"migration: van_application_status → English"}
+0|chatvan- | 2026-08-23 03:59:47 +00:00: {"level":30,"time":1787457587595,"pid":661171,"hostname":"srv1087935","msg":"migration: vehicle_status → English"}
+0|chatvan- | 2026-08-23 03:59:49 +00:00: {"level":30,"time":1787457589116,"pid":661171,"hostname":"srv1087935","msg":"migration: van_contract_status → English"}
+0|chatvan- | 2026-08-23 03:59:56 +00:00: {"level":30,"time":1787457596723,"pid":661531,"hostname":"srv1087935","msg":"migration: master_card_data / stops_json columns ready"}
+0|chatvan- | 2026-08-23 03:59:58 +00:00: {"level":30,"time":1787457598228,"pid":661531,"hostname":"srv1087935","msg":"migration: van_application_status → English"}
+
+root@srv1087935:/var/www/chatvan# 
