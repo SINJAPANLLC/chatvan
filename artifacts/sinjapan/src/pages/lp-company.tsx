@@ -51,6 +51,29 @@ export default function LPCompany() {
           </Link>
           <p className="text-black/25 text-sm mt-6">初期費用無料・成約時のみ手数料</p>
         </div>
+
+        {/* Store Badges */}
+        <div className="absolute bottom-14 right-6 md:right-20 flex flex-col items-end gap-2">
+          <div className="relative select-none">
+            <div className="flex items-center gap-2.5 bg-black rounded-xl px-4 py-2.5 w-[152px] opacity-35">
+              <svg width="20" height="24" viewBox="0 0 24 24" fill="white"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+              <div className="text-white"><p className="text-[9px] leading-none opacity-70">Download on the</p><p className="text-[13px] font-semibold leading-tight mt-0.5">App Store</p></div>
+            </div>
+            <span className="absolute -top-2 -right-2 bg-black text-white text-[9px] font-bold px-2 py-0.5 rounded-full">準備中</span>
+          </div>
+          <div className="relative select-none">
+            <div className="flex items-center gap-2.5 bg-black rounded-xl px-4 py-2.5 w-[152px] opacity-35">
+              <svg width="20" height="22" viewBox="0 0 24 24" fill="white"><path d="M3 20.5v-17c0-.83.94-1.3 1.6-.8l14 8.5c.6.37.6 1.23 0 1.6l-14 8.5c-.66.5-1.6.03-1.6-.8zM5 6.87v10.26L16.01 12 5 6.87z"/></svg>
+              <div className="text-white"><p className="text-[9px] leading-none opacity-70">GET IT ON</p><p className="text-[13px] font-semibold leading-tight mt-0.5">Google Play</p></div>
+            </div>
+            <span className="absolute -top-2 -right-2 bg-black text-white text-[9px] font-bold px-2 py-0.5 rounded-full">準備中</span>
+          </div>
+          <a href="#" className="flex items-center gap-2.5 bg-[#06C755] rounded-xl px-4 py-2.5 w-[152px] hover:bg-[#05b34d] transition-colors">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/></svg>
+            <div className="text-white"><p className="text-[9px] leading-none opacity-80">友だち追加</p><p className="text-[13px] font-semibold leading-tight mt-0.5">LINE</p></div>
+          </a>
+        </div>
+
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3">
           <span className="text-black/20 text-[10px] tracking-[0.4em] uppercase">Scroll</span>
           <div className="w-px h-14 bg-gradient-to-b from-black/20 to-transparent" />
@@ -102,6 +125,27 @@ export default function LPCompany() {
         </div>
       </section>
 
+      {/* Van Photo Slider */}
+      <section className="bg-white pt-10 pb-4 overflow-hidden">
+        <style>{`
+          .van-slider-c { overflow:hidden; width:100%; -webkit-mask-image:linear-gradient(to right,transparent 0%,#000 10%,#000 90%,transparent 100%); mask-image:linear-gradient(to right,transparent 0%,#000 10%,#000 90%,transparent 100%); }
+          .van-track-c { display:flex; width:calc(240px * 20); animation:van-scroll-c 28s linear infinite; will-change:transform; }
+          .van-slide-c { width:240px; height:160px; flex-shrink:0; padding:0 8px; }
+          .van-slide-c img { width:100%; height:100%; object-fit:contain; display:block; }
+          @keyframes van-scroll-c { 0%{transform:translateX(0)} 100%{transform:translateX(-25%)} }
+          @media(max-width:768px){ .van-track-c{width:calc(180px * 20)} .van-slide-c{width:180px;height:120px} }
+        `}</style>
+        <div className="van-slider-c">
+          <div className="van-track-c">
+            {[...Array(4)].flatMap((_, loop) =>
+              ['/images/van-1.png','/images/van-2.png','/images/van-3.png','/images/van-4.png','/images/van-5.png'].map((src, i) => (
+                <div key={`${loop}-${i}`} className="van-slide-c"><img src={src} alt={`軽バン ${i+1}`} /></div>
+              ))
+            )}
+          </div>
+        </div>
+      </section>
+
       {/* Features */}
       <section className="bg-white py-28 px-6 md:px-20">
         <div className="max-w-5xl mx-auto">
@@ -139,7 +183,7 @@ export default function LPCompany() {
               { q: '審査にはどのくらいかかりますか？', a: '通常3〜5営業日以内にご連絡します。' },
               { q: 'どのエリアで対応していますか？', a: '全国対応しています。登録時にご対応可能なエリアをお知らせください。' },
             ].map((item) => (
-              <details key={item.q} className="group border-b border-black/8 py-6 cursor-pointer">
+              <details key={item.q} className="group border-b border-black/8 last:border-b-0 py-6 cursor-pointer">
                 <summary className="flex items-center justify-between font-bold text-base list-none">
                   {item.q}
                   <span className="text-black/30 group-open:rotate-45 transition-transform text-xl shrink-0 ml-4">＋</span>
@@ -147,6 +191,36 @@ export default function LPCompany() {
                 <p className="text-black/50 text-sm mt-4">{item.a}</p>
               </details>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Logo Slider */}
+      <section className="bg-white py-16 border-t border-black/8">
+        <style>{`
+          .sin-logo-wall-c{--slide-w:200px;--slide-h:110px;--speed:22s}
+          .sin-slider-c{height:var(--slide-h);overflow:hidden;width:100%;-webkit-mask-image:linear-gradient(to right,transparent 0%,#000 12%,#000 88%,transparent 100%);mask-image:linear-gradient(to right,transparent 0%,#000 12%,#000 88%,transparent 100%)}
+          .sin-slide-track-c{display:flex;width:calc(var(--slide-w)*16);animation:sin-scroll-c var(--speed) linear infinite;will-change:transform}
+          .sin-slide-c2{width:var(--slide-w);height:var(--slide-h);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+          .sin-slide-c2 img{max-width:160px;max-height:72px;object-fit:contain;display:block}
+          @keyframes sin-scroll-c{0%{transform:translateX(0)}100%{transform:translateX(-25%)}}
+          @media(max-width:768px){.sin-logo-wall-c{--slide-w:160px;--slide-h:90px;--speed:18s}.sin-slide-track-c{width:calc(var(--slide-w)*16)}}
+        `}</style>
+        <div className="sin-logo-wall-c">
+          <div className="sin-slider-c">
+            <div className="sin-slide-track-c">
+              {(() => {
+                const logos = [
+                  'https://s3-ap-northeast-1.amazonaws.com/s3.peraichi.com/userData/5b45aaad-02a4-4454-911d-14fb0a0000c5/img/1c9b1920-d996-013e-3faf-0a58a9feac02/70617d441cf711e88062963aecd2c947.jpg',
+                  'https://s3-ap-northeast-1.amazonaws.com/s3.peraichi.com/userData/5b45aaad-02a4-4454-911d-14fb0a0000c5/img/095c3f70-d994-013e-82c3-0a58a9feac02/m_logo.png',
+                  'https://s3-ap-northeast-1.amazonaws.com/s3.peraichi.com/userData/5b45aaad-02a4-4454-911d-14fb0a0000c5/img/0f974c20-d994-013e-82c4-0a58a9feac02/nikko-logo.jpg',
+                  'https://s3-ap-northeast-1.amazonaws.com/s3.peraichi.com/userData/5b45aaad-02a4-4454-911d-14fb0a0000c5/img/1412ad40-d994-013e-82c6-0a58a9feac02/tmp-75613e906c3e5ab6ea00c4f39150e44f-cff486a9ddccba3a97b5c4297fb3c057.jpg',
+                ];
+                return [...logos,...logos,...logos,...logos].map((src,i) => (
+                  <div key={i} className="sin-slide-c2"><img src={src} alt="" /></div>
+                ));
+              })()}
+            </div>
           </div>
         </div>
       </section>
@@ -184,6 +258,15 @@ export default function LPCompany() {
           <p className="text-black/20 text-xs">© 2026 Chat VAN. All rights reserved.</p>
         </div>
       </footer>
+      {/* Fixed panda */}
+      <Link href="/company/register">
+        <img
+          src="/images/panda.png"
+          alt="登録してね！"
+          className="fixed bottom-0 left-0 z-50 cursor-pointer select-none"
+          style={{ width: 'clamp(140px, 28vw, 220px)' }}
+        />
+      </Link>
     </div>
   );
 }
