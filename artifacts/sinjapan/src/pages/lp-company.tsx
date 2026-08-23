@@ -231,7 +231,7 @@ export default function LPCompany() {
           <span className="text-black/[0.025] font-black leading-none" style={{ fontSize: 'clamp(6rem, 20vw, 20rem)' }}>JOIN</span>
         </div>
         <div className="relative z-10 max-w-xl mx-auto">
-          <h2 className="font-black tracking-tight leading-tight mb-4" style={{ fontSize: 'clamp(2rem, 6vw, 4.5rem)' }}>
+          <h2 className="font-black tracking-tight leading-tight mb-4" style={{ fontSize: 'clamp(1.8rem, 4vw, 2.8rem)' }}>
             まず、登録してみよう。
           </h2>
           <p className="text-black/35 text-sm mb-12">初期費用無料・登録完全無料・いつでも退会可</p>
