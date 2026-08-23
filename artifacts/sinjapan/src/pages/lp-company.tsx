@@ -36,7 +36,7 @@ export default function LPCompany() {
         <div className="max-w-5xl mx-auto w-full relative z-10 pt-20">
           <p className="text-black/35 text-xs tracking-[0.4em] uppercase mb-10">For Rental Companies</p>
           <h1 className="font-black leading-[1.05] tracking-tight mb-8">
-            <span className="block" style={{ fontSize: 'clamp(1.6rem, 8vw, 6.5rem)' }}>遊んでいる軽バンを、</span>
+            <span className="block" style={{ fontSize: 'clamp(1.6rem, 8vw, 6.5rem)' }}>軽バンを、</span>
             <span className="block" style={{ fontSize: 'clamp(1.6rem, 8vw, 6.5rem)' }}>収益に変えよう。</span>
           </h1>
           <p className="text-black/50 text-lg leading-relaxed mb-14 max-w-xl">
