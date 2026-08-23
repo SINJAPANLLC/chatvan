@@ -45,8 +45,8 @@ export default function Login() {
       if ((res as any).token) {
         localStorage.setItem('sinjapan_auth_token', (res as any).token);
       }
-      // キャッシュをリセットして useGetMe を強制再取得させる
-      await queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+      // キャッシュにユーザーを即セット（遷移先で isLoading=false&&user=null になるのを防ぐ）
+      queryClient.setQueryData(getGetMeQueryKey(), res.user);
       if (res.user.role === 'admin') setLocation('/admin');
       else if (res.user.role === 'rental_company') setLocation('/company');
       else setLocation('/');
