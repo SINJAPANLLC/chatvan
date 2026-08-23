@@ -13,10 +13,10 @@ export default function Tokusho() {
         <table className="w-full text-sm">
           <tbody className="divide-y divide-black/8">
             {[
-              { label: '販売事業者', value: '株式会社SIN JAPAN' },
-              { label: '代表者', value: '' },
-              { label: '所在地', value: '〒xxx-xxxx 東京都（詳細はお問い合わせください）' },
-              { label: '電話番号', value: 'お問い合わせはメールにて承ります' },
+              { label: '販売事業者', value: '合同会社SIN JAPAN' },
+              { label: '所在地', value: '〒243-0303 神奈川県愛甲郡愛川町中津7287' },
+              { label: 'TEL', value: '046-212-2325' },
+              { label: 'FAX', value: '046-212-2326' },
               { label: 'メールアドレス', value: 'info@sinjapan.jp' },
               { label: 'サービス名', value: 'Chat VAN（軽バンレンタル仲介サービス）' },
               { label: 'サービス料金', value: '車両・期間・エリアによって異なります。ご利用前にチャットにてご案内します。' },

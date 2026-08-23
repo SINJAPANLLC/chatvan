@@ -13,7 +13,7 @@ export default function Privacy() {
         <div className="space-y-10 text-sm leading-relaxed text-black/70">
           <section>
             <h2 className="font-bold text-black text-base mb-3">1. 事業者情報</h2>
-            <p>株式会社SIN JAPAN（以下「当社」）は、個人情報の保護に関する法律（個人情報保護法）を遵守し、利用者の個人情報を適切に管理します。</p>
+            <p>合同会社SIN JAPAN（以下「当社」）は、個人情報の保護に関する法律（個人情報保護法）を遵守し、利用者の個人情報を適切に管理します。</p>
           </section>
           <section>
             <h2 className="font-bold text-black text-base mb-3">2. 取得する情報</h2>

@@ -13,7 +13,7 @@ export default function Terms() {
         <div className="space-y-10 text-sm leading-relaxed text-black/70">
           <section>
             <h2 className="font-bold text-black text-base mb-3">第1条（適用）</h2>
-            <p>本規約は、株式会社SIN JAPANが提供するChat VAN（以下「本サービス」）の利用に関する条件を定めるものです。ユーザーは本規約に同意の上、本サービスを利用するものとします。</p>
+            <p>本規約は、合同会社SIN JAPANが提供するChat VAN（以下「本サービス」）の利用に関する条件を定めるものです。ユーザーは本規約に同意の上、本サービスを利用するものとします。</p>
           </section>
           <section>
             <h2 className="font-bold text-black text-base mb-3">第2条（利用登録）</h2>
