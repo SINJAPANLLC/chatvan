@@ -13,8 +13,12 @@ import { AdminLayout } from '@/components/layout/AdminLayout';
 import { CompanyLayout } from '@/components/layout/CompanyLayout';
 import { PublicSeo } from '@/components/seo/PublicSeo';
 
-// Landing Page
-const LP = lazy(() => import('@/pages/lp'));
+// Landing Page & Static Pages
+const LP       = lazy(() => import('@/pages/lp'));
+const Company  = lazy(() => import('@/pages/company'));
+const Terms    = lazy(() => import('@/pages/terms'));
+const Privacy  = lazy(() => import('@/pages/privacy'));
+const Tokusho  = lazy(() => import('@/pages/tokusho'));
 
 // User Pages
 const Home          = lazy(() => import('@/pages/home'));
@@ -105,6 +109,10 @@ function Router() {
     <Suspense fallback={<PageLoader />}>
       <Switch>
         <Route path="/lp" component={LP} />
+        <Route path="/company" component={Company} />
+        <Route path="/terms" component={Terms} />
+        <Route path="/privacy" component={Privacy} />
+        <Route path="/tokusho" component={Tokusho} />
         <Route path="/login" component={Login} />
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/register" component={Register} />
