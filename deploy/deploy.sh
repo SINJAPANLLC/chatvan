@@ -42,8 +42,8 @@ NODE_ENV=production \
 
 log "[5/5] PM2 起動 / リロード"
 if pm2 describe "${PM2_NAME}" &>/dev/null; then
-  pm2 reload "${APP_DIR}/deploy/ecosystem.config.cjs" --env production --update-env
-  log "  → pm2 reload 完了"
+  pm2 restart "${APP_DIR}/deploy/ecosystem.config.cjs" --env production --update-env
+  log "  → pm2 restart 完了"
 else
   pm2 start "${APP_DIR}/deploy/ecosystem.config.cjs" --env production
   log "  → pm2 start 完了"
