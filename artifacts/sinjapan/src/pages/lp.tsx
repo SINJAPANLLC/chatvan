@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 
 const VAN_PHOTOS = [
-  '/images/van-1.jpg',
-  '/images/van-2.jpg',
-  '/images/van-3.jpg',
-  '/images/van-4.jpg',
-  '/images/van-5.jpg',
+  '/images/van-1.png',
+  '/images/van-2.png',
+  '/images/van-3.png',
+  '/images/van-4.png',
+  '/images/van-5.png',
 ];
 
 export default function LP() {
@@ -173,8 +173,7 @@ export default function LP() {
           .van-slide img {
             width: 100%;
             height: 100%;
-            object-fit: cover;
-            border-radius: 4px;
+            object-fit: contain;
             display: block;
           }
           @keyframes van-scroll {
