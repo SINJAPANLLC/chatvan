@@ -187,6 +187,82 @@ export default function LP() {
         </div>
       </section>
 
+      {/* 導入パートナー 無限スライダー */}
+      <section className="bg-white py-16 border-t border-black/8">
+        <p className="text-center text-[10px] tracking-[0.4em] text-black/25 uppercase mb-10">RENTAL PARTNERS</p>
+        <style>{`
+          .sin-logo-wall {
+            --slide-w: 200px;
+            --slide-h: 110px;
+            --speed: 22s;
+          }
+          .sin-slider {
+            height: var(--slide-h);
+            overflow: hidden;
+            width: 100%;
+            -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 12%, #000 88%, transparent 100%);
+            mask-image: linear-gradient(to right, transparent 0%, #000 12%, #000 88%, transparent 100%);
+          }
+          .sin-slide-track {
+            display: flex;
+            width: calc(var(--slide-w) * 8);
+            animation: sin-scroll var(--speed) linear infinite;
+            will-change: transform;
+          }
+          .sin-slide {
+            width: var(--slide-w);
+            height: var(--slide-h);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+          }
+          .sin-slide img {
+            max-width: 160px;
+            max-height: 72px;
+            object-fit: contain;
+            display: block;
+            filter: grayscale(100%);
+            opacity: 0.45;
+            transition: opacity 0.3s, filter 0.3s;
+          }
+          .sin-slide img:hover {
+            filter: grayscale(0%);
+            opacity: 0.85;
+          }
+          @keyframes sin-scroll {
+            0%   { transform: translateX(0); }
+            100% { transform: translateX(calc(-1 * var(--slide-w) * 4)); }
+          }
+          @media (max-width: 768px) {
+            .sin-logo-wall {
+              --slide-w: 160px;
+              --slide-h: 90px;
+              --speed: 18s;
+            }
+            .sin-slide-track {
+              width: calc(var(--slide-w) * 8);
+            }
+          }
+        `}</style>
+        <div className="sin-logo-wall">
+          <div className="sin-slider">
+            <div className="sin-slide-track">
+              {[
+                'https://s3-ap-northeast-1.amazonaws.com/s3.peraichi.com/userData/5b45aaad-02a4-4454-911d-14fb0a0000c5/img/1c9b1920-d996-013e-3faf-0a58a9feac02/70617d441cf711e88062963aecd2c947.jpg',
+                'https://s3-ap-northeast-1.amazonaws.com/s3.peraichi.com/userData/5b45aaad-02a4-4454-911d-14fb0a0000c5/img/095c3f70-d994-013e-82c3-0a58a9feac02/m_logo.png',
+                'https://s3-ap-northeast-1.amazonaws.com/s3.peraichi.com/userData/5b45aaad-02a4-4454-911d-14fb0a0000c5/img/0f974c20-d994-013e-82c4-0a58a9feac02/nikko-logo.jpg',
+                'https://s3-ap-northeast-1.amazonaws.com/s3.peraichi.com/userData/5b45aaad-02a4-4454-911d-14fb0a0000c5/img/1412ad40-d994-013e-82c6-0a58a9feac02/tmp-75613e906c3e5ab6ea00c4f39150e44f-cff486a9ddccba3a97b5c4297fb3c057.jpg',
+              ].flatMap((src, i) => [0, 1].map((loop) => (
+                <div key={`${i}-${loop}`} className="sin-slide">
+                  <img src={src} alt="" />
+                </div>
+              )))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* CTA */}
       <section className="bg-white py-36 px-6 md:px-20 text-center border-t border-black/8 relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none select-none flex items-center justify-center">
