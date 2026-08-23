@@ -52,7 +52,7 @@ export async function authorizeOnFile(shipmentId: number): Promise<{ paymentId: 
     customer_id: user.squareCustomerId,
     location_id: process.env.SQUARE_LOCATION_ID,
     autocomplete: false,
-    note: `Chat LOGI 案件 #${shipment.id}`,
+    note: `Chat VAN 案件 #${shipment.id}`,
   });
 
   const data = await squareRes.json() as any;

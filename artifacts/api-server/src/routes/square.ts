@@ -133,7 +133,7 @@ router.post("/square/authorize", requireAuth, async (req, res): Promise<void> =>
     amount_money: { amount: 1, currency: "JPY" },
     location_id: process.env.SQUARE_LOCATION_ID,
     autocomplete: false,
-    note: `Chat LOGI カード確認 案件 #${shipment.id}`,
+    note: `Chat VAN カード確認 案件 #${shipment.id}`,
   });
 
   const data = await squareRes.json() as any;
@@ -196,7 +196,7 @@ router.post("/square/charge", requireAuth, async (req, res): Promise<void> => {
     amount_money: { amount: totalAmount, currency: "JPY" },
     location_id: process.env.SQUARE_LOCATION_ID,
     autocomplete: true,
-    note: `Chat LOGI 決済 案件 #${shipment.id}`,
+    note: `Chat VAN 決済 案件 #${shipment.id}`,
     buyer_email_address: req.session?.userEmail ?? undefined,
   });
 
@@ -249,7 +249,7 @@ router.post("/square/capture/:squarePaymentId", requireAdmin, async (req, res): 
     const [user] = await db.select({ name: usersTable.name, email: usersTable.email })
       .from(usersTable).where(eq(usersTable.id, updated.userId)).limit(1);
     if (user) {
-      const subject = "【Chat LOGI】決済が完了しました";
+      const subject = "【Chat VAN】決済が完了しました";
       const body = `クレジットカードの決済が完了いたしました。\n\nご利用いただきありがとうございました。\n領収書・請求書はマイページよりご確認いただけます。`;
       await db.insert(notificationsTable).values({
         userId: updated.userId,
