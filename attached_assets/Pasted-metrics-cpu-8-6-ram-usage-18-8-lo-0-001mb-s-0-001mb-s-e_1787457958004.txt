@@ -1,0 +1,66 @@
+metrics | cpu: 8.6% | ram usage: 18.8% | lo: ⇓ 0.001mb/s ⇑ 0.001mb/s | eth0: ⇓ 0.263mb/s ⇑ 0.015mb/s |
+root@srv1087935:/var/www/chatvan# psql "postgresql://neondb_owner:npg_BwSUET14nbrI@ep-blue-hill-aymdo9tu-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require" << 'SQL'
+-- 全開発データを削除（CASCADEで子テーブルも自動削除）
+TRUNCATE
+  rental_companies,
+  vehicles,
+  van_applications,
+  blog_posts,
+  contacts,
+  conversations,
+  prospects,
+  shipments,
+  payments,
+  audit_logs,
+  email_send_logs,
+  user_activity_logs,
+  notifications
+CASCADE;
+
+-- 期限切れトークンのみ削除（現在のログインセッションは維持）
+DELETE FROM auth_tokens WHERE expires_at < NOW();
+
+-- 確認
+SELECT 'rental_companies' AS tbl, COUNT(*) FROM rental_companies
+UNION ALL SELECT 'vehicles',       COUNT(*) FROM vehicles
+UNION ALL SELECT 'van_applications', COUNT(*) FROM van_applications
+UNION ALL SELECT 'van_contracts',  COUNT(*) FROM van_contracts
+UNION ALL SELECT 'blog_posts',     COUNT(*) FROM blog_posts
+SQLON ALL SELECT 'auth_tokens',    COUNT(*) FROM auth_tokens;
+NOTICE:  truncate cascades to table "gps_devices"
+NOTICE:  truncate cascades to table "identity_verifications"
+NOTICE:  truncate cascades to table "insurance_policies"
+NOTICE:  truncate cascades to table "invoice_items"
+NOTICE:  truncate cascades to table "recovery_cases"
+NOTICE:  truncate cascades to table "returns"
+NOTICE:  truncate cascades to table "screenings"
+NOTICE:  truncate cascades to table "settlements"
+NOTICE:  truncate cascades to table "upload_claims"
+NOTICE:  truncate cascades to table "users"
+NOTICE:  truncate cascades to table "van_contracts"
+NOTICE:  truncate cascades to table "van_messages"
+NOTICE:  truncate cascades to table "van_proposals"
+NOTICE:  truncate cascades to table "vehicle_images"
+NOTICE:  truncate cascades to table "auth_tokens"
+NOTICE:  truncate cascades to table "breakdowns"
+NOTICE:  truncate cascades to table "contract_messages"
+NOTICE:  truncate cascades to table "gps_locations"
+NOTICE:  truncate cascades to table "invoices"
+NOTICE:  truncate cascades to table "password_reset_tokens"
+NOTICE:  truncate cascades to table "payment_retries"
+NOTICE:  truncate cascades to table "return_inspections"
+NOTICE:  truncate cascades to table "van_incidents"
+TRUNCATE TABLE
+DELETE 0
+       tbl        | count 
+------------------+-------
+ rental_companies |     0
+ vehicles         |     0
+ van_applications |     0
+ van_contracts    |     0
+ blog_posts       |     0
+ contacts         |     0
+ auth_tokens      |     0
+(7 rows)
+
+root@srv1087935:/var/www/chatvan# 
