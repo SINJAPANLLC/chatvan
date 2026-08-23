@@ -45,7 +45,7 @@ export default function LP() {
               無料で相談する <span className="group-hover:translate-x-1 transition-transform">→</span>
             </button>
           </Link>
-          <p className="text-black/25 text-sm mt-6">登録無料・最短即日・対面不要</p>
+          <p className="text-black/25 text-sm mt-6">登録無料・最短即日・書類手続き不要</p>
         </div>
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3">
           <span className="text-black/20 text-[10px] tracking-[0.4em] uppercase">Scroll</span>
@@ -78,7 +78,7 @@ export default function LP() {
             {[
               { num: '01', title: 'チャットで相談', body: 'エリア・期間・用途を入力するだけ。', tags: ['1分で登録完了', '24時間受付'] },
               { num: '02', title: 'AIが提案', body: '条件に合う車両を最短即日でご提案。チャットで質問・条件変更もOK。', tags: ['複数候補から選択', '即日対応'] },
-              { num: '03', title: '書類・支払いもオンラインで', body: '電子契約・オンライン決済で完結。印鑑・来店不要。', tags: ['電子契約', 'カード／請求書払い'] },
+              { num: '03', title: '書類・支払いもオンラインで', body: '電子契約・オンライン決済で完結。印鑑・郵送不要。', tags: ['電子契約', 'カード／請求書払い'] },
               { num: '04', title: '受け取って利用開始', body: '日時・場所を調整して利用開始。サポートもチャットで対応。', tags: ['チャットサポート'] },
             ].map((step) => (
               <div key={step.num} className="flex gap-8 md:gap-16 py-8 border-b border-black/8 last:border-0">
@@ -129,7 +129,7 @@ export default function LP() {
               { q: '個人でも使えますか？', a: '個人・個人事業主・法人のいずれも対応しています。' },
               { q: '利用期間はどのくらいから？', a: '1ヶ月から対応しています。チャットでご相談ください。' },
               { q: '料金はいくらですか？', a: '車両・期間・エリアによって異なります。相談は無料です。' },
-              { q: '来店・書類郵送は必要ですか？', a: '不要です。本人確認から契約・決済まですべてオンラインで完結します。' },
+              { q: '来店は必要ですか？', a: '契約・決済はオンラインで完結します。車両の受け取り時のみ来店が必要です。' },
               { q: '法人請求書払いは対応していますか？', a: '対応しています。月末締め翌月末払いなどはチャットでご相談ください。' },
             ].map((item) => (
               <details key={item.q} className="group border-b border-black/8 py-6 cursor-pointer">
