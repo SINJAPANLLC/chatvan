@@ -13,8 +13,8 @@ export function generateToken(): string {
 
 export async function setToken(token: string, data: TokenData): Promise<void> {
   await pool.query(
-    `INSERT INTO auth_tokens (token, user_id, user_role, user_email)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO auth_tokens (token, user_id, user_role, user_email, expires_at)
+     VALUES ($1, $2, $3, $4, NOW() + INTERVAL '30 days')
      ON CONFLICT (token) DO UPDATE
        SET user_id = EXCLUDED.user_id,
            user_role = EXCLUDED.user_role,
