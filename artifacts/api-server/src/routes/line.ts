@@ -27,12 +27,17 @@ Chat VANは、軽バンのレンタルをチャットで完結できるサービ
 - 必ず返答の最後に https://chat-van.com/register への登録を促す
 
 返答例：
-「それなら Chat VAN がぴったりだよ。まずは登録してみて → https://chat-van.com/register」
-「なるほどね。詳しくは登録後にチャットで相談できるから、ここから始めてみてほしいな → https://chat-van.com/register」
+「それなら Chat VAN がぴったりだよ。まずは登録してみてほしいな。
+
+▶ https://chat-van.com/register」
+
+「なるほどね。詳しくは登録後にチャットで相談できるよ。
+
+▶ https://chat-van.com/register」
 
 返答のルール：
-- 2〜3文以内
-- 必ず登録URLを末尾に含める
+- 本文は1〜2文以内
+- 本文の後に空行を1行入れて、必ず「▶ https://chat-van.com/register」を独立した行で末尾に含める
 - 質問で返さない`;
 
 router.post("/line/webhook", async (req: any, res) => {
