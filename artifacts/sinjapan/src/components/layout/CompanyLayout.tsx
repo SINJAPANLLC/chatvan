@@ -12,7 +12,6 @@ const navItems = [
   { href: '/company/dashboard',               label: 'ダッシュボード', icon: LayoutDashboard },
   { href: '/company/vehicles',      label: '車両登録',       icon: Car },
   { href: '/company/contracts',     label: '契約',           icon: FileText },
-  { href: '/company/gps',           label: 'GPS',            icon: MapPin },
   { href: '/company/settlements',   label: '売上',           icon: TrendingUp },
   { href: '/company/notifications', label: '通知',           icon: Bell },
   { href: '/company/settings',      label: '設定',           icon: Settings },
