@@ -13,6 +13,7 @@ export default function Company() {
           <tbody className="divide-y divide-black/8">
             {[
               { label: '会社名', value: '合同会社SIN JAPAN' },
+              { label: '代表者', value: '大谷　和哉' },
               { label: '所在地', value: '〒243-0303 神奈川県愛甲郡愛川町中津7287' },
               { label: '設立', value: '2024年' },
               { label: 'TEL', value: '046-212-2325' },
