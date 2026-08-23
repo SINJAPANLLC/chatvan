@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 
 const VAN_SLIDES = [
-  'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=1400&q=80',
-  'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=1400&q=80',
-  'https://images.unsplash.com/photo-1571987502227-9231b837d92a?auto=format&fit=crop&w=1400&q=80',
-  'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1400&q=80',
-  'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=1400&q=80',
+  '/images/van-1.jpg',
+  '/images/van-2.jpg',
+  '/images/van-3.jpg',
+  '/images/van-4.jpg',
+  '/images/van-5.jpg',
 ];
 
 export default function LP() {
