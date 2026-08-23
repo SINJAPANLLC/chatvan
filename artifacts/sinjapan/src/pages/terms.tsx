@@ -56,11 +56,6 @@ export default function Terms() {
           </section>
 
           <section>
-            <h2 className="font-bold text-black text-base mb-3">第6条（キャンセル・変更）</h2>
-            <p className="mb-3">レンタル契約の成立後のキャンセル・変更は、各レンタル会社のキャンセルポリシーに従います。キャンセル料が発生する場合があります。詳細はチャット上でご確認ください。</p>
-          </section>
-
-          <section>
             <h2 className="font-bold text-black text-base mb-3">第7条（禁止事項）</h2>
             <p className="mb-3">ユーザーは以下の行為を行ってはなりません。</p>
             <ul className="space-y-2 list-disc list-inside">
