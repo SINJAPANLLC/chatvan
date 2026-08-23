@@ -63,13 +63,13 @@ export default function CompanyContact() {
                 <div className="w-8 h-8 bg-muted rounded-lg flex items-center justify-center shrink-0">
                   <Phone className="h-3.5 w-3.5 text-muted-foreground" />
                 </div>
-                <a href="tel:0505526-9906" className="hover:underline">050-5526-9906</a>
+                <a href="tel:046-212-2325" className="hover:underline">046-212-2325</a>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <div className="w-8 h-8 bg-muted rounded-lg flex items-center justify-center shrink-0">
                   <Mail className="h-3.5 w-3.5 text-muted-foreground" />
                 </div>
-                <a href="mailto:info@chat-van.com" className="hover:underline">info@chat-van.com</a>
+                <a href="mailto:info@sinjapan.jp" className="hover:underline">info@sinjapan.jp</a>
               </div>
               <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 <div className="w-8 h-8 bg-muted rounded-lg flex items-center justify-center shrink-0">
