@@ -11,17 +11,17 @@ export default function LP() {
   }, []);
 
   return (
-    <div className="font-['Noto_Sans_JP'] bg-white overflow-x-hidden">
+    <div className="font-['Noto_Sans_JP'] bg-white overflow-x-hidden text-black">
 
       {/* ── Nav ── */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4 transition-all duration-300 ${scrolled ? 'bg-black/90 backdrop-blur-sm' : 'bg-transparent'}`}>
-        <img src="/logo.png" alt="Chat VAN" className="h-8 w-auto brightness-0 invert" />
+      <nav className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4 transition-all duration-300 ${scrolled ? 'bg-white/95 backdrop-blur-sm border-b border-black/8' : 'bg-white'}`}>
+        <img src="/logo.png" alt="Chat VAN" className="h-8 w-auto" />
         <div className="flex items-center gap-4">
           <Link href="/login">
-            <button className="text-white/70 text-sm hover:text-white transition-colors">ログイン</button>
+            <button className="text-black/50 text-sm hover:text-black transition-colors">ログイン</button>
           </Link>
           <Link href="/register">
-            <button className="bg-white text-black text-sm font-bold px-5 py-2 hover:bg-white/90 transition-colors">
+            <button className="bg-black text-white text-sm font-bold px-5 py-2 hover:bg-black/80 transition-colors">
               無料で始める
             </button>
           </Link>
@@ -29,50 +29,50 @@ export default function LP() {
       </nav>
 
       {/* ── Hero ── */}
-      <section className="min-h-screen bg-black flex flex-col justify-center px-6 md:px-20 relative overflow-hidden">
-        {/* bg decoration */}
-        <div className="absolute inset-0 pointer-events-none select-none">
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 text-[clamp(12rem,30vw,28rem)] font-black text-white/[0.03] leading-none tracking-tight whitespace-nowrap">
+      <section className="min-h-screen bg-white flex flex-col justify-center px-6 md:px-20 relative overflow-hidden">
+        {/* bg watermark */}
+        <div className="absolute inset-0 pointer-events-none select-none flex items-center justify-end pr-4 md:pr-0">
+          <span className="text-[clamp(8rem,22vw,20rem)] font-black text-black/[0.04] leading-none tracking-tight whitespace-nowrap">
             CHAT VAN
-          </div>
+          </span>
         </div>
 
         <div className="max-w-5xl mx-auto w-full relative z-10 pt-20">
-          <p className="text-white/40 text-xs tracking-[0.4em] uppercase mb-10">軽バンレンタル × チャット</p>
+          <p className="text-black/35 text-xs tracking-[0.4em] uppercase mb-10">軽バンレンタル × チャット</p>
 
           <h1 className="font-black leading-[1.05] tracking-tight mb-8">
-            <span className="block text-white" style={{ fontSize: 'clamp(2.8rem, 9vw, 7.5rem)' }}>
+            <span className="block text-black" style={{ fontSize: 'clamp(2.8rem, 9vw, 7.5rem)' }}>
               チャットするだけ。
             </span>
-            <span className="block text-white" style={{ fontSize: 'clamp(2.8rem, 9vw, 7.5rem)' }}>
+            <span className="block text-black" style={{ fontSize: 'clamp(2.8rem, 9vw, 7.5rem)' }}>
               軽バンかりれる。
             </span>
           </h1>
 
-          <p className="text-white/50 text-base md:text-xl leading-relaxed mb-14 max-w-lg">
+          <p className="text-black/50 text-base md:text-xl leading-relaxed mb-14 max-w-lg">
             エリア・期間・用途をチャットで伝えるだけ。<br />
             手続きゼロで、あなたに合う車両をすぐ提案します。
           </p>
 
           <Link href="/register">
-            <button className="group bg-white text-black font-bold text-lg px-12 py-5 hover:bg-white/90 transition-all flex items-center gap-3">
+            <button className="group bg-black text-white font-bold text-lg px-12 py-5 hover:bg-black/80 transition-all flex items-center gap-3">
               無料で相談する
               <span className="group-hover:translate-x-1 transition-transform">→</span>
             </button>
           </Link>
 
-          <p className="text-white/25 text-sm mt-6">登録無料・最短即日対応・対面不要</p>
+          <p className="text-black/25 text-sm mt-6">登録無料・最短即日対応・対面不要</p>
         </div>
 
         {/* scroll indicator */}
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3">
-          <span className="text-white/25 text-[10px] tracking-[0.4em] uppercase">Scroll</span>
-          <div className="w-px h-14 bg-gradient-to-b from-white/25 to-transparent" />
+          <span className="text-black/20 text-[10px] tracking-[0.4em] uppercase">Scroll</span>
+          <div className="w-px h-14 bg-gradient-to-b from-black/20 to-transparent" />
         </div>
       </section>
 
       {/* ── Steps ── */}
-      <section className="bg-white py-28 px-6 md:px-20">
+      <section className="bg-[#f7f7f7] py-28 px-6 md:px-20">
         <div className="max-w-5xl mx-auto">
           <p className="text-[10px] tracking-[0.4em] text-black/30 uppercase mb-3">How it works</p>
           <h2 className="font-black tracking-tight mb-20" style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)' }}>
@@ -110,14 +110,14 @@ export default function LP() {
       </section>
 
       {/* ── Features ── */}
-      <section className="bg-black py-28 px-6 md:px-20">
+      <section className="bg-white py-28 px-6 md:px-20">
         <div className="max-w-5xl mx-auto">
-          <p className="text-[10px] tracking-[0.4em] text-white/30 uppercase mb-3">Features</p>
-          <h2 className="font-black tracking-tight text-white mb-20" style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)' }}>
+          <p className="text-[10px] tracking-[0.4em] text-black/30 uppercase mb-3">Features</p>
+          <h2 className="font-black tracking-tight mb-20" style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)' }}>
             Chat VANを<br />選ぶ理由
           </h2>
 
-          <div className="grid md:grid-cols-2 gap-px bg-white/10">
+          <div className="grid md:grid-cols-2 gap-px bg-black/8">
             {[
               {
                 title: '最短即日対応',
@@ -136,9 +136,9 @@ export default function LP() {
                 body: '個人事業主から中小企業まで。軽貨物・出張・移動販売など用途は自由。',
               },
             ].map((f) => (
-              <div key={f.title} className="bg-black p-10 md:p-12">
-                <h3 className="text-white text-xl font-bold mb-4">{f.title}</h3>
-                <p className="text-white/40 leading-relaxed text-sm">{f.body}</p>
+              <div key={f.title} className="bg-white p-10 md:p-12">
+                <h3 className="text-black text-xl font-bold mb-4">{f.title}</h3>
+                <p className="text-black/45 leading-relaxed text-sm">{f.body}</p>
               </div>
             ))}
           </div>
@@ -146,7 +146,7 @@ export default function LP() {
       </section>
 
       {/* ── For ── */}
-      <section className="bg-white py-28 px-6 md:px-20">
+      <section className="bg-[#f7f7f7] py-28 px-6 md:px-20">
         <div className="max-w-5xl mx-auto">
           <p className="text-[10px] tracking-[0.4em] text-black/30 uppercase mb-3">For you</p>
           <h2 className="font-black tracking-tight mb-16" style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)' }}>
@@ -162,10 +162,7 @@ export default function LP() {
               '短期間だけ車両が必要',
               '対面手続きが面倒、時間が取れない',
             ].map((item, i) => (
-              <div
-                key={item}
-                className="flex items-center gap-5 py-5 border-b border-black/8"
-              >
+              <div key={item} className="flex items-center gap-5 py-5 border-b border-black/8 bg-[#f7f7f7]">
                 <span className="text-black/20 font-black text-sm tabular-nums w-8 shrink-0">
                   {String(i + 1).padStart(2, '0')}
                 </span>
@@ -177,21 +174,21 @@ export default function LP() {
       </section>
 
       {/* ── Final CTA ── */}
-      <section className="bg-black py-36 px-6 md:px-20 text-center relative overflow-hidden">
+      <section className="bg-white py-36 px-6 md:px-20 text-center relative overflow-hidden border-t border-black/8">
         <div className="absolute inset-0 pointer-events-none select-none flex items-center justify-center">
-          <span className="text-white/[0.025] font-black leading-none" style={{ fontSize: 'clamp(6rem, 20vw, 20rem)' }}>
+          <span className="text-black/[0.025] font-black leading-none" style={{ fontSize: 'clamp(6rem, 20vw, 20rem)' }}>
             START
           </span>
         </div>
         <div className="relative z-10 max-w-2xl mx-auto">
-          <h2 className="text-white font-black tracking-tight leading-tight mb-6" style={{ fontSize: 'clamp(2rem, 6vw, 4.5rem)' }}>
+          <h2 className="text-black font-black tracking-tight leading-tight mb-6" style={{ fontSize: 'clamp(2rem, 6vw, 4.5rem)' }}>
             まず、チャットで<br />相談してみよう。
           </h2>
-          <p className="text-white/30 text-base mb-12 tracking-wider">
+          <p className="text-black/30 text-base mb-12 tracking-wider">
             登録無料&emsp;|&emsp;最短即日&emsp;|&emsp;対面不要
           </p>
           <Link href="/register">
-            <button className="group bg-white text-black font-bold text-xl px-16 py-6 hover:bg-white/90 transition-all inline-flex items-center gap-4">
+            <button className="group bg-black text-white font-bold text-xl px-16 py-6 hover:bg-black/80 transition-all inline-flex items-center gap-4">
               無料で始める
               <span className="group-hover:translate-x-1 transition-transform">→</span>
             </button>
@@ -200,14 +197,14 @@ export default function LP() {
       </section>
 
       {/* ── Footer ── */}
-      <footer className="bg-black border-t border-white/8 py-8 px-6 md:px-20">
+      <footer className="bg-white border-t border-black/8 py-8 px-6 md:px-20">
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <img src="/logo.png" alt="Chat VAN" className="h-7 w-auto brightness-0 invert opacity-60" />
-          <div className="flex items-center gap-6 text-white/25 text-xs">
-            <Link href="/login"><span className="hover:text-white/60 cursor-pointer transition-colors">ログイン</span></Link>
-            <Link href="/register"><span className="hover:text-white/60 cursor-pointer transition-colors">新規登録</span></Link>
+          <img src="/logo.png" alt="Chat VAN" className="h-7 w-auto opacity-60" />
+          <div className="flex items-center gap-6 text-black/30 text-xs">
+            <Link href="/login"><span className="hover:text-black cursor-pointer transition-colors">ログイン</span></Link>
+            <Link href="/register"><span className="hover:text-black cursor-pointer transition-colors">新規登録</span></Link>
           </div>
-          <p className="text-white/20 text-xs">© 2026 Chat VAN. All rights reserved.</p>
+          <p className="text-black/20 text-xs">© 2026 Chat VAN. All rights reserved.</p>
         </div>
       </footer>
 
