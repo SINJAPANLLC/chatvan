@@ -164,12 +164,8 @@ export default function LP() {
 
       {/* Footer */}
       <footer className="bg-white border-t border-black/8 py-8 px-6 md:px-20">
-        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="max-w-5xl mx-auto flex flex-col items-center gap-4">
           <img src="/logo.png" alt="Chat VAN" className="h-7 w-auto opacity-50" />
-          <div className="flex items-center gap-6 text-black/30 text-xs">
-            <Link href="/login"><span className="hover:text-black cursor-pointer transition-colors">ログイン</span></Link>
-            <Link href="/register"><span className="hover:text-black cursor-pointer transition-colors">新規登録</span></Link>
-          </div>
           <p className="text-black/20 text-xs">© 2026 Chat VAN. All rights reserved.</p>
         </div>
       </footer>
