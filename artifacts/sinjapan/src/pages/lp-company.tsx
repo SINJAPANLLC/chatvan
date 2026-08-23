@@ -105,7 +105,7 @@ export default function LPCompany() {
             {[
               { num: '01', title: '無料で登録', body: '会社情報を入力するだけ。審査後すぐに利用開始できます。', tags: ['初期費用無料', '審査あり'] },
               { num: '02', title: '車両を登録', body: '保有車両の情報（車種・エリア・空き状況）を登録します。', tags: ['複数台対応', 'いつでも更新可'] },
-              { num: '03', title: 'マッチング・提案', body: 'ユーザーからの依頼をもとに、Chat VANがマッチングを行います。提案内容はダッシュボードで確認できます。', tags: ['Chat VANが集客', '提案内容を事前確認'] },
+              { num: '03', title: 'マッチング・提案', body: 'ユーザーからの依頼をもとに、Chat VANがマッチングを行います。提案内容はダッシュボードで確認できます。', tags: ['Chat VANが集客'] },
               { num: '04', title: '成約・売上管理', body: '契約が成立したら売上が発生。入金・請求もダッシュボードで一括管理できます。', tags: ['売上はダッシュボードで確認'] },
             ].map((step) => (
               <div key={step.num} className="flex gap-8 md:gap-16 py-8 border-b border-black/8 last:border-0">
