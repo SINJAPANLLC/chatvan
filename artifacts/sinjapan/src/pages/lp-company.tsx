@@ -3,6 +3,7 @@ import { Link } from 'wouter';
 
 export default function LPCompany() {
   const [scrolled, setScrolled] = useState(false);
+  const [pandaVisible, setPandaVisible] = useState(true);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -283,14 +284,25 @@ export default function LPCompany() {
         </div>
       </footer>
       {/* Fixed panda */}
-      <Link href="/company/register">
-        <img
-          src="/images/panda.png"
-          alt="登録してね！"
-          className="fixed bottom-0 left-0 z-50 cursor-pointer select-none"
-          style={{ width: 'clamp(140px, 28vw, 220px)' }}
-        />
-      </Link>
+      {pandaVisible && (
+        <div className="fixed bottom-0 left-0 z-50">
+          <button
+            onClick={() => setPandaVisible(false)}
+            className="absolute top-3 left-1 w-5 h-5 rounded-full bg-black/50 text-white text-xs flex items-center justify-center hover:bg-black transition-colors"
+            aria-label="閉じる"
+          >
+            ×
+          </button>
+          <Link href="/company/register">
+            <img
+              src="/images/panda.png"
+              alt="登録してね！"
+              className="cursor-pointer select-none block"
+              style={{ width: 'clamp(140px, 28vw, 220px)' }}
+            />
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
