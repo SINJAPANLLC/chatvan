@@ -1,0 +1,40 @@
+tracts の子テーブル
+  DELETE FROM payment_retries  WHERE user_id = ANY(ids);
+  DELETE FROM recovery_cases   WHERE user_id = ANY(ids);
+  DELETE FROM van_incidents    WHERE user_id = ANY(ids);
+  DELETE FROM breakdowns       WHERE user_id = ANY(ids);
+  DELETE FROM returns          WHERE user_id = ANY(ids);
+  DELETE FROM invoices         WHERE user_id = ANY(ids);
+  DELETE FROM settlements      WHERE contract_id IN (SELECT id FROM van_contracts WHERE user_id = ANY(ids));
+
+  -- van_applications の子テーブル
+  DELETE FROM screenings       WHERE user_id = ANY(ids);
+  DELETE FROM van_contracts    WHERE user_id = ANY(ids);
+
+  -- van_messages / contract_messages
+  DELETE FROM van_messages        WHERE application_id IN (SELECT id FROM van_applications WHERE user_id = ANY(ids));
+  DELETE FROM contract_messages   WHERE contract_id IN (SELECT id FROM van_contracts WHERE user_id = ANY(ids));
+SQLECT id, email, role FROM users; 'info@sinjapan.jp';Y(ids);;
+ERROR:  update or delete on table "van_contracts" violates foreign key constraint "contract_messages_contract_id_fkey" on table "contract_messages"
+DETAIL:  Key (id)=(11) is still referenced from table "contract_messages".
+CONTEXT:  SQL statement "DELETE FROM van_contracts    WHERE user_id = ANY(ids)"
+PL/pgSQL function inline_code_block line 19 at SQL statement
+ id |        email         |      role      
+----+----------------------+----------------
+  2 | admin@sinjapan.co.jp | admin
+  6 | a@a                  | rental_company
+  7 | b@b                  | rental_company
+  8 | a@a.com              | rental_company
+ 10 | x@x.com              | rental_company
+ 11 | c@c.com              | rental_company
+ 12 | 9@9.com              | rental_company
+ 13 | 5@5.com              | rental_company
+  3 | あ                   | rental_company
+  4 | ｑ                   | rental_company
+  5 | ｗ                   | user
+  9 | z@z.com              | user
+ 14 | info@chat-van.com    | admin
+  1 | info@sinjapan.jp     | admin
+(14 rows)
+
+root@srv1087935:/var/www/chatvan# 
