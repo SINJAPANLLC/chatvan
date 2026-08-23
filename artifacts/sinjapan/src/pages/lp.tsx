@@ -175,7 +175,7 @@ export default function LP() {
               { q: '来店は必要ですか？', a: '契約・決済はオンラインで完結します。車両の受け取り時のみ来店が必要です。' },
               { q: '法人請求書払いは対応していますか？', a: '対応しています。月末締め翌月末払いなどはチャットでご相談ください。' },
             ].map((item) => (
-              <details key={item.q} className="group border-b border-black/8 py-6 cursor-pointer">
+              <details key={item.q} className="group border-b border-black/8 last:border-b-0 py-6 cursor-pointer">
                 <summary className="flex items-center justify-between font-bold text-base list-none">
                   {item.q}
                   <span className="text-black/30 group-open:rotate-45 transition-transform text-xl shrink-0 ml-4">＋</span>
@@ -204,7 +204,7 @@ export default function LP() {
           }
           .sin-slide-track {
             display: flex;
-            width: calc(var(--slide-w) * 8);
+            width: calc(var(--slide-w) * 16);
             animation: sin-scroll var(--speed) linear infinite;
             will-change: transform;
           }
@@ -224,7 +224,7 @@ export default function LP() {
           }
           @keyframes sin-scroll {
             0%   { transform: translateX(0); }
-            100% { transform: translateX(calc(-1 * var(--slide-w) * 4)); }
+            100% { transform: translateX(-25%); }
           }
           @media (max-width: 768px) {
             .sin-logo-wall {
@@ -233,7 +233,7 @@ export default function LP() {
               --speed: 18s;
             }
             .sin-slide-track {
-              width: calc(var(--slide-w) * 8);
+              width: calc(var(--slide-w) * 16);
             }
           }
         `}</style>
@@ -247,7 +247,7 @@ export default function LP() {
                   'https://s3-ap-northeast-1.amazonaws.com/s3.peraichi.com/userData/5b45aaad-02a4-4454-911d-14fb0a0000c5/img/0f974c20-d994-013e-82c4-0a58a9feac02/nikko-logo.jpg',
                   'https://s3-ap-northeast-1.amazonaws.com/s3.peraichi.com/userData/5b45aaad-02a4-4454-911d-14fb0a0000c5/img/1412ad40-d994-013e-82c6-0a58a9feac02/tmp-75613e906c3e5ab6ea00c4f39150e44f-cff486a9ddccba3a97b5c4297fb3c057.jpg',
                 ];
-                return [...logos, ...logos].map((src, i) => (
+                return [...logos, ...logos, ...logos, ...logos].map((src, i) => (
                   <div key={i} className="sin-slide">
                     <img src={src} alt="" />
                   </div>
