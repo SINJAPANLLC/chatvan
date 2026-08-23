@@ -58,7 +58,7 @@ export default function LP() {
         </div>
 
         {/* Store Badges */}
-        <div className="fixed top-[64px] right-3 md:absolute md:top-auto md:bottom-14 md:right-20 flex flex-col items-end gap-2 z-40">
+        <div className="fixed top-[84px] right-3 md:absolute md:top-auto md:bottom-14 md:right-20 flex flex-col items-end gap-2 z-40">
           {/* App Store - 準備中 */}
           <div className="relative select-none">
             <div className="flex items-center gap-2.5 bg-black rounded-xl px-4 py-2.5 w-[152px] opacity-35">
