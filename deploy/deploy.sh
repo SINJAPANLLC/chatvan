@@ -21,13 +21,16 @@ export NVM_DIR="$HOME/.nvm"
 if [ -s "$NVM_DIR/nvm.sh" ]; then
   # shellcheck source=/dev/null
   source "$NVM_DIR/nvm.sh"
-  nvm use default
+  nvm use default 2>/dev/null || true
 fi
+
+log "Node.js: $(node -v), pnpm: $(pnpm -v)"
 
 log "[1/5] git pull"
 git pull origin main
 
 log "[2/5] pnpm install"
+# pnpm 9.x (lockfileVersion 9.0 対応) で実行
 pnpm install --frozen-lockfile
 
 log "[3/5] API サーバービルド"

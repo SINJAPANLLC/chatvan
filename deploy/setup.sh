@@ -8,26 +8,35 @@ set -euo pipefail
 
 APP_DIR="/var/www/chatvan"
 REPO_URL="https://github.com/SINJAPANLLC/chatvan.git"
-NODE_VERSION="20"
+# pnpm 9.x は Node 18+ に対応。lockfileVersion 9.0 と一致。
+# pnpm 10/11 は Node 22.13+ が必要なので使わない。
+PNPM_VERSION="9"
 
 echo "=== [1/7] 依存パッケージをインストール ==="
 apt-get update -y
 apt-get install -y git curl nginx certbot python3-certbot-nginx
 
-echo "=== [2/7] Node.js ${NODE_VERSION} を nvm でインストール ==="
-if ! command -v node &>/dev/null || [[ "$(node -e 'process.exit(+process.versions.node.split(".")[0]<20)')" ]]; then
+echo "=== [2/7] Node.js を確認 ==="
+# nvm がなければインストール
+export NVM_DIR="$HOME/.nvm"
+if [ ! -s "$NVM_DIR/nvm.sh" ]; then
   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-  export NVM_DIR="$HOME/.nvm"
-  # shellcheck source=/dev/null
-  source "$NVM_DIR/nvm.sh"
-  nvm install "${NODE_VERSION}"
-  nvm alias default "${NODE_VERSION}"
-  nvm use default
 fi
-node -v
+# shellcheck source=/dev/null
+source "$NVM_DIR/nvm.sh"
 
-echo "=== [3/7] pnpm をインストール ==="
-npm install -g pnpm@latest
+# Node 20 以上でなければインストール（VPSに既にあれば skip）
+NODE_MAJOR=$(node -e "process.stdout.write(String(+process.versions.node.split('.')[0]))" 2>/dev/null || echo "0")
+if [ "${NODE_MAJOR}" -lt 20 ]; then
+  nvm install 20
+  nvm alias default 20
+fi
+nvm use default
+echo "Node.js: $(node -v)"
+
+echo "=== [3/7] pnpm ${PNPM_VERSION} をインストール ==="
+# pnpm 9.x = lockfileVersion 9.0 と互換、Node 18/20 対応
+npm install -g "pnpm@${PNPM_VERSION}"
 pnpm -v
 
 echo "=== [4/7] PM2 をインストール ==="
