@@ -34,8 +34,8 @@ export default function LP() {
         <div className="max-w-5xl mx-auto w-full relative z-10 pt-20">
           <p className="text-black/35 text-xs tracking-[0.4em] uppercase mb-10">軽バンレンタル × チャット</p>
           <h1 className="font-black leading-[1.05] tracking-tight mb-8">
-            <span className="block" style={{ fontSize: 'clamp(2.8rem, 9vw, 7.5rem)' }}>チャットするだけ。</span>
-            <span className="block" style={{ fontSize: 'clamp(2.8rem, 9vw, 7.5rem)' }}>軽バンかりれる。</span>
+            <span className="block" style={{ fontSize: 'clamp(1.6rem, 8.5vw, 7.5rem)' }}>チャットするだけ。</span>
+            <span className="block" style={{ fontSize: 'clamp(1.6rem, 8.5vw, 7.5rem)' }}>軽バンかりれる。</span>
           </h1>
           <p className="text-black/50 text-lg leading-relaxed mb-14 max-w-lg">
             条件を送るだけ。AIが即日提案。<br />契約・支払いまでオンラインで完結。
