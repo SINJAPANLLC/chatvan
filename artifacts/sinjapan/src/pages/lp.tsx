@@ -189,7 +189,6 @@ export default function LP() {
 
       {/* 導入パートナー 無限スライダー */}
       <section className="bg-white py-16 border-t border-black/8">
-        <p className="text-center text-[10px] tracking-[0.4em] text-black/25 uppercase mb-10">RENTAL PARTNERS</p>
         <style>{`
           .sin-logo-wall {
             --slide-w: 200px;
@@ -222,13 +221,6 @@ export default function LP() {
             max-height: 72px;
             object-fit: contain;
             display: block;
-            filter: grayscale(100%);
-            opacity: 0.45;
-            transition: opacity 0.3s, filter 0.3s;
-          }
-          .sin-slide img:hover {
-            filter: grayscale(0%);
-            opacity: 0.85;
           }
           @keyframes sin-scroll {
             0%   { transform: translateX(0); }
