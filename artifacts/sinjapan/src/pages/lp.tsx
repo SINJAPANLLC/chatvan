@@ -79,7 +79,7 @@ export default function LP() {
               { num: '01', title: 'チャットで相談', body: 'エリア・期間・用途を入力するだけ。', tags: ['1分で登録完了', '24時間受付'] },
               { num: '02', title: 'AIが提案', body: '条件に合う車両を最短即日でご提案。チャットで質問・条件変更もOK。', tags: ['複数候補から選択', '即日対応'] },
               { num: '03', title: '書類・支払いもオンラインで', body: '電子契約・オンライン決済で完結。印鑑・来店不要。', tags: ['電子契約', 'カード／請求書払い'] },
-              { num: '04', title: '受け取って利用開始', body: '日時・場所を調整して利用開始。GPS確認やサポートもチャットで。', tags: ['GPS位置確認', 'チャットサポート'] },
+              { num: '04', title: '受け取って利用開始', body: '日時・場所を調整して利用開始。サポートもチャットで対応。', tags: ['チャットサポート'] },
             ].map((step) => (
               <div key={step.num} className="flex gap-8 md:gap-16 py-8 border-b border-black/8 last:border-0">
                 <p className="font-black text-black/10 leading-none shrink-0" style={{ fontSize: 'clamp(3rem, 6vw, 5rem)' }}>{step.num}</p>
