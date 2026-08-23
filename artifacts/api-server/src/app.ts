@@ -16,6 +16,9 @@ if (!process.env.SESSION_SECRET) {
 
 const app: Express = express();
 
+// nginx リバースプロキシ経由でも secure Cookie・X-Forwarded-Proto を正しく扱う
+app.set("trust proxy", 1);
+
 app.use(
   pinoHttp({
     logger,
