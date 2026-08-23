@@ -29,7 +29,7 @@ function PhotoGallery({ photos, alt, compact = false }: { photos: string[]; alt:
   if (photos.length === 0) {
     return (
       <div className={`w-full ${compact ? 'aspect-[4/3]' : 'aspect-[16/9]'} bg-muted flex items-center justify-center rounded-xl overflow-hidden`}>
-        <img src="/logo.png" alt="Chat VAN" className="w-20 h-20 object-contain opacity-30" />
+        <img src="/logo.png" alt="Chat VAN" className="w-36 h-36 object-contain opacity-30" />
       </div>
     );
   }

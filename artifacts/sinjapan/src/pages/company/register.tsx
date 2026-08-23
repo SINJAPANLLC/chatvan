@@ -57,7 +57,7 @@ export default function CompanyRegister() {
     <div className="min-h-[100dvh] bg-muted/20 py-12 px-4">
       <div className="max-w-lg mx-auto space-y-8">
         <div className="text-center space-y-2">
-          <img src="/logo.png" alt="Chat VAN" className="h-10 w-auto mx-auto" />
+          <img src="/logo.png" alt="Chat VAN" className="h-16 w-auto mx-auto" />
           <h1 className="text-2xl font-bold tracking-tight">協力会社パートナー登録</h1>
           <p className="text-sm text-muted-foreground">軽バン車両を提供して安定した収益を得ませんか？</p>
         </div>
