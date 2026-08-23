@@ -23,7 +23,7 @@ const SEO_FIELDS: SeoField[] = [
   { label: 'メタキーワード',         key: 'keywords',       type: 'input',    placeholder: '軽バンレンタル, 軽バン 月額, 軽貨物車両, 車両レンタル, 軽バン 相談' },
   { label: 'OGタイトル（SNS表示）', key: 'ogTitle',        type: 'input',    placeholder: '軽バンレンタルならChat VAN' },
   { label: 'OG説明文（SNS表示）',   key: 'ogDescription',  type: 'textarea', placeholder: '希望エリア・利用期間・用途をチャットで伝えるだけ。Chat VANがあなたに合った軽バンをご提案します。' },
-  { label: 'OG画像URL',            key: 'ogImage',        type: 'input',    placeholder: 'https://example.com/og-image.jpg' },
+  { label: 'OG画像URL',            key: 'ogImage',        type: 'input',    placeholder: 'https://example.com/og-image.png' },
   { label: 'Google Analyticsタグ', key: 'gaTag',          type: 'input',    placeholder: 'G-XXXXXXXXXX' },
   { label: 'Googleサーチコンソール確認コード', key: 'gscCode', type: 'input', placeholder: 'google-site-verification=...' },
   { label: 'robots.txt 内容',      key: 'robotsTxt',      type: 'textarea', placeholder: 'User-agent: *\nAllow: /' },

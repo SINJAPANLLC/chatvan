@@ -55,7 +55,7 @@ export default function ResetPassword() {
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
           <Link href="/" className="inline-flex justify-center mb-2">
-            <img src="/logo.jpg" alt="Chat VAN" className="h-8 w-auto" />
+            <img src="/logo.png" alt="Chat VAN" className="h-8 w-auto" />
           </Link>
           <h1 className="text-xl font-medium tracking-tight">新しいパスワードの設定</h1>
         </div>

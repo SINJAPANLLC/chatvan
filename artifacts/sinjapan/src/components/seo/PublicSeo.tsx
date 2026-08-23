@@ -55,7 +55,7 @@ export function PublicSeo() {
     if (!settings) return;
     const baseUrl = settings.siteUrl || window.location.origin;
     const canonical = absoluteUrl(location || "/", baseUrl);
-    const image = absoluteUrl(settings.ogImage || "/og-image.jpg", baseUrl);
+    const image = absoluteUrl(settings.ogImage || "/og-image.png", baseUrl);
     const title = settings.title;
     const description = settings.description;
 

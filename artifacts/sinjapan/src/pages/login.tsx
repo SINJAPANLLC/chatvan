@@ -64,7 +64,7 @@ export default function Login() {
       <div className="w-full max-w-md space-y-8 my-8">
         <div className="text-center">
           <Link href="/" className="inline-flex justify-center mb-2">
-            <img src="/logo.jpg" alt="Chat VAN" className="h-8 w-auto" />
+            <img src="/logo.png" alt="Chat VAN" className="h-8 w-auto" />
           </Link>
           <h1 className="text-xl font-medium tracking-tight">ログイン</h1>
         </div>
