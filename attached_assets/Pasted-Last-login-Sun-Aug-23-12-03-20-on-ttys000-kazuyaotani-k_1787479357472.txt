@@ -1,0 +1,58 @@
+Last login: Sun Aug 23 12:03:20 on ttys000
+kazuyaotani@kazuya-MacBook-Air-2 ~ % ssh root@212.85.24.206
+root@212.85.24.206's password: 
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-124-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Sun Aug 23 10:02:21 UTC 2026
+
+  System load:  0.35                Processes:             165
+  Usage of /:   20.9% of 192.69GB   Users logged in:       0
+  Memory usage: 20%                 IPv4 address for eth0: 212.85.24.206
+  Swap usage:   0%                  IPv6 address for eth0: 2a02:4780:59:cc86::1
+
+ * Strictly confined Kubernetes makes edge and IoT secure. Learn how MicroK8s
+   just raised the bar for easy, resilient and secure K8s cluster deployment.
+
+   https://ubuntu.com/engage/secure-kubernetes-at-the-edge
+
+Expanded Security Maintenance for Applications is not enabled.
+
+29 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+23 additional security updates can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+1 updates could not be installed automatically. For more details,
+see /var/log/unattended-upgrades/unattended-upgrades.log
+
+*** System restart required ***
+Last login: Sun Aug 23 03:04:33 2026 from 126.116.55.23
+root@srv1087935:~# pm2 list
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 5  │ aiagent            │ fork     │ 0    │ online    │ 0%       │ 149.2mb  │
+│ 15 │ chatlogi-api       │ fork     │ 4608 │ online    │ 0%       │ 132.8mb  │
+│ 0  │ chatvan-api        │ fork     │ 65   │ online    │ 0%       │ 171.7mb  │
+│ 4  │ keimatch           │ fork     │ 0    │ online    │ 0%       │ 266.9mb  │
+│ 13 │ keisaiyou          │ fork     │ 0    │ online    │ 0%       │ 262.9mb  │
+│ 3  │ menz-esthe-town    │ fork     │ 0    │ online    │ 0%       │ 143.2mb  │
+│ 12 │ onlyu              │ fork     │ 0    │ online    │ 0%       │ 118.7mb  │
+│ 8  │ sinjapan-crm-api   │ fork     │ 6256 │ online    │ 0%       │ 85.3mb   │
+│ 1  │ sinjapan-manager   │ fork     │ 0    │ online    │ 0%       │ 60.3mb   │
+│ 2  │ sinjapan-onlinesc… │ fork     │ 0    │ online    │ 0%       │ 96.0mb   │
+│ 14 │ sinjapan-sales-api │ fork     │ 0    │ online    │ 0%       │ 312.5mb  │
+│ 6  │ sinjapanai         │ fork     │ 0    │ online    │ 0%       │ 101.6mb  │
+│ 7  │ sinjapanailive-api │ fork     │ 0    │ online    │ 0%       │ 98.9mb   │
+│ 10 │ sinjapanaisite-api │ fork     │ 0    │ online    │ 0%       │ 139.2mb  │
+│ 11 │ tiktokshindan      │ fork     │ 0    │ online    │ 0%       │ 89.2mb   │
+│ 9  │ tramatch           │ fork     │ 0    │ online    │ 0%       │ 279.6mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+host metrics | cpu: 4.7% | ram usage: 20.1% | lo: ⇓ 0.001mb/s ⇑ 0.001mb/s | eth0: ⇓ 0.053mb/s ⇑ 0.009mb/s |
+root@srv1087935:~# 
