@@ -14,11 +14,12 @@ import { CompanyLayout } from '@/components/layout/CompanyLayout';
 import { PublicSeo } from '@/components/seo/PublicSeo';
 
 // Landing Page & Static Pages
-const LP       = lazy(() => import('@/pages/lp'));
-const Company  = lazy(() => import('@/pages/company'));
-const Terms    = lazy(() => import('@/pages/terms'));
-const Privacy  = lazy(() => import('@/pages/privacy'));
-const Tokusho  = lazy(() => import('@/pages/tokusho'));
+const LP          = lazy(() => import('@/pages/lp'));
+const LPCompany   = lazy(() => import('@/pages/lp-company'));
+const Company     = lazy(() => import('@/pages/company'));
+const Terms       = lazy(() => import('@/pages/terms'));
+const Privacy     = lazy(() => import('@/pages/privacy'));
+const Tokusho     = lazy(() => import('@/pages/tokusho'));
 
 // User Pages
 const Home          = lazy(() => import('@/pages/home'));
@@ -109,6 +110,7 @@ function Router() {
     <Suspense fallback={<PageLoader />}>
       <Switch>
         <Route path="/lp" component={LP} />
+        <Route path="/lp-company" component={LPCompany} />
         <Route path="/company" component={Company} />
         <Route path="/terms" component={Terms} />
         <Route path="/privacy" component={Privacy} />

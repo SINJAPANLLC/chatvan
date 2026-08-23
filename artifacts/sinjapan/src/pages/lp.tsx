@@ -207,6 +207,8 @@ export default function LP() {
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-black/35">
+            <Link href="/lp-company"><span className="hover:text-black cursor-pointer transition-colors">レンタル会社の方はこちら</span></Link>
+            <span className="text-black/15">|</span>
             <Link href="/company"><span className="hover:text-black cursor-pointer transition-colors">会社概要</span></Link>
             <span className="text-black/15">|</span>
             <Link href="/terms"><span className="hover:text-black cursor-pointer transition-colors">利用規約</span></Link>
