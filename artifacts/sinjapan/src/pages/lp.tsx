@@ -150,7 +150,7 @@ export default function LP() {
       </section>
 
       {/* Van Photo Slider */}
-      <section className="bg-white py-4 overflow-hidden">
+      <section className="bg-white pt-10 pb-4 overflow-hidden">
         <style>{`
           .van-slider {
             overflow: hidden;
