@@ -1,0 +1,92 @@
+dcec2e354bc8e769cd65405de675db28
+{"error":"認証が必要です"}root@srv1087935:/var/www/chatvan# pm2 logs chatvan-api --lines 30 --nostream            pm2 logs chatvan-api --lines 30 --nostream
+
+psql "postgresql://neondb_owner:npg_BwSUET14nbrI@ep-blue-hill-aymdo9tu-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require" -c "SELECT token, user_id, expires_at FROM auth_tokens ORDER BY created_at DESC LIMIT 5;"
+[TAILING] Tailing last 30 lines for [chatvan-api] process (change the value wit…
+/var/log/pm2/chatvan-api-err.log last 30 lines:
+0|chatvan- | 2026-08-23 03:56:38 +00:00: 
+0|chatvan- | 2026-08-23 03:56:38 +00:00: See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+0|chatvan- | 2026-08-23 03:56:38 +00:00: (Use `node --trace-warnings ...` to show where the warning was created)
+0|chatvan- | 2026-08-23 03:57:16 +00:00: (node:657059) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+0|chatvan- | 2026-08-23 03:57:16 +00:00: In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+0|chatvan- | 2026-08-23 03:57:16 +00:00: 
+0|chatvan- | 2026-08-23 03:57:16 +00:00: To prepare for this change:
+0|chatvan- | 2026-08-23 03:57:16 +00:00: - If you want the current behavior, explicitly use 'sslmode=verify-full'
+0|chatvan- | 2026-08-23 03:57:16 +00:00: - If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+0|chatvan- | 2026-08-23 03:57:16 +00:00: 
+0|chatvan- | 2026-08-23 03:57:16 +00:00: See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+0|chatvan- | 2026-08-23 03:57:16 +00:00: (Use `node --trace-warnings ...` to show where the warning was created)
+0|chatvan- | 2026-08-23 03:57:53 +00:00: (node:658101) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+0|chatvan- | 2026-08-23 03:57:53 +00:00: In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+0|chatvan- | 2026-08-23 03:57:53 +00:00: 
+0|chatvan- | 2026-08-23 03:57:53 +00:00: To prepare for this change:
+0|chatvan- | 2026-08-23 03:57:53 +00:00: - If you want the current behavior, explicitly use 'sslmode=verify-full'
+0|chatvan- | 2026-08-23 03:57:53 +00:00: - If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+0|chatvan- | 2026-08-23 03:57:53 +00:00: 
+0|chatvan- | 2026-08-23 03:57:53 +00:00: See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+0|chatvan- | 2026-08-23 03:57:53 +00:00: (Use `node --trace-warnings ...` to show where the warning was created)
+0|chatvan- | 2026-08-23 03:58:29 +00:00: (node:659093) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+0|chatvan- | 2026-08-23 03:58:29 +00:00: In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+0|chatvan- | 2026-08-23 03:58:29 +00:00: 
+0|chatvan- | 2026-08-23 03:58:29 +00:00: To prepare for this change:
+0|chatvan- | 2026-08-23 03:58:29 +00:00: - If you want the current behavior, explicitly use 'sslmode=verify-full'
+0|chatvan- | 2026-08-23 03:58:29 +00:00: - If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+0|chatvan- | 2026-08-23 03:58:29 +00:00: 
+0|chatvan- | 2026-08-23 03:58:29 +00:00: See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+0|chatvan- | 2026-08-23 03:58:29 +00:00: (Use `node --trace-warnings ...` to show where the warning was created)
+
+/var/log/pm2/chatvan-api-out.log last 30 lines:
+0|chatvan- | 2026-08-23 03:57:49 +00:00: {"level":30,"time":1787457469897,"pid":657059,"hostname":"srv1087935","msg":"migration: admin operation tracking columns ready"}
+0|chatvan- | 2026-08-23 03:57:50 +00:00: {"level":30,"time":1787457470898,"pid":657059,"hostname":"srv1087935","msg":"migration: payment ledger uniqueness indexes ready"}
+0|chatvan- | 2026-08-23 03:57:51 +00:00: {"level":30,"time":1787457471151,"pid":657059,"hostname":"srv1087935","msg":"migration: prospects prospect_type column ready"}
+0|chatvan- | 2026-08-23 03:57:51 +00:00: {"level":30,"time":1787457471401,"pid":657059,"hostname":"srv1087935","msg":"migration: email send history ready"}
+0|chatvan- | 2026-08-23 03:57:51 +00:00: {"level":30,"time":1787457471651,"pid":657059,"hostname":"srv1087935","msg":"migration: blog_posts target_type column ready"}
+0|chatvan- | 2026-08-23 03:57:51 +00:00: {"level":30,"time":1787457471902,"pid":657059,"hostname":"srv1087935","msg":"migration: vehicles.rejection_reason column ready"}
+0|chatvan- | 2026-08-23 03:57:52 +00:00: {"level":50,"time":1787457472408,"pid":657059,"hostname":"srv1087935","err":{"type":"Error","message":"listen EADDRINUSE: address already in use :::4820","stack":"Error: listen EADDRINUSE: address already in use :::4820\n    at Server.setupListenHandle [as _listen2] (node:net:1908:16)\n    at listenInCluster (node:net:1965:12)\n    at Server.listen (node:net:2067:7)\n    at Function.listen (/var/www/chatvan/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:605:24)\n    at startServer (/var/www/chatvan/artifacts/api-server/src/index.ts:567:7)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)","code":"EADDRINUSE","errno":-98,"syscall":"listen","address":"::","port":4820},"msg":"Error listening on port"}
+0|chatvan- | 2026-08-23 03:57:56 +00:00: {"level":30,"time":1787457476122,"pid":658101,"hostname":"srv1087935","msg":"migration: master_card_data / stops_json columns ready"}
+0|chatvan- | 2026-08-23 03:57:57 +00:00: {"level":30,"time":1787457477625,"pid":658101,"hostname":"srv1087935","msg":"migration: van_application_status → English"}
+0|chatvan- | 2026-08-23 03:57:59 +00:00: {"level":30,"time":1787457479167,"pid":658101,"hostname":"srv1087935","msg":"migration: vehicle_status → English"}
+0|chatvan- | 2026-08-23 03:58:00 +00:00: {"level":30,"time":1787457480686,"pid":658101,"hostname":"srv1087935","msg":"migration: van_contract_status → English"}
+0|chatvan- | 2026-08-23 03:58:15 +00:00: {"level":30,"time":1787457495646,"pid":658101,"hostname":"srv1087935","msg":"migration: Chat VAN invoices linked to contracts"}
+0|chatvan- | 2026-08-23 03:58:16 +00:00: {"level":30,"time":1787457496140,"pid":658101,"hostname":"srv1087935","msg":"migration: rental_company_status ready"}
+0|chatvan- | 2026-08-23 03:58:20 +00:00: {"level":30,"time":1787457500473,"pid":658101,"hostname":"srv1087935","msg":"migration: rental_company role & column ready"}
+0|chatvan- | 2026-08-23 03:58:21 +00:00: {"level":30,"time":1787457501709,"pid":658101,"hostname":"srv1087935","msg":"migration: vehicle extra columns ready"}
+0|chatvan- | 2026-08-23 03:58:21 +00:00: {"level":30,"time":1787457501955,"pid":658101,"hostname":"srv1087935","msg":"migration: contract_messages table ready"}
+0|chatvan- | 2026-08-23 03:58:22 +00:00: {"level":30,"time":1787457502202,"pid":658101,"hostname":"srv1087935","msg":"migration: upload_claims table ready"}
+0|chatvan- | 2026-08-23 03:58:22 +00:00: {"level":30,"time":1787457502450,"pid":658101,"hostname":"srv1087935","msg":"migration: upload_claims.company_id column ready"}
+0|chatvan- | 2026-08-23 03:58:22 +00:00: {"level":30,"time":1787457502450,"pid":658101,"hostname":"srv1087935","msg":"migration: all Chat VAN tables ready"}
+0|chatvan- | 2026-08-23 03:58:25 +00:00: {"level":30,"time":1787457505909,"pid":658101,"hostname":"srv1087935","msg":"migration: admin operation tracking columns ready"}
+0|chatvan- | 2026-08-23 03:58:26 +00:00: {"level":30,"time":1787457506897,"pid":658101,"hostname":"srv1087935","msg":"migration: payment ledger uniqueness indexes ready"}
+0|chatvan- | 2026-08-23 03:58:27 +00:00: {"level":30,"time":1787457507144,"pid":658101,"hostname":"srv1087935","msg":"migration: prospects prospect_type column ready"}
+0|chatvan- | 2026-08-23 03:58:27 +00:00: {"level":30,"time":1787457507392,"pid":658101,"hostname":"srv1087935","msg":"migration: email send history ready"}
+0|chatvan- | 2026-08-23 03:58:27 +00:00: {"level":30,"time":1787457507651,"pid":658101,"hostname":"srv1087935","msg":"migration: blog_posts target_type column ready"}
+0|chatvan- | 2026-08-23 03:58:27 +00:00: {"level":30,"time":1787457507921,"pid":658101,"hostname":"srv1087935","msg":"migration: vehicles.rejection_reason column ready"}
+0|chatvan- | 2026-08-23 03:58:28 +00:00: {"level":50,"time":1787457508421,"pid":658101,"hostname":"srv1087935","err":{"type":"Error","message":"listen EADDRINUSE: address already in use :::4820","stack":"Error: listen EADDRINUSE: address already in use :::4820\n    at Server.setupListenHandle [as _listen2] (node:net:1908:16)\n    at listenInCluster (node:net:1965:12)\n    at Server.listen (node:net:2067:7)\n    at Function.listen (/var/www/chatvan/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:605:24)\n    at startServer (/var/www/chatvan/artifacts/api-server/src/index.ts:567:7)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)","code":"EADDRINUSE","errno":-98,"syscall":"listen","address":"::","port":4820},"msg":"Error listening on port"}
+0|chatvan- | 2026-08-23 03:58:32 +00:00: {"level":30,"time":1787457512373,"pid":659093,"hostname":"srv1087935","msg":"migration: master_card_data / stops_json columns ready"}
+0|chatvan- | 2026-08-23 03:58:33 +00:00: {"level":30,"time":1787457513857,"pid":659093,"hostname":"srv1087935","msg":"migration: van_application_status → English"}
+0|chatvan- | 2026-08-23 03:58:35 +00:00: {"level":30,"time":1787457515339,"pid":659093,"hostname":"srv1087935","msg":"migration: vehicle_status → English"}
+0|chatvan- | 2026-08-23 03:58:37 +00:00: {"level":30,"time":1787457517284,"pid":659093,"hostname":"srv1087935","msg":"migration: van_contract_status → English"}
+
+
+                              token                               | user_id |          expires_at           
+------------------------------------------------------------------+---------+-------------------------------
+ a4b1732af06507dfa5a4a93a1963f88cdcec2e354bc8e769cd65405de675db28 |       1 | 2026-08-23 03:57:45.522352+00
+ b233d717655a65ef453b3838bdd12b21c56ef05ab9ba73ba819ed7e804ab58a1 |       1 | 2026-08-23 03:56:40.473586+00
+ 15aa66ad662c6d12e61cfeb87b214c5cb59bf1957fbd5c7edb8ed03992ccc206 |       1 | 2026-08-23 03:53:18.655059+00
+ ec33df8d96c41a24f68abbc3acd726be5b7c18121eb7cd3070130ca80df9c199 |       1 | 2026-08-23 03:51:20.461647+00
+ 23143b0a20aaa5307ed83414a852e4d8d84dff3609af81c7359b6cb9f8f1c6e2 |       1 | 2026-08-23 03:50:55.959393+00
+(5 rows)
+
+(END)
+
+
+
+
+
+
+
+
+
+
+
+
