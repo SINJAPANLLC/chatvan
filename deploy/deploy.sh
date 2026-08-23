@@ -40,14 +40,14 @@ log "[4/5] フロントエンドビルド（静的ファイル生成）"
 NODE_ENV=production \
   pnpm --filter @workspace/sinjapan run build
 
-log "[5/5] PM2 起動 / リロード"
-if pm2 describe "${PM2_NAME}" &>/dev/null; then
-  pm2 restart "${APP_DIR}/deploy/ecosystem.config.cjs" --env production --update-env
-  log "  → pm2 restart 完了"
-else
-  pm2 start "${APP_DIR}/deploy/ecosystem.config.cjs" --env production
-  log "  → pm2 start 完了"
-fi
+log "[5/5] PM2 起動"
+# stop → ポート強制解放 → start（マイグレーションが長いため reload/restart は競合しやすい）
+pm2 stop "${PM2_NAME}" 2>/dev/null || true
+sleep 3
+fuser -k 4820/tcp 2>/dev/null || true
+sleep 2
+pm2 start "${APP_DIR}/deploy/ecosystem.config.cjs" --env production
+log "  → pm2 start 完了"
 
 # PM2 リストを表示
 pm2 list
