@@ -49,7 +49,7 @@ export default function LPCompany() {
               <span className="group-hover:translate-x-1 transition-transform">→</span>
             </button>
           </Link>
-          <p className="text-black/25 text-sm mt-6">初期費用無料・成約時のみ手数料</p>
+          <p className="text-black/25 text-sm mt-6">初期費用無料・登録完全無料</p>
         </div>
 
         {/* Store Badges */}
@@ -106,7 +106,7 @@ export default function LPCompany() {
               { num: '01', title: '無料で登録', body: '会社情報を入力するだけ。審査後すぐに利用開始できます。', tags: ['初期費用無料', '審査あり'] },
               { num: '02', title: '車両を登録', body: '保有車両の情報（車種・エリア・空き状況）を登録します。', tags: ['複数台対応', 'いつでも更新可'] },
               { num: '03', title: 'マッチング・提案', body: 'ユーザーからの依頼をもとに、Chat VANがマッチングを行います。提案内容はダッシュボードで確認できます。', tags: ['Chat VANが集客', '提案内容を事前確認'] },
-              { num: '04', title: '成約・売上管理', body: '契約が成立したら売上が発生。入金・請求もダッシュボードで一括管理できます。', tags: ['成約時のみ手数料', '売上はダッシュボードで確認'] },
+              { num: '04', title: '成約・売上管理', body: '契約が成立したら売上が発生。入金・請求もダッシュボードで一括管理できます。', tags: ['売上はダッシュボードで確認'] },
             ].map((step) => (
               <div key={step.num} className="flex gap-8 md:gap-16 py-8 border-b border-black/8 last:border-0">
                 <p className="font-black text-black/10 leading-none shrink-0" style={{ fontSize: 'clamp(3rem, 6vw, 5rem)' }}>{step.num}</p>
@@ -154,7 +154,7 @@ export default function LPCompany() {
           <div className="grid md:grid-cols-2 gap-8">
             {[
               { title: '集客はおまかせ', body: 'ユーザーの集客・マッチングはすべてChat VANが行います。営業コストをかけずに案件を受けられます。' },
-              { title: '初期費用・月額費用なし', body: '登録・掲載は完全無料。手数料は成約時のみ発生するため、リスクなく始められます。' },
+              { title: '初期費用・月額費用なし', body: '登録・掲載は完全無料。リスクなく始められます。' },
               { title: '契約・書類もシステムで完結', body: '電子契約・入金管理・請求書発行もダッシュボードで一括管理。事務作業を大幅に削減できます。' },
               { title: '複数台・複数エリア対応', body: '1社で複数の車両・エリアを登録可能。稼働率の低い車両を効率よく活用できます。' },
             ].map((f) => (
@@ -177,7 +177,7 @@ export default function LPCompany() {
           <h2 className="font-black tracking-tight mb-16" style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)' }}>よくある質問</h2>
           <div className="space-y-0">
             {[
-              { q: '手数料はどのくらいですか？', a: '成約時のみ手数料が発生します。金額は審査後にご案内します。月額費用・初期費用は無料です。' },
+              { q: '費用はどのくらいかかりますか？', a: '初期費用・月額費用は無料です。詳細は審査後にご案内します。' },
               { q: '何台から登録できますか？', a: '1台から登録可能です。複数台・複数エリアにも対応しています。' },
               { q: '既存の顧客への営業活動はありますか？', a: 'ありません。Chat VANが新規ユーザーを集客し、条件に合った案件のみご提案します。' },
               { q: '審査にはどのくらいかかりますか？', a: '通常3〜5営業日以内にご連絡します。' },
@@ -234,7 +234,7 @@ export default function LPCompany() {
           <h2 className="font-black tracking-tight leading-tight mb-4" style={{ fontSize: 'clamp(2rem, 6vw, 4.5rem)' }}>
             まず、登録してみよう。
           </h2>
-          <p className="text-black/35 text-sm mb-12">初期費用無料・成約時のみ手数料・いつでも退会可</p>
+          <p className="text-black/35 text-sm mb-12">初期費用無料・登録完全無料・いつでも退会可</p>
           <Link href="/company/register">
             <button className="group bg-black text-white font-bold text-xl px-16 py-6 hover:bg-black/80 transition-all inline-flex items-center gap-4">
               無料でパートナー登録
