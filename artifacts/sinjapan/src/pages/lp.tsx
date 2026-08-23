@@ -38,7 +38,7 @@ export default function LP() {
             <span className="block" style={{ fontSize: 'clamp(2.8rem, 9vw, 7.5rem)' }}>軽バンかりれる。</span>
           </h1>
           <p className="text-black/50 text-lg leading-relaxed mb-14 max-w-lg">
-            条件を送るだけ。専任スタッフが即日提案。<br />契約・支払いまでオンラインで完結。
+            条件を送るだけ。AIが即日提案。<br />契約・支払いまでオンラインで完結。
           </p>
           <Link href="/register">
             <button className="group bg-black text-white font-bold text-lg px-12 py-5 hover:bg-black/80 transition-all flex items-center gap-3">
@@ -77,7 +77,7 @@ export default function LP() {
           <div className="space-y-0">
             {[
               { num: '01', title: 'チャットで相談', body: 'エリア・期間・用途を入力するだけ。', tags: ['1分で登録完了', '24時間受付'] },
-              { num: '02', title: '専任スタッフが提案', body: '条件に合う車両を最短即日でご提案。チャットで質問・条件変更もOK。', tags: ['複数候補から選択', '即日対応'] },
+              { num: '02', title: 'AIが提案', body: '条件に合う車両を最短即日でご提案。チャットで質問・条件変更もOK。', tags: ['複数候補から選択', '即日対応'] },
               { num: '03', title: '書類・支払いもオンラインで', body: '電子契約・オンライン決済で完結。印鑑・来店不要。', tags: ['電子契約', 'カード／請求書払い'] },
               { num: '04', title: '受け取って利用開始', body: '日時・場所を調整して利用開始。GPS確認やサポートもチャットで。', tags: ['GPS位置確認', 'チャットサポート'] },
             ].map((step) => (
