@@ -389,6 +389,14 @@ export default function LP() {
           <p className="text-black/20 text-xs">© 2026 Chat VAN. All rights reserved.</p>
         </div>
       </footer>
+
+      {/* Fixed panda */}
+      <img
+        src="/images/panda.png"
+        alt="登録してね！"
+        className="fixed bottom-0 left-0 z-50 pointer-events-none select-none"
+        style={{ width: 'clamp(100px, 20vw, 160px)' }}
+      />
     </div>
   );
 }
