@@ -1,0 +1,286 @@
+────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+host metrics | cpu: 4.7% | ram usage: 20.1% | lo: ⇓ 0.001mb/s ⇑ 0.001mb/s | eth0: ⇓ 0.053mb/s ⇑ 0.009mb/s |
+root@srv1087935:~# bash /var/www/chatvan/deploy/deploy.sh
+[2026-08-23 10:03:35] === Chat VAN デプロイ開始 ===
+Now using node v20.20.0 (npm v10.8.2)
+[2026-08-23 10:03:37] Node.js: v20.20.0, pnpm: 9.15.9
+[2026-08-23 10:03:37] [1/5] git pull
+remote: Enumerating objects: 587, done.
+remote: Counting objects: 100% (269/269), done.
+remote: Compressing objects: 100% (172/172), done.
+remote: Total 587 (delta 193), reused 171 (delta 97), pack-reused 318 (from 1)
+Receiving objects: 100% (587/587), 15.00 MiB | 18.66 MiB/s, done.
+Resolving deltas: 100% (409/409), completed with 13 local objects.
+From https://github.com/SINJAPANLLC/chatvan
+ * branch            main       -> FETCH_HEAD
+   6a2ed59..7a01f59  main       -> origin/main
+Updating 6a2ed59..7a01f59
+Fast-forward
+ artifacts/api-server/src/app.ts                    |   7 +-
+ artifacts/api-server/src/index.ts                  |  20 +
+ artifacts/api-server/src/routes/index.ts           |   2 +
+ artifacts/api-server/src/routes/line.ts            | 167 +++++++++
+ artifacts/sinjapan/index.html                      |  18 +-
+ artifacts/sinjapan/public/apple-touch-icon.png     | Bin 2661 -> 13237 bytes
+ artifacts/sinjapan/public/favicon-32.png           | Bin 433 -> 1177 bytes
+ artifacts/sinjapan/public/favicon-512.png          | Bin 11451 -> 164072 bytes
+ artifacts/sinjapan/public/favicon.ico              | Bin 7886 -> 4286 bytes
+ artifacts/sinjapan/public/images/panda.png         | Bin 0 -> 964886 bytes
+ artifacts/sinjapan/public/images/van-1.jpg         | Bin 0 -> 197417 bytes
+ artifacts/sinjapan/public/images/van-1.png         | Bin 0 -> 1032045 bytes
+ artifacts/sinjapan/public/images/van-2.jpg         | Bin 0 -> 174712 bytes
+ artifacts/sinjapan/public/images/van-2.png         | Bin 0 -> 1111382 bytes
+ artifacts/sinjapan/public/images/van-3.jpg         | Bin 0 -> 118818 bytes
+ artifacts/sinjapan/public/images/van-3.png         | Bin 0 -> 981229 bytes
+ artifacts/sinjapan/public/images/van-4.jpg         | Bin 0 -> 198079 bytes
+ artifacts/sinjapan/public/images/van-4.png         | Bin 0 -> 1151360 bytes
+ artifacts/sinjapan/public/images/van-5.jpg         | Bin 0 -> 188119 bytes
+ artifacts/sinjapan/public/images/van-5.png         | Bin 0 -> 1094713 bytes
+ artifacts/sinjapan/public/logo.png                 | Bin 0 -> 553438 bytes
+ artifacts/sinjapan/public/og-image.png             | Bin 0 -> 553438 bytes
+ artifacts/sinjapan/src/App.tsx                     |  16 +-
+ .../sinjapan/src/components/layout/AdminLayout.tsx |   4 +-
+ .../src/components/layout/CompanyLayout.tsx        |  13 +-
+ .../sinjapan/src/components/layout/UserLayout.tsx  |   6 +-
+ .../sinjapan/src/components/seo/PublicSeo.tsx      |   2 +-
+ artifacts/sinjapan/src/pages/admin/seo.tsx         |   2 +-
+ artifacts/sinjapan/src/pages/company.tsx           |  36 ++
+ artifacts/sinjapan/src/pages/company/contact.tsx   |   4 +-
+ artifacts/sinjapan/src/pages/company/register.tsx  |   2 +-
+ artifacts/sinjapan/src/pages/contact.tsx           |   5 +-
+ artifacts/sinjapan/src/pages/forgot-password.tsx   |   2 +-
+ artifacts/sinjapan/src/pages/login.tsx             |   2 +-
+ artifacts/sinjapan/src/pages/lp-company.tsx        | 296 +++++++++++++++
+ artifacts/sinjapan/src/pages/lp.tsx                | 406 ++++++++++++++++++++-
+ artifacts/sinjapan/src/pages/privacy.tsx           | 126 +++++++
+ artifacts/sinjapan/src/pages/register.tsx          |   2 +-
+ artifacts/sinjapan/src/pages/reset-password.tsx    |   2 +-
+ artifacts/sinjapan/src/pages/terms.tsx             | 123 +++++++
+ artifacts/sinjapan/src/pages/tokusho.tsx           |  94 +++++
+ artifacts/sinjapan/src/pages/van-proposal.tsx      |   2 +-
+ ...7-E7F6-4C03-ACD5-17D4B722EFA4_1787474842635.PNG | Bin 0 -> 964886 bytes
+ ...8-7115-460B-A0B7-6F3CAFF37046_1787469760119.PNG | Bin 0 -> 751506 bytes
+ ...1-FBD8-43F6-9E75-90D54551B77B_1787469531528.PNG | Bin 0 -> 890620 bytes
+ ...sted--4-2-HTML--1787472905565_1787472905566.txt |  94 +++++
+ ...ced-from-table-notifications-_1787457160181.txt |  52 +++
+ ...trics-cpu-38-4--1787457770460_1787457770461.txt | 119 ++++++
+ ...s-10-nostream-Use-update-env-_1787457611750.txt |  51 +++
+ ...75db28-error-root-srv1087935-_1787457531962.txt |  92 +++++
+ ...g-id-INTO-contract-ids-FROM-v_1787457349318.txt |  41 +++
+ ...18-8-lo-0-001mb-s-0-001mb-s-e_1787457958004.txt |  66 ++++
+ ...ECT-array-agg-id-INTO-ids-FRO_1787457315199.txt |  45 +++
+ ...-retries-WHERE-user-id-ANY-id_1787457246926.txt |  40 ++
+ ...\203\210_2026-08-23_16.21.24_1787469695173.png" | Bin 0 -> 553438 bytes
+ ...\203\210_2026-08-23_17.20.53_1787473255104.png" | Bin 0 -> 82585 bytes
+ ...\203\210_2026-08-23_18.03.52_1787475834370.png" | Bin 0 -> 292368 bytes
+ ...\203\210_2026-08-23_18.07.27_1787476049618.png" | Bin 0 -> 270185 bytes
+ ...\203\210_2026-08-23_18.42.07_1787478129358.png" | Bin 0 -> 169786 bytes
+ ...\203\210_2026-08-23_18.43.59_1787478241662.png" | Bin 0 -> 215070 bytes
+ ...\203\210_2026-08-23_18.48.16_1787478498631.png" | Bin 0 -> 219435 bytes
+ ...\203\210_2026-08-23_18.49.32_1787478574261.png" | Bin 0 -> 162703 bytes
+ ...\203\210_2026-08-23_18.52.04_1787478725857.png" | Bin 0 -> 222562 bytes
+ ...\203\210_2026-08-23_18.58.06_1787479087983.png" | Bin 0 -> 224619 bytes
+ ...\203\210_2026-08-23_18.59.13_1787479155613.png" | Bin 0 -> 253241 bytes
+ ...\203\210_2026-08-23_19.00.17_1787479219474.png" | Bin 0 -> 218803 bytes
+ deploy/deploy.sh                                   |  16 +-
+ lib/db/src/schema/index.ts                         |   1 +
+ lib/db/src/schema/line_conversations.ts            |  11 +
+ 69 files changed, 1932 insertions(+), 55 deletions(-)
+ create mode 100644 artifacts/api-server/src/routes/line.ts
+ create mode 100644 artifacts/sinjapan/public/images/panda.png
+ create mode 100644 artifacts/sinjapan/public/images/van-1.jpg
+ create mode 100644 artifacts/sinjapan/public/images/van-1.png
+ create mode 100644 artifacts/sinjapan/public/images/van-2.jpg
+ create mode 100644 artifacts/sinjapan/public/images/van-2.png
+ create mode 100644 artifacts/sinjapan/public/images/van-3.jpg
+ create mode 100644 artifacts/sinjapan/public/images/van-3.png
+ create mode 100644 artifacts/sinjapan/public/images/van-4.jpg
+ create mode 100644 artifacts/sinjapan/public/images/van-4.png
+ create mode 100644 artifacts/sinjapan/public/images/van-5.jpg
+ create mode 100644 artifacts/sinjapan/public/images/van-5.png
+ create mode 100644 artifacts/sinjapan/public/logo.png
+ create mode 100644 artifacts/sinjapan/public/og-image.png
+ create mode 100644 artifacts/sinjapan/src/pages/company.tsx
+ create mode 100644 artifacts/sinjapan/src/pages/lp-company.tsx
+ create mode 100644 artifacts/sinjapan/src/pages/privacy.tsx
+ create mode 100644 artifacts/sinjapan/src/pages/terms.tsx
+ create mode 100644 artifacts/sinjapan/src/pages/tokusho.tsx
+ create mode 100644 attached_assets/3D4EB347-E7F6-4C03-ACD5-17D4B722EFA4_1787474842635.PNG
+ create mode 100644 attached_assets/CD0860C8-7115-460B-A0B7-6F3CAFF37046_1787469760119.PNG
+ create mode 100644 attached_assets/E91D52E1-FBD8-43F6-9E75-90D54551B77B_1787469531528.PNG
+ create mode 100644 attached_assets/Pasted--4-2-HTML--1787472905565_1787472905566.txt
+ create mode 100644 attached_assets/Pasted--Key-id-2-is-still-referenced-from-table-notifications-_1787457160181.txt
+ create mode 100644 attached_assets/Pasted--host-metrics-cpu-38-4--1787457770460_1787457770461.txt
+ create mode 100644 attached_assets/Pasted--pm2-logs-chatvan-api-lines-10-nostream-Use-update-env-_1787457611750.txt
+ create mode 100644 attached_assets/Pasted-dcec2e354bc8e769cd65405de675db28-error-root-srv1087935-_1787457531962.txt
+ create mode 100644 attached_assets/Pasted-injapan-jp-SELECT-array-agg-id-INTO-contract-ids-FROM-v_1787457349318.txt
+ create mode 100644 attached_assets/Pasted-metrics-cpu-8-6-ram-usage-18-8-lo-0-001mb-s-0-001mb-s-e_1787457958004.txt
+ create mode 100644 attached_assets/Pasted-ract-ids-INTEGER-BEGIN-SELECT-array-agg-id-INTO-ids-FRO_1787457315199.txt
+ create mode 100644 attached_assets/Pasted-tracts-DELETE-FROM-payment-retries-WHERE-user-id-ANY-id_1787457246926.txt
+ create mode 100644 "attached_assets/\343\202\271\343\202\257\343\203\252\343\203\274\343\203\263\343\202\267\343\203\247\343\203\203\343\203\210_2026-08-23_16.21.24_1787469695173.png"
+ create mode 100644 "attached_assets/\343\202\271\343\202\257\343\203\252\343\203\274\343\203\263\343\202\267\343\203\247\343\203\203\343\203\210_2026-08-23_17.20.53_1787473255104.png"
+ create mode 100644 "attached_assets/\343\202\271\343\202\257\343\203\252\343\203\274\343\203\263\343\202\267\343\203\247\343\203\203\343\203\210_2026-08-23_18.03.52_1787475834370.png"
+ create mode 100644 "attached_assets/\343\202\271\343\202\257\343\203\252\343\203\274\343\203\263\343\202\267\343\203\247\343\203\203\343\203\210_2026-08-23_18.07.27_1787476049618.png"
+ create mode 100644 "attached_assets/\343\202\271\343\202\257\343\203\252\343\203\274\343\203\263\343\202\267\343\203\247\343\203\203\343\203\210_2026-08-23_18.42.07_1787478129358.png"
+ create mode 100644 "attached_assets/\343\202\271\343\202\257\343\203\252\343\203\274\343\203\263\343\202\267\343\203\247\343\203\203\343\203\210_2026-08-23_18.43.59_1787478241662.png"
+ create mode 100644 "attached_assets/\343\202\271\343\202\257\343\203\252\343\203\274\343\203\263\343\202\267\343\203\247\343\203\203\343\203\210_2026-08-23_18.48.16_1787478498631.png"
+ create mode 100644 "attached_assets/\343\202\271\343\202\257\343\203\252\343\203\274\343\203\263\343\202\267\343\203\247\343\203\203\343\203\210_2026-08-23_18.49.32_1787478574261.png"
+ create mode 100644 "attached_assets/\343\202\271\343\202\257\343\203\252\343\203\274\343\203\263\343\202\267\343\203\247\343\203\203\343\203\210_2026-08-23_18.52.04_1787478725857.png"
+ create mode 100644 "attached_assets/\343\202\271\343\202\257\343\203\252\343\203\274\343\203\263\343\202\267\343\203\247\343\203\203\343\203\210_2026-08-23_18.58.06_1787479087983.png"
+ create mode 100644 "attached_assets/\343\202\271\343\202\257\343\203\252\343\203\274\343\203\263\343\202\267\343\203\247\343\203\203\343\203\210_2026-08-23_18.59.13_1787479155613.png"
+ create mode 100644 "attached_assets/\343\202\271\343\202\257\343\203\252\343\203\274\343\203\263\343\202\267\343\203\247\343\203\203\343\203\210_2026-08-23_19.00.17_1787479219474.png"
+ create mode 100644 lib/db/src/schema/line_conversations.ts
+[2026-08-23 10:03:40] [2/5] pnpm install
+Scope: all 12 workspace projects
+Lockfile is up to date, resolution step is skipped
+Already up to date
+. preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_use…
+└─ Done in 18ms
+Done in 2.8s using pnpm v9.15.9
+[2026-08-23 10:03:43] [3/5] API サーバービルド
+
+> @workspace/api-server@0.0.0 build /var/www/chatvan/artifacts/api-server
+> node ./build.mjs
+
+
+  dist/index.mjs                       3.4mb ⚠️
+  dist/pino-worker.mjs               153.4kb
+  dist/pino-file.mjs                 142.0kb
+  dist/pino-pretty.mjs               114.4kb
+  dist/thread-stream-worker.mjs        7.3kb
+  dist/index.mjs.map                   7.7mb
+  dist/pino-worker.mjs.map           256.9kb
+  dist/pino-file.mjs.map             229.0kb
+  dist/pino-pretty.mjs.map           203.6kb
+  dist/thread-stream-worker.mjs.map   12.0kb
+
+⚡ Done in 854ms
+[2026-08-23 10:03:44] [4/5] フロントエンドビルド（静的ファイル生成）
+
+> @workspace/sinjapan@0.0.0 build /var/www/chatvan/artifacts/sinjapan
+> vite build --config vite.config.ts
+
+vite v7.3.6 building client environment for production...
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 3147 modules transformed.
+Generated an empty chunk: "vendor-react".
+dist/public/index.html                                             2.89 kB │ gzip:   0.99 kB
+dist/public/assets/leaflet-CIGW-MKW.css                           15.61 kB │ gzip:   6.46 kB
+dist/public/assets/index-Dn3MKKx4.css                            164.84 kB │ gzip:  25.14 kB
+dist/public/assets/vendor-react-l0sNRNKZ.js                        0.00 kB │ gzip:   0.02 kB
+dist/public/assets/textarea-CnQFoZ36.js                            0.50 kB │ gzip:   0.35 kB
+dist/public/assets/input-DK6A1_2f.js                               0.60 kB │ gzip:   0.38 kB
+dist/public/assets/label-g1_5zUM9.js                               0.67 kB │ gzip:   0.45 kB
+dist/public/assets/button-C4GTI2Bc.js                              1.32 kB │ gzip:   0.67 kB
+dist/public/assets/company-DgzJ-X33.js                             1.41 kB │ gzip:   0.82 kB
+dist/public/assets/shipments-carriers-conversations-Cdj12JFS.js    1.47 kB │ gzip:   0.55 kB
+dist/public/assets/dialog-CYcj04da.js                              2.23 kB │ gzip:   0.89 kB
+dist/public/assets/forgot-password-CCweun2A.js                     2.63 kB │ gzip:   1.31 kB
+dist/public/assets/parseISO-BuOw8hXq.js                            2.67 kB │ gzip:   1.18 kB
+dist/public/assets/select-C3H2aUHC.js                              3.13 kB │ gzip:   1.16 kB
+dist/public/assets/home-BnrAYJ21.js                                3.14 kB │ gzip:   1.59 kB
+dist/public/assets/login-XSRT2U4e.js                               3.28 kB │ gzip:   1.51 kB
+dist/public/assets/gps-Cl-bXSsB.js                                 3.43 kB │ gzip:   1.50 kB
+dist/public/assets/tokusho-CoroAsiQ.js                             3.59 kB │ gzip:   1.97 kB
+dist/public/assets/contracts-CgCRN_Vp.js                           3.66 kB │ gzip:   1.57 kB
+dist/public/assets/settings-C2I4hbRR.js                            3.92 kB │ gzip:   1.79 kB
+dist/public/assets/register-DQ9d8wyc.js                            3.92 kB │ gzip:   1.68 kB
+dist/public/assets/contact-BLXTWl_q.js                             4.03 kB │ gzip:   1.73 kB
+dist/public/assets/shipments-C1C0yxe-.js                           4.11 kB │ gzip:   1.55 kB
+dist/public/assets/invoice-detail-bzyl44LR.js                      4.25 kB │ gzip:   1.54 kB
+dist/public/assets/audit-logs-D1e1heef.js                          4.36 kB │ gzip:   1.66 kB
+dist/public/assets/payments-van-BGxYu9jV.js                        4.40 kB │ gzip:   1.93 kB
+dist/public/assets/contact-BJ05p4bb.js                             4.42 kB │ gzip:   1.73 kB
+dist/public/assets/insurance-CORYDOOf.js                           4.61 kB │ gzip:   1.73 kB
+dist/public/assets/vendor-router-BTidj2DY.js                       4.92 kB │ gzip:   2.39 kB
+dist/public/assets/van-history-Bs53hJiO.js                         5.47 kB │ gzip:   1.97 kB
+dist/public/assets/notifications-CSnDhYq5.js                       5.64 kB │ gzip:   2.02 kB
+dist/public/assets/ja-BNmDrzzg.js                                  5.72 kB │ gzip:   2.08 kB
+dist/public/assets/company-vehicles-Bpa-gKs7.js                    6.55 kB │ gzip:   2.54 kB
+dist/public/assets/incidents-BP1yl2PH.js                           6.56 kB │ gzip:   2.10 kB
+dist/public/assets/seo-DnBC_vM4.js                                 6.89 kB │ gzip:   2.62 kB
+dist/public/assets/contacts-D_uHgZZp.js                            7.00 kB │ gzip:   2.67 kB
+dist/public/assets/index-CiteyBC-.js                               7.16 kB │ gzip:   2.65 kB
+dist/public/assets/breakdown-DLpONZE-.js                           7.19 kB │ gzip:   2.50 kB
+dist/public/assets/register-DX-a6Rdi.js                            7.24 kB │ gzip:   2.36 kB
+dist/public/assets/applications-DIiFLXjv.js                        7.50 kB │ gzip:   2.77 kB
+dist/public/assets/privacy-CRE_wmfA.js                             7.55 kB │ gzip:   2.75 kB
+dist/public/assets/screening-Db7_XW-b.js                           7.80 kB │ gzip:   2.51 kB
+dist/public/assets/invoices-BElCeZiI.js                            7.88 kB │ gzip:   2.90 kB
+dist/public/assets/settings-Dgn4AlMT.js                            8.12 kB │ gzip:   2.98 kB
+dist/public/assets/user-logs-20druheu.js                           8.54 kB │ gzip:   2.93 kB
+dist/public/assets/terms-CVU9hQw7.js                               8.87 kB │ gzip:   2.86 kB
+dist/public/assets/van-proposal-B9XiDQKl.js                        9.07 kB │ gzip:   3.46 kB
+dist/public/assets/recovery-IpeOxW5p.js                            9.14 kB │ gzip:   2.87 kB
+dist/public/assets/corporate-D2yj5mgj.js                           9.18 kB │ gzip:   2.74 kB
+dist/public/assets/gps-BR5Q-fxJ.js                                 9.88 kB │ gzip:   2.76 kB
+dist/public/assets/insurance-DRlh0MM7.js                           9.98 kB │ gzip:   2.93 kB
+dist/public/assets/article-2cwAl4Yd.js                            10.02 kB │ gzip:   3.45 kB
+dist/public/assets/dashboard-BRxlfCiU.js                          11.78 kB │ gzip:   3.94 kB
+dist/public/assets/settlements-BMuWwjJh.js                        11.84 kB │ gzip:   4.14 kB
+dist/public/assets/rental-companies-CuZRerZa.js                   12.70 kB │ gzip:   3.79 kB
+dist/public/assets/identity-verification-DNjiuXV5.js              12.83 kB │ gzip:   3.82 kB
+dist/public/assets/pricing-o_AKNVhs.js                            12.87 kB │ gzip:   4.50 kB
+dist/public/assets/dashboard-CXW4lInD.js                          13.15 kB │ gzip:   4.49 kB
+dist/public/assets/van-pickup-CbewAngj.js                         13.26 kB │ gzip:   3.96 kB
+dist/public/assets/mypage-BIC-sU5l.js                             13.75 kB │ gzip:   4.59 kB
+dist/public/assets/van-payment-B1GJxOgq.js                        13.79 kB │ gzip:   4.18 kB
+dist/public/assets/invoices-Cr_6waMf.js                           13.79 kB │ gzip:   4.10 kB
+dist/public/assets/contract-chat-DvbSXsDU.js                      13.89 kB │ gzip:   4.53 kB
+dist/public/assets/master-card-C3raPyAG.js                        16.81 kB │ gzip:   4.86 kB
+dist/public/assets/customers-ovW-4myH.js                          19.60 kB │ gzip:   5.39 kB
+dist/public/assets/format-DoPCwC_x.js                             19.76 kB │ gzip:   5.63 kB
+dist/public/assets/blog-BTYUifZP.js                               20.45 kB │ gzip:   6.41 kB
+dist/public/assets/vehicles-CfOZPOav.js                           20.81 kB │ gzip:   6.40 kB
+dist/public/assets/lp-company-Dhz1QAIE.js                         22.73 kB │ gzip:   6.97 kB
+dist/public/assets/lp-CO7UbviI.js                                 23.26 kB │ gzip:   6.90 kB
+dist/public/assets/vehicles-Cw6juW6X.js                           26.23 kB │ gzip:   7.55 kB
+dist/public/assets/contracts-DnWN6v4w.js                          26.86 kB │ gzip:   7.16 kB
+dist/public/assets/purify.es-4eNOHKSq.js                          28.74 kB │ gzip:  11.02 kB
+dist/public/assets/email-marketing-BQtvsYwk.js                    30.84 kB │ gzip:   9.05 kB
+dist/public/assets/van-contract-Qj3XvuZu.js                       30.98 kB │ gzip:  10.62 kB
+dist/public/assets/finance-C4OBLv1t.js                            31.47 kB │ gzip:   6.13 kB
+dist/public/assets/notifications-3XtSp3uT.js                      33.20 kB │ gzip:   8.69 kB
+dist/public/assets/shipment-detail-CHUeBM7H.js                    41.66 kB │ gzip:   9.27 kB
+dist/public/assets/van-status-DmcwGvV2.js                         42.90 kB │ gzip:   9.77 kB
+dist/public/assets/vendor-query-ChLhbXNe.js                       44.69 kB │ gzip:  13.71 kB
+dist/public/assets/application-detail-ez-6YZ-3.js                 67.10 kB │ gzip:  17.31 kB
+dist/public/assets/form-DhnncfOn.js                               88.89 kB │ gzip:  24.97 kB
+dist/public/assets/van-chat-BSrKnHLx.js                          122.85 kB │ gzip:  38.22 kB
+dist/public/assets/vendor-ui-BgKVhDJZ.js                         126.82 kB │ gzip:  43.20 kB
+dist/public/assets/leaflet-src-CylAWYLv.js                       149.91 kB │ gzip:  43.49 kB
+dist/public/assets/index.es-DXRd4XaL.js                          159.05 kB │ gzip:  53.11 kB
+dist/public/assets/html2canvas.esm-DXEQVQnt.js                   201.04 kB │ gzip:  47.43 kB
+dist/public/assets/index-DEZv5J8V.js                             270.16 kB │ gzip:  82.50 kB
+dist/public/assets/jspdf.es.min-BcmC93Tg.js                      386.32 kB │ gzip: 126.46 kB
+✓ built in 11.68s
+[2026-08-23 10:03:57] [5/5] PM2 起動 / リロード
+[PM2] Applying action reloadProcessId on app [chatvan-api](ids: [ 0 ])
+[PM2] [chatvan-api](0) ✓
+[2026-08-23 10:03:58]   → pm2 reload 完了
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 5  │ aiagent            │ fork     │ 0    │ online    │ 0%       │ 149.3mb  │
+│ 15 │ chatlogi-api       │ fork     │ 4608 │ online    │ 0%       │ 132.8mb  │
+│ 0  │ chatvan-api        │ fork     │ 66   │ online    │ 0%       │ 68.6mb   │
+│ 4  │ keimatch           │ fork     │ 0    │ online    │ 0%       │ 262.9mb  │
+│ 13 │ keisaiyou          │ fork     │ 0    │ online    │ 0%       │ 262.9mb  │
+│ 3  │ menz-esthe-town    │ fork     │ 0    │ online    │ 0%       │ 143.6mb  │
+│ 12 │ onlyu              │ fork     │ 0    │ online    │ 0%       │ 118.3mb  │
+│ 8  │ sinjapan-crm-api   │ fork     │ 6280 │ online    │ 0%       │ 84.6mb   │
+│ 1  │ sinjapan-manager   │ fork     │ 0    │ online    │ 0%       │ 59.5mb   │
+│ 2  │ sinjapan-onlinesc… │ fork     │ 0    │ online    │ 0%       │ 96.1mb   │
+│ 14 │ sinjapan-sales-api │ fork     │ 0    │ online    │ 0%       │ 314.1mb  │
+│ 6  │ sinjapanai         │ fork     │ 0    │ online    │ 0%       │ 102.1mb  │
+│ 7  │ sinjapanailive-api │ fork     │ 0    │ online    │ 0%       │ 98.9mb   │
+│ 10 │ sinjapanaisite-api │ fork     │ 0    │ online    │ 0%       │ 140.0mb  │
+│ 11 │ tiktokshindan      │ fork     │ 0    │ online    │ 0%       │ 89.5mb   │
+│ 9  │ tramatch           │ fork     │ 0    │ online    │ 0%       │ 279.1mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+host metrics | cpu: 6% | ram usage: 20.6% | lo: ⇓ 0.004mb/s ⇑ 0.004mb/s | eth0: ⇓ 0.089mb/s ⇑ 0.012mb/s |
+[2026-08-23 10:03:58] === デプロイ完了 ✅ ===
+[2026-08-23 10:03:58] ポート確認: curl -s http://127.0.0.1:4820/api/public/seo | head -c 100
+root@srv1087935:~# 
