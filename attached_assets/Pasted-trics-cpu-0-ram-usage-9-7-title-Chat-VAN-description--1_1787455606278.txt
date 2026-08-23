@@ -1,0 +1,45 @@
+trics | cpu: 0% | ram usage: 9.7% |
+{"title":"軽バンレンタルをチャットで相談｜Chat VAN","description":"希望エリア・利用期間・用途をチャットで伝えるだけ。Chat VANがあなたに合った軽バン?root@srv1087935:/var/www/chatvan# ls -la /root/.pm2/dump.pm2*
+-rw-r--r-- 1 root root   8139 Aug 23 03:24 /root/.pm2/dump.pm2
+-rw-r--r-- 1 root root 201760 Aug 23 03:24 /root/.pm2/dump.pm2.bak
+root@srv1087935:/var/www/chatvan# cp /root/.pm2/dump.pm2.bak /root/.pm2/dump.pm2 
+pm2 resurrect
+[PM2] Resurrecting
+[PM2] Restoring processes located in /root/.pm2/dump.pm2
+[PM2] Process /var/www/sinjapan-manager/dist/index.js restored
+[PM2] Process /var/www/sinjapan-onlineschool-ver2/dist/index.js restored
+[PM2] Process /var/www/menz-esthe-town/dist/index.js restored
+[PM2] Process /var/www/keimatch/start.sh restored
+[PM2] Process /var/www/aiagent/dist/index.cjs restored
+[PM2] Process /opt/sinjapanai/artifacts/api-server/dist/index.cjs restored
+[PM2] Process /var/www/sinjapanailive/artifacts/api-server/dist/index.cjs resto…
+[PM2] Process /usr/bin/bash restored
+[PM2] Process /var/www/tramatch/dist/index.cjs restored
+[PM2] Process /opt/sinjapanaisite/artifacts/api-server/dist/index.mjs restored
+[PM2] Process /var/www/tiktokshindan/artifacts/api-server/dist/index.mjs restor…
+[PM2] Process /var/www/onlyu/dist/index.cjs restored
+[PM2] Process /var/www/keisaiyou/artifacts/keimatch/start.sh restored
+[PM2] Process /var/www/sinjapan-sales/server.mjs restored
+[PM2] Process /var/www/chatlogi/start-api.sh restored
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 5  │ aiagent            │ fork     │ 0    │ online    │ 0%       │ 52.0mb   │
+│ 15 │ chatlogi-api       │ fork     │ 0    │ online    │ 0%       │ 16.8mb   │
+│ 0  │ chatvan-api        │ fork     │ 3    │ online    │ 0%       │ 154.1mb  │
+│ 4  │ keimatch           │ fork     │ 0    │ online    │ 0%       │ 58.3mb   │
+│ 13 │ keisaiyou          │ fork     │ 0    │ online    │ 0%       │ 26.5mb   │
+│ 3  │ menz-esthe-town    │ fork     │ 0    │ online    │ 0%       │ 56.4mb   │
+│ 12 │ onlyu              │ fork     │ 0    │ online    │ 0%       │ 28.1mb   │
+│ 8  │ sinjapan-crm-api   │ fork     │ 0    │ online    │ 0%       │ 44.3mb   │
+│ 1  │ sinjapan-manager   │ fork     │ 0    │ online    │ 0%       │ 55.0mb   │
+│ 2  │ sinjapan-onlinesc… │ fork     │ 0    │ online    │ 0%       │ 57.4mb   │
+│ 14 │ sinjapan-sales-api │ fork     │ 0    │ online    │ 0%       │ 26.3mb   │
+│ 6  │ sinjapanai         │ fork     │ 0    │ online    │ 0%       │ 51.5mb   │
+│ 7  │ sinjapanailive-api │ fork     │ 0    │ online    │ 0%       │ 49.2mb   │
+│ 10 │ sinjapanaisite-api │ fork     │ 0    │ online    │ 0%       │ 49.7mb   │
+│ 11 │ tiktokshindan      │ fork     │ 0    │ online    │ 0%       │ 29.8mb   │
+│ 9  │ tramatch           │ fork     │ 0    │ online    │ 0%       │ 40.6mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+host metrics | cpu: 1.4% | ram usage: 10.1% | eth0: ⇓ 0.004mb/s ⇑ 0.002mb/s |
+root@srv1087935:/var/www/chatvan# 
