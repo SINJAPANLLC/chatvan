@@ -1094,7 +1094,7 @@ export default function AdminShipmentDetail() {
               </button>
             </div>
             <div className="px-6 py-5 space-y-4">
-              <p className="text-sm text-muted-foreground">以下のURLを運送会社へ共有してください。運送会社が自社情報を入力・送信するとinfo@sinjapan.jpに通知されます。</p>
+              <p className="text-sm text-muted-foreground">以下のURLを運送会社へ共有してください。運送会社が自社情報を入力・送信するとinfo@chat-van.comに通知されます。</p>
               <div className="bg-foreground text-background rounded-xl p-4 space-y-2">
                 <p className="text-xs font-semibold opacity-70">マスターカードURL</p>
                 {generatingMasterToken ? (

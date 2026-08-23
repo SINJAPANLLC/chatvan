@@ -65,7 +65,7 @@ export default function Contact() {
         <h1 className="text-xl font-semibold">お問い合わせを受け付けました</h1>
         <p className="text-sm text-muted-foreground leading-relaxed">
           担当者より順次ご連絡いたします。<br />
-          お急ぎの場合は <a href="mailto:info@sinjapan.jp" className="underline">info@sinjapan.jp</a> までご連絡ください。
+          お急ぎの場合は <a href="mailto:info@chat-van.com" className="underline">info@chat-van.com</a> までご連絡ください。
         </p>
       </div>
     );
@@ -157,7 +157,8 @@ export default function Contact() {
         <p>合同会社SIN JAPAN</p>
         <p>〒243-0303 神奈川県愛甲郡愛川町中津7287</p>
         <p>TEL 046-212-2325　FAX 046-212-2326</p>
-        <p><a href="mailto:info@sinjapan.jp" className="hover:underline">info@sinjapan.jp</a></p>
+        <p><a href="mailto:info@chat-van.com" className="hover:underline">info@chat-van.com</a></p>
+        <p><a href="https://x.com/Kazuya8008" target="_blank" rel="noopener noreferrer" className="hover:underline">X: @Kazuya8008</a></p>
       </div>
     </div>
   );

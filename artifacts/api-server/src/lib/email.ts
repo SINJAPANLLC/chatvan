@@ -5,7 +5,7 @@ function createTransport() {
   const port = Number(process.env.SMTP_PORT ?? 587);
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
-  const from = process.env.SMTP_FROM ?? "Chat LOGI <noreply@chatlogi.jp>";
+  const from = process.env.SMTP_FROM ?? "Chat VAN <noreply@chat-van.com>";
 
   if (!host || !user || !pass) return null;
 
@@ -15,7 +15,7 @@ function createTransport() {
   };
 }
 
-export const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFY_EMAIL ?? "info@sinjapan.jp";
+export const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFY_EMAIL ?? "info@chat-van.com";
 
 export async function sendEmail(
   to: string,
@@ -75,9 +75,9 @@ export interface SalesEmailOptions {
 
 export function buildSalesEmailHtml(opts: SalesEmailOptions): string {
   const { subject, bodyText, companyName, contactName, ctaText, ctaUrl } = opts;
-  const baseUrl = process.env.APP_BASE_URL ?? "https://chatlogi.jp";
+  const baseUrl = process.env.APP_BASE_URL ?? "https://chat-van.com";
   const cta = ctaUrl ?? baseUrl;
-  const ctaLabel = ctaText ?? "Chat LOGIを無料で試す →";
+  const ctaLabel = ctaText ?? "Chat VANを無料で試す →";
   const to = contactName ? `${companyName ? companyName + " " : ""}${contactName} 様` : (companyName ? `${companyName} ご担当者様` : "ご担当者様");
 
   // {会社名} {担当者名} プレースホルダーを置換（冒頭の宛名行は挨拶と重複するので除去）
@@ -177,7 +177,7 @@ export function buildEmailHtml(opts: EmailOptions | string, bodyArg?: string, re
 
   const greeting = recipientName ? `${recipientName} 様` : "お客様";
   const badgeColor = statusBadge ? (BADGE_COLOR[statusBadge] ?? "#1a1a1a") : null;
-  const baseUrl = process.env.APP_BASE_URL ?? "https://chatlogi.jp";
+  const baseUrl = process.env.APP_BASE_URL ?? "https://chat-van.com";
   const ctaHref = shipmentId ? `${baseUrl}/shipment/${shipmentId}` : `${baseUrl}/`;
 
   return `<!DOCTYPE html>

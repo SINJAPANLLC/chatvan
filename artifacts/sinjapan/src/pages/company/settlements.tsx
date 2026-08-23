@@ -212,7 +212,7 @@ function DetailTable({ rows, initialMonth }: { rows: any[]; initialMonth: string
           <div class="party-name">合同会社SIN JAPAN</div>
           <div class="party-detail">〒243-0303 神奈川県愛甲郡愛川町中津7287
 TEL: 050-5526-9906
-Email: info@sinjapan.jp</div>
+Email: info@chat-van.com</div>
         </div>
         <div class="party">
           <div class="party-title">お支払い先（協力会社）</div>
@@ -264,7 +264,7 @@ Email: info@sinjapan.jp</div>
         <div class="bank-content">${bankInfo}</div>
       </div>` : ''}
 
-      <div class="footer">合同会社SIN JAPAN　／　info@sinjapan.jp　／　050-5526-9906</div>
+      <div class="footer">合同会社SIN JAPAN　／　info@chat-van.com　／　050-5526-9906</div>
     </body></html>`;
 
     const win = window.open('', '_blank');

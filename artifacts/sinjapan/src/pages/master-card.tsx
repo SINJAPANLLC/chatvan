@@ -190,7 +190,7 @@ export default function MasterCardPage() {
             <div className="text-right text-xs opacity-80 shrink-0 ml-4">
               <p className="font-bold text-base text-white mb-1">合同会社 SIN JAPAN</p>
               <p>FAX 046-212-2326</p>
-              <p>Mail info@sinjapan.jp</p>
+              <p>Mail info@chat-van.com</p>
             </div>
           </div>
           <div className="px-6 py-3 border-b border-gray-300 flex items-center justify-between">

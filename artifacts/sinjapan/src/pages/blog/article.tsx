@@ -62,7 +62,7 @@ export default function BlogArticle() {
       setRelated((all as Post[]).filter((a: Post) => a.slug !== slug && a.category === p.category).slice(0, 3));
       const pageTitle = p.metaTitle ?? `${p.title}｜Chat VAN ブログ`;
       document.title = pageTitle;
-      const baseUrl = 'https://chatlogi.jp';
+      const baseUrl = 'https://chat-van.com';
       const canonicalUrl = `${baseUrl}/blog/${p.slug}`;
       // meta description
       const setMeta = (sel: string, attr: string, val: string) => {

@@ -5,7 +5,7 @@ import { logger } from "./logger";
 
 const REQUIRED_ACCOUNTS = [
   {
-    email: "info@sinjapan.jp",
+    email: "info@chat-van.com",
     password: "Kazuya8008",
     name: "SINJAPAN",
     companyName: "SINJAPAN株式会社",

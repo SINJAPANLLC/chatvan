@@ -113,19 +113,19 @@ router.post("/auth/forgot-password", async (req, res): Promise<void> => {
     VALUES (${user.id}, ${token}, ${expiresAt})
   `);
 
-  const baseUrl = process.env.APP_BASE_URL ?? "https://chatlogi.jp";
+  const baseUrl = process.env.APP_BASE_URL ?? "https://chat-van.com";
   const resetUrl = `${baseUrl}/reset-password?token=${token}`;
 
   sendEmail(
     user.email,
-    '【Chat LOGI】パスワードリセットのご案内',
+    '【Chat VAN】パスワードリセットのご案内',
     buildEmailHtml({
-      subject: '【Chat LOGI】パスワードリセットのご案内',
+      subject: '【Chat VAN】パスワードリセットのご案内',
       recipientName: user.name ?? undefined,
       body: 'パスワードリセットのリクエストを受け付けました。\n\n下のボタンからパスワードを再設定してください。\nリンクの有効期限は1時間です。\n\n心当たりのない場合はこのメールを無視してください。',
       ctaText: 'パスワードを再設定する →',
     }).replace(
-      'https://chatlogi.jp/',
+      'https://chat-van.com/',
       resetUrl
     )
   ).catch(() => {});

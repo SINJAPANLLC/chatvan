@@ -70,7 +70,7 @@ async function getSeoValues(): Promise<SeoValues> {
 function publicBaseUrl(values: SeoValues): string {
   return normalizeSiteUrl(values.siteUrl)
     ?? normalizeSiteUrl(process.env.SITE_URL)
-    ?? "https://chatlogi.jp";
+    ?? "https://chat-van.com";
 }
 
 function buildRobots(values: SeoValues, baseUrl: string): string {
