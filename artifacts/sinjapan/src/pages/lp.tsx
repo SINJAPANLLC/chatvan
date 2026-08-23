@@ -396,7 +396,7 @@ export default function LP() {
         <div className="fixed bottom-0 left-0 z-50">
           <button
             onClick={() => setPandaVisible(false)}
-            className="absolute top-3 right-1 w-5 h-5 rounded-full bg-black/50 text-white text-xs flex items-center justify-center hover:bg-black transition-colors"
+            className="absolute top-3 left-1 w-5 h-5 rounded-full bg-black/50 text-white text-xs flex items-center justify-center hover:bg-black transition-colors"
             aria-label="閉じる"
           >
             ×
