@@ -119,8 +119,14 @@ router.post("/line/webhook", async (req: any, res) => {
         temperature: 0.75,
       });
 
-      const reply = completion.choices[0]?.message?.content?.trim()
+      const REGISTER_URL = "https://chat-van.com/register";
+      const rawReply = completion.choices[0]?.message?.content?.trim()
         ?? "少々お待ちください。";
+      // URLが含まれていれば除去してコードで付け直す（改行を確実に保証）
+      const bodyText = rawReply
+        .replace(/▶?\s*https?:\/\/chat-van\.com\/register/g, "")
+        .trim();
+      const reply = `${bodyText}\n\n▶ ${REGISTER_URL}`;
 
       // AI返答をDBに保存
       await db.insert(lineConversationsTable).values({
