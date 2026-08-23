@@ -1,8 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 
+const VAN_SLIDES = [
+  'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=1400&q=80',
+  'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=1400&q=80',
+  'https://images.unsplash.com/photo-1571987502227-9231b837d92a?auto=format&fit=crop&w=1400&q=80',
+  'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1400&q=80',
+  'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=1400&q=80',
+];
+
 export default function LP() {
   const [scrolled, setScrolled] = useState(false);
+  const [vanSlide, setVanSlide] = useState(0);
+
+  useEffect(() => {
+    const t = setInterval(() => setVanSlide(c => (c + 1) % VAN_SLIDES.length), 4500);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -138,6 +152,44 @@ export default function LP() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Van Photo Slider */}
+      <section className="relative overflow-hidden bg-black" style={{ height: 'clamp(220px, 55vw, 560px)' }}>
+        {VAN_SLIDES.map((src, i) => (
+          <img
+            key={src}
+            src={src}
+            alt={`軽バン ${i + 1}`}
+            className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000"
+            style={{ opacity: vanSlide === i ? 1 : 0 }}
+          />
+        ))}
+        {/* bottom fade into white */}
+        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+        {/* arrows */}
+        <button
+          aria-label="前へ"
+          onClick={() => setVanSlide(c => (c - 1 + VAN_SLIDES.length) % VAN_SLIDES.length)}
+          className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/40 transition-colors text-lg"
+        >‹</button>
+        <button
+          aria-label="次へ"
+          onClick={() => setVanSlide(c => (c + 1) % VAN_SLIDES.length)}
+          className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/40 transition-colors text-lg"
+        >›</button>
+        {/* dots */}
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+          {VAN_SLIDES.map((_, i) => (
+            <button
+              key={i}
+              aria-label={`スライド ${i + 1}`}
+              onClick={() => setVanSlide(i)}
+              className="h-1.5 rounded-full transition-all duration-300 bg-white"
+              style={{ width: vanSlide === i ? '24px' : '6px', opacity: vanSlide === i ? 1 : 0.45 }}
+            />
+          ))}
         </div>
       </section>
 
