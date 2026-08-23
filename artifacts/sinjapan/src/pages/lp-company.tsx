@@ -18,7 +18,7 @@ export default function LPCompany() {
       <nav className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4 transition-all duration-300 ${scrolled ? 'bg-white/95 backdrop-blur-sm border-b border-black/8' : 'bg-white'}`}>
         <img src="/logo.png" alt="Chat VAN" className="h-8 w-auto" />
         <div className="flex items-center gap-4">
-          <Link href="/company/login">
+          <Link href="/login">
             <button className="text-black/50 text-sm hover:text-black transition-colors">ログイン</button>
           </Link>
           <Link href="/company/register">
