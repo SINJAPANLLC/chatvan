@@ -1,0 +1,45 @@
+ract_ids INTEGER[];
+BEGIN
+  SELECT array_agg(id) INTO ids          FROM users         WHERE email != 'info@sinjapan.jp';
+  SELECT array_agg(id) INTO contract_ids FROM van_contracts WHERE user_id = ANY(ids);
+  IF ids IS NULL THEN RAISE NOTICE 'No users to delete'; RETURN; END IF;
+
+  DELETE FROM contract_messages      WHERE contract_id = ANY(contract_ids);
+  DELETE FROM payment_retries        WHERE user_id = ANY(ids);
+  DELETE FROM recovery_cases         WHERE user_id = ANY(ids);
+  DELETE FROM van_incidents          WHERE user_id = ANY(ids);
+  DELETE FROM breakdowns             WHERE user_id = ANY(ids);
+  DELETE FROM returns                WHERE user_id = ANY(ids);
+  DELETE FROM invoices               WHERE user_id = ANY(ids);
+  DELETE FROM settlements            WHERE contract_id = ANY(contract_ids);
+  DELETE FROM van_contracts          WHERE user_id = ANY(ids);
+  DELETE FROM screenings             WHERE user_id = ANY(ids);
+  DELETE FROM van_applications       WHERE user_id = ANY(ids);
+  DELETE FROM upload_claims          WHERE user_id = ANY(ids);
+  DELETE FROM notifications          WHERE user_id = ANY(ids);
+  DELETE FROM identity_verifications WHERE user_id = ANY(ids);
+  DELETE FROM shipments              WHERE user_id = ANY(ids);
+SQLECT id, email, role FROM users;   WHERE email != 'info@sinjapan.jp';
+ERROR:  update or delete on table "van_applications" violates foreign key constraint "van_proposals_application_id_fkey" on table "van_proposals"
+DETAIL:  Key (id)=(42) is still referenced from table "van_proposals".
+CONTEXT:  SQL statement "DELETE FROM van_applications       WHERE user_id = ANY(ids)"
+PL/pgSQL function inline_code_block line 20 at SQL statement
+ id |        email         |      role      
+----+----------------------+----------------
+  2 | admin@sinjapan.co.jp | admin
+  6 | a@a                  | rental_company
+  7 | b@b                  | rental_company
+  8 | a@a.com              | rental_company
+ 10 | x@x.com              | rental_company
+ 11 | c@c.com              | rental_company
+ 12 | 9@9.com              | rental_company
+ 13 | 5@5.com              | rental_company
+  3 | あ                   | rental_company
+  4 | ｑ                   | rental_company
+  5 | ｗ                   | user
+  9 | z@z.com              | user
+ 14 | info@chat-van.com    | admin
+  1 | info@sinjapan.jp     | admin
+(14 rows)
+
+root@srv1087935:/var/www/chatvan# 
