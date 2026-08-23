@@ -395,7 +395,7 @@ export default function LP() {
         src="/images/panda.png"
         alt="登録してね！"
         className="fixed bottom-0 left-0 z-50 pointer-events-none select-none"
-        style={{ width: 'clamp(100px, 20vw, 160px)' }}
+        style={{ width: 'clamp(140px, 28vw, 220px)' }}
       />
     </div>
   );
