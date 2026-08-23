@@ -1,0 +1,52 @@
+:  Key (id)=(2) is still referenced from table "notifications".
+root@srv1087935:/var/www/chatvan# psql "postgresql://neondb_owner:npg_BwSUET14nbrI@ep-blue-hill-aymdo9tu-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require" << 'SQL'
+DO $$
+DECLARE
+  target_ids INTEGER[];
+BEGIN
+  -- 削除対象ユーザーのID一覧（info@sinjapan.jp 以外）
+  SELECT array_agg(id) INTO target_ids FROM users WHERE email != 'info@sinjapan.jp';
+  IF target_ids IS NULL THEN RETURN; END IF;
+
+  -- 依存テーブルを順番に削除
+  DELETE FROM notifications          WHERE user_id = ANY(target_ids);
+  DELETE FROM audit_logs             WHERE user_id = ANY(target_ids);
+  DELETE FROM user_activity_logs     WHERE user_id = ANY(target_ids);
+  DELETE FROM auth_tokens            WHERE user_id = ANY(target_ids);
+  DELETE FROM password_reset_tokens  WHERE user_id = ANY(target_ids);
+  DELETE FROM email_send_logs        WHERE user_id = ANY(target_ids);
+  DELETE FROM identity_verifications WHERE user_id = ANY(target_ids);
+  DELETE FROM van_applications       WHERE user_id = ANY(target_ids);
+  DELETE FROM van_proposals          WHERE user_id = ANY(target_ids);
+  DELETE FROM van_contracts          WHERE user_id = ANY(target_ids);
+  DELETE FROM screenings             WHERE user_id = ANY(target_ids);
+  DELETE FROM prospects              WHERE user_id = ANY(target_ids);
+  DELETE FROM contacts               WHERE user_id = ANY(target_ids);
+  DELETE FROM conversations          WHERE user_id = ANY(target_ids);
+  DELETE FROM payments               WHERE user_id = ANY(target_ids);
+  DELETE FROM shipments              WHERE user_id = ANY(target_ids);
+SQLECT id, email, role FROM users; 'info@sinjapan.jp';
+ERROR:  column "user_id" does not exist
+LINE 1: DELETE FROM audit_logs             WHERE user_id = ANY(targe...
+                                                 ^
+QUERY:  DELETE FROM audit_logs             WHERE user_id = ANY(target_ids)
+CONTEXT:  PL/pgSQL function inline_code_block line 11 at SQL statement
+ id |        email         |      role      
+----+----------------------+----------------
+  2 | admin@sinjapan.co.jp | admin
+  6 | a@a                  | rental_company
+  7 | b@b                  | rental_company
+  8 | a@a.com              | rental_company
+ 10 | x@x.com              | rental_company
+ 11 | c@c.com              | rental_company
+ 12 | 9@9.com              | rental_company
+ 13 | 5@5.com              | rental_company
+  3 | あ                   | rental_company
+  4 | ｑ                   | rental_company
+  5 | ｗ                   | user
+  9 | z@z.com              | user
+ 14 | info@chat-van.com    | admin
+  1 | info@sinjapan.jp     | admin
+(14 rows)
+
+root@srv1087935:/var/www/chatvan# 
