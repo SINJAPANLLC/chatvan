@@ -47,6 +47,49 @@ export default function LP() {
           </Link>
           <p className="text-black/25 text-sm mt-6">登録無料・最短即日・書類手続き不要</p>
         </div>
+
+        {/* Store Badges */}
+        <div className="absolute bottom-14 right-6 md:right-20 flex flex-col items-end gap-2">
+          {/* App Store - 準備中 */}
+          <div className="relative select-none">
+            <div className="flex items-center gap-2.5 bg-black rounded-xl px-4 py-2.5 w-[152px] opacity-35">
+              <svg width="20" height="24" viewBox="0 0 24 24" fill="white">
+                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+              </svg>
+              <div className="text-white">
+                <p className="text-[9px] leading-none opacity-70">Download on the</p>
+                <p className="text-[13px] font-semibold leading-tight mt-0.5">App Store</p>
+              </div>
+            </div>
+            <span className="absolute -top-2 -right-2 bg-black text-white text-[9px] font-bold px-2 py-0.5 rounded-full">準備中</span>
+          </div>
+
+          {/* Google Play - 準備中 */}
+          <div className="relative select-none">
+            <div className="flex items-center gap-2.5 bg-black rounded-xl px-4 py-2.5 w-[152px] opacity-35">
+              <svg width="20" height="22" viewBox="0 0 24 24" fill="white">
+                <path d="M3 20.5v-17c0-.83.94-1.3 1.6-.8l14 8.5c.6.37.6 1.23 0 1.6l-14 8.5c-.66.5-1.6.03-1.6-.8zM5 6.87v10.26L16.01 12 5 6.87z"/>
+              </svg>
+              <div className="text-white">
+                <p className="text-[9px] leading-none opacity-70">GET IT ON</p>
+                <p className="text-[13px] font-semibold leading-tight mt-0.5">Google Play</p>
+              </div>
+            </div>
+            <span className="absolute -top-2 -right-2 bg-black text-white text-[9px] font-bold px-2 py-0.5 rounded-full">準備中</span>
+          </div>
+
+          {/* LINE 友だち追加 */}
+          <a href="#" className="flex items-center gap-2.5 bg-[#06C755] rounded-xl px-4 py-2.5 w-[152px] hover:bg-[#05b34d] transition-colors">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
+              <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/>
+            </svg>
+            <div className="text-white">
+              <p className="text-[9px] leading-none opacity-80">友だち追加</p>
+              <p className="text-[13px] font-semibold leading-tight mt-0.5">LINE</p>
+            </div>
+          </a>
+        </div>
+
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3">
           <span className="text-black/20 text-[10px] tracking-[0.4em] uppercase">Scroll</span>
           <div className="w-px h-14 bg-gradient-to-b from-black/20 to-transparent" />
