@@ -3,7 +3,8 @@ import { useLocation, Link } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useLogin, useGetMe } from '@workspace/api-client-react';
+import { useLogin, useGetMe, getGetMeQueryKey } from '@workspace/api-client-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -19,7 +20,8 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const login = useLogin();
-  
+  const queryClient = useQueryClient();
+
   // Check if already logged in
   const { data: user, isLoading } = useGetMe();
   
@@ -43,6 +45,8 @@ export default function Login() {
       if ((res as any).token) {
         localStorage.setItem('sinjapan_auth_token', (res as any).token);
       }
+      // キャッシュをリセットして useGetMe を強制再取得させる
+      await queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
       if (res.user.role === 'admin') setLocation('/admin');
       else if (res.user.role === 'rental_company') setLocation('/company');
       else setLocation('/');
