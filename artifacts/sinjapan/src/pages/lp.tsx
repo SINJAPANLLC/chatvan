@@ -11,6 +11,7 @@ const VAN_PHOTOS = [
 
 export default function LP() {
   const [scrolled, setScrolled] = useState(false);
+  const [pandaVisible, setPandaVisible] = useState(true);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -57,7 +58,7 @@ export default function LP() {
         </div>
 
         {/* Store Badges */}
-        <div className="absolute bottom-14 right-6 md:right-20 flex flex-col items-end gap-2 z-20">
+        <div className="fixed top-[64px] right-3 md:absolute md:top-auto md:bottom-14 md:right-20 flex flex-col items-end gap-2 z-40">
           {/* App Store - 準備中 */}
           <div className="relative select-none">
             <div className="flex items-center gap-2.5 bg-black rounded-xl px-4 py-2.5 w-[152px] opacity-35">
@@ -391,14 +392,25 @@ export default function LP() {
       </footer>
 
       {/* Fixed panda */}
-      <Link href="/register">
-        <img
-          src="/images/panda.png"
-          alt="登録してね！"
-          className="fixed bottom-0 left-0 z-50 cursor-pointer select-none"
-          style={{ width: 'clamp(140px, 28vw, 220px)' }}
-        />
-      </Link>
+      {pandaVisible && (
+        <div className="fixed bottom-0 left-0 z-50">
+          <button
+            onClick={() => setPandaVisible(false)}
+            className="absolute top-3 right-1 w-5 h-5 rounded-full bg-black/50 text-white text-xs flex items-center justify-center hover:bg-black transition-colors"
+            aria-label="閉じる"
+          >
+            ×
+          </button>
+          <Link href="/register">
+            <img
+              src="/images/panda.png"
+              alt="登録してね！"
+              className="cursor-pointer select-none block"
+              style={{ width: 'clamp(140px, 28vw, 220px)' }}
+            />
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
