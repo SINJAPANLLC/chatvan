@@ -545,6 +545,26 @@ async function runMigrations() {
   } catch (e: any) {
     logger.warn({ err: e.message }, "migration warning (non-fatal)");
   }
+
+  // LINE 壁打ちボット 会話履歴テーブル
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS line_conversations (
+        id SERIAL PRIMARY KEY,
+        line_user_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_line_conversations_user_id
+      ON line_conversations(line_user_id, created_at)
+    `);
+    logger.info("migration: line_conversations table ready");
+  } catch (e: any) {
+    logger.warn({ err: e.message }, "migration warning (non-fatal)");
+  }
 }
 
 const port = Number(process.env.PORT ?? 8080);

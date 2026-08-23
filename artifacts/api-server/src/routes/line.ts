@@ -1,13 +1,15 @@
 import { Router } from "express";
 import crypto from "crypto";
 import { openai } from "@workspace/integrations-openai-ai-server";
+import { db, lineConversationsTable } from "@workspace/db";
+import { eq, desc } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
 const router = Router();
 
-// 会話履歴をユーザーIDごとにメモリで管理
-const conversations = new Map<string, { role: "user" | "assistant"; content: string }[]>();
 const MAX_HISTORY = 20;
+
+const RESET_KEYWORDS = ["リセット", "やり直し", "最初から", "reset", "やりなおし"];
 
 const SYSTEM_PROMPT = `あなたはChat VANのマスコット「SIN PANDA」です。
 Chat VANは、軽バンのレンタルをチャットで完結できるサービスです。
@@ -63,27 +65,47 @@ router.post("/line/webhook", async (req: any, res) => {
     if (event.type !== "message" || event.message?.type !== "text") continue;
 
     const userId: string = event.source?.userId;
-    const userText: string = event.message.text;
+    const userText: string = event.message.text.trim();
     const replyToken: string = event.replyToken;
 
     if (!userId || !replyToken) continue;
 
     try {
-      // 会話履歴を取得・更新
-      if (!conversations.has(userId)) {
-        conversations.set(userId, []);
+      // リセットコマンド
+      if (RESET_KEYWORDS.some((kw) => userText === kw)) {
+        await db.delete(lineConversationsTable)
+          .where(eq(lineConversationsTable.lineUserId, userId));
+
+        await sendLineReply(replyToken, "わかった！話をリセットしたよ。改めて、どんな軽バンの使い方を考えてるか教えてほしいな。");
+        continue;
       }
-      const history = conversations.get(userId)!;
-      history.push({ role: "user", content: userText });
 
-      // 長くなりすぎたら古い履歴を削除
-      while (history.length > MAX_HISTORY) history.shift();
+      // DBから会話履歴を取得（新しい順で取得して逆順に並べる）
+      const rows = await db
+        .select()
+        .from(lineConversationsTable)
+        .where(eq(lineConversationsTable.lineUserId, userId))
+        .orderBy(desc(lineConversationsTable.createdAt))
+        .limit(MAX_HISTORY);
 
+      const history = rows
+        .reverse()
+        .map((r) => ({ role: r.role as "user" | "assistant", content: r.content }));
+
+      // ユーザーメッセージをDBに保存
+      await db.insert(lineConversationsTable).values({
+        lineUserId: userId,
+        role: "user",
+        content: userText,
+      });
+
+      // OpenAI 呼び出し
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           ...history,
+          { role: "user", content: userText },
         ],
         max_tokens: 400,
         temperature: 0.75,
@@ -92,14 +114,19 @@ router.post("/line/webhook", async (req: any, res) => {
       const reply = completion.choices[0]?.message?.content?.trim()
         ?? "少々お待ちください。";
 
-      history.push({ role: "assistant", content: reply });
+      // AI返答をDBに保存
+      await db.insert(lineConversationsTable).values({
+        lineUserId: userId,
+        role: "assistant",
+        content: reply,
+      });
 
       await sendLineReply(replyToken, reply);
     } catch (err) {
       logger.error({ err, userId }, "LINE webhook processing error");
       await sendLineReply(
         replyToken,
-        "申し訳ありません、一時的なエラーが発生しました。少し経ってから再度お試しください。"
+        "ごめん、一時的なエラーが発生しちゃった。少し経ってから再度試してみてほしいな。"
       );
     }
   }
