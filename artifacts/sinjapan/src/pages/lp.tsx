@@ -391,12 +391,14 @@ export default function LP() {
       </footer>
 
       {/* Fixed panda */}
-      <img
-        src="/images/panda.png"
-        alt="登録してね！"
-        className="fixed bottom-0 left-0 z-50 pointer-events-none select-none"
-        style={{ width: 'clamp(140px, 28vw, 220px)' }}
-      />
+      <Link href="/register">
+        <img
+          src="/images/panda.png"
+          alt="登録してね！"
+          className="fixed bottom-0 left-0 z-50 cursor-pointer select-none"
+          style={{ width: 'clamp(140px, 28vw, 220px)' }}
+        />
+      </Link>
     </div>
   );
 }
