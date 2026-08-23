@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 
-const VAN_SLIDES = [
+const VAN_PHOTOS = [
   '/images/van-1.jpg',
   '/images/van-2.jpg',
   '/images/van-3.jpg',
@@ -11,12 +11,6 @@ const VAN_SLIDES = [
 
 export default function LP() {
   const [scrolled, setScrolled] = useState(false);
-  const [vanSlide, setVanSlide] = useState(0);
-
-  useEffect(() => {
-    const t = setInterval(() => setVanSlide(c => (c + 1) % VAN_SLIDES.length), 4500);
-    return () => clearInterval(t);
-  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -156,40 +150,50 @@ export default function LP() {
       </section>
 
       {/* Van Photo Slider */}
-      <section className="relative overflow-hidden bg-black" style={{ height: 'clamp(220px, 55vw, 560px)' }}>
-        {VAN_SLIDES.map((src, i) => (
-          <img
-            key={src}
-            src={src}
-            alt={`軽バン ${i + 1}`}
-            className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000"
-            style={{ opacity: vanSlide === i ? 1 : 0 }}
-          />
-        ))}
-        {/* bottom fade into white */}
-        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-white to-transparent pointer-events-none" />
-        {/* arrows */}
-        <button
-          aria-label="前へ"
-          onClick={() => setVanSlide(c => (c - 1 + VAN_SLIDES.length) % VAN_SLIDES.length)}
-          className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/40 transition-colors text-lg"
-        >‹</button>
-        <button
-          aria-label="次へ"
-          onClick={() => setVanSlide(c => (c + 1) % VAN_SLIDES.length)}
-          className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/40 transition-colors text-lg"
-        >›</button>
-        {/* dots */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-          {VAN_SLIDES.map((_, i) => (
-            <button
-              key={i}
-              aria-label={`スライド ${i + 1}`}
-              onClick={() => setVanSlide(i)}
-              className="h-1.5 rounded-full transition-all duration-300 bg-white"
-              style={{ width: vanSlide === i ? '24px' : '6px', opacity: vanSlide === i ? 1 : 0.45 }}
-            />
-          ))}
+      <section className="bg-white py-4 overflow-hidden">
+        <style>{`
+          .van-slider {
+            overflow: hidden;
+            width: 100%;
+            -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 10%, #000 90%, transparent 100%);
+            mask-image: linear-gradient(to right, transparent 0%, #000 10%, #000 90%, transparent 100%);
+          }
+          .van-track {
+            display: flex;
+            width: calc(240px * 20);
+            animation: van-scroll 28s linear infinite;
+            will-change: transform;
+          }
+          .van-slide {
+            width: 240px;
+            height: 160px;
+            flex-shrink: 0;
+            padding: 0 8px;
+          }
+          .van-slide img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 4px;
+            display: block;
+          }
+          @keyframes van-scroll {
+            0%   { transform: translateX(0); }
+            100% { transform: translateX(-25%); }
+          }
+          @media (max-width: 768px) {
+            .van-track { width: calc(180px * 20); }
+            .van-slide { width: 180px; height: 120px; }
+          }
+        `}</style>
+        <div className="van-slider">
+          <div className="van-track">
+            {[...VAN_PHOTOS, ...VAN_PHOTOS, ...VAN_PHOTOS, ...VAN_PHOTOS].map((src, i) => (
+              <div key={i} className="van-slide">
+                <img src={src} alt={`軽バン ${(i % VAN_PHOTOS.length) + 1}`} />
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
