@@ -64,11 +64,51 @@ else
   echo "  → .env.production は既に存在します（スキップ）"
 fi
 
-echo "=== [7/7] nginx サイト設定を配置 ==="
-cp "${APP_DIR}/deploy/nginx-chat-van.com.conf" /etc/nginx/sites-available/chat-van.com
+echo "=== [7/7] nginx サイト設定を配置（HTTP のみ。SSL は certbot 後に有効化）==="
+# 初回は HTTP のみ。certbot が自動で HTTPS 設定を追記してくれる。
+cat > /etc/nginx/sites-available/chat-van.com << 'NGINXEOF'
+server {
+    listen 80;
+    listen [::]:80;
+    server_name chat-van.com www.chat-van.com;
+
+    # certbot 用（SSL 取得時に必要）
+    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+
+    root /var/www/chatvan/artifacts/sinjapan/dist/public;
+    index index.html;
+
+    location /api/ {
+        proxy_pass         http://127.0.0.1:4820;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+        client_max_body_size 20M;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+        expires -1;
+    }
+
+    location ~* \.(js|css|woff2?|ttf|eot|svg|png|jpg|jpeg|gif|ico|webp)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+
+    access_log /var/log/nginx/chat-van.com-access.log;
+    error_log  /var/log/nginx/chat-van.com-error.log;
+}
+NGINXEOF
+
 ln -sf /etc/nginx/sites-available/chat-van.com /etc/nginx/sites-enabled/chat-van.com
-nginx -t
-systemctl reload nginx
+# デフォルトサイトを無効化（ポート競合防止）
+rm -f /etc/nginx/sites-enabled/default
+nginx -t && systemctl reload nginx
 
 mkdir -p /var/log/pm2
 
@@ -77,6 +117,14 @@ echo "✅ 初回セットアップ完了"
 echo ""
 echo "次のステップ:"
 echo "  1. ${APP_DIR}/.env.production を編集して DB・シークレット等を設定"
-echo "  2. bash ${APP_DIR}/deploy/deploy.sh でビルド＆起動"
-echo "  3. SSL証明書を取得: certbot --nginx -d chat-van.com -d www.chat-van.com"
-echo "  4. PM2 を OS 起動時に自動起動: pm2 startup && pm2 save"
+echo "     nano ${APP_DIR}/.env.production"
+echo ""
+echo "  2. ビルド＆起動"
+echo "     bash ${APP_DIR}/deploy/deploy.sh"
+echo ""
+echo "  3. DNSが chat-van.com をこのサーバーに向けてから SSL 取得"
+echo "     certbot --nginx -d chat-van.com -d www.chat-van.com"
+echo ""
+echo "  4. PM2 自動起動を設定"
+echo "     pm2 startup  # 表示されたコマンドを実行"
+echo "     pm2 save"
