@@ -5,7 +5,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { db, notificationsTable, usersTable, vanIncidentsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
-import { notifyAdmins } from "../lib/notifyHelpers";
+import { notifyAdmins, notifyCriticalEmail } from "../lib/notifyHelpers";
 import { logAdminAudit } from "../lib/auditLogger";
 
 const router: IRouter = Router();
@@ -125,6 +125,11 @@ router.post("/van/incidents", requireAuth, async (req: Request, res: Response) =
     }).returning();
 
     await notifyAdmins('🚨 Chat VAN - 事故報告', `事故が報告されました。場所: ${b.location ?? '不明'}`);
+    void notifyCriticalEmail(
+      `incident:${saved.id}`,
+      `Chat VAN - ${incidentType === "breakdown" ? "故障" : "事故"}報告`,
+      `${incidentType === "breakdown" ? "故障" : "事故"}が報告されました。\n\n契約ID：${contractId}\n利用者ID：${userId}\n場所：${b.location ?? "不明"}\n内容：${b.description ?? b.user_comment ?? "未入力"}`,
+    );
     return res.status(201).json(saved);
   } catch (err) {
     console.error("create incident error:", err);

@@ -30,7 +30,7 @@ import { logUserActivity } from "../lib/userLogger";
 import { randomUUID } from "crypto";
 import { squareFetch, getSquareConfigError } from "../lib/square-authorize";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
-import { notifyUser, notifyAdmins, notifyRcUsers } from "../lib/notifyHelpers";
+import { notifyUser, notifyAdmins, notifyRcUsers, notifyCriticalEmail } from "../lib/notifyHelpers";
 import { RC_ALLOWED_CONTRACT_STATUSES } from "../lib/rentalCompanyApplicationAccess";
 import {
   getCaller,
@@ -542,6 +542,11 @@ router.post("/van/start", optionalAuth, async (req: Request, res: Response) => {
 
       await notifyAdmins('Chat VAN相談',
         `新しい軽バン相談が届きました（ID: ${app.id} / ${inquiry.area} / ¥${(inquiry.monthlyBudget as number)?.toLocaleString()}/月）`);
+      void notifyCriticalEmail(
+        `consultation-received:${app.id}`,
+        "Chat VAN - 新規相談",
+        `新しい軽バン相談が届きました。\n\n相談ID：${app.id}\nエリア：${inquiry.area}\n月額予算：¥${(inquiry.monthlyBudget as number)?.toLocaleString() ?? "未入力"}\n利用者：${userInfo?.name ?? "未登録"}\nメール：${userInfo?.email ?? "未登録"}`,
+      );
     }
 
     logUserActivity({
@@ -1100,6 +1105,11 @@ router.post("/van/applications/:id/accept", requireAuth, async (req: Request, re
     if (!app) return res.status(404).json({ error: "Not found" });
 
     await notifyAdmins('Chat VAN - 申込受付', `申込みを受け付けました（ID: ${appId}）`);
+    void notifyCriticalEmail(
+      `application-received:${appId}`,
+      "Chat VAN - 新規申込受付",
+      `新しい申込を受け付けました。\n\n申込ID：${appId}\n利用者ID：${app.userId ?? "未登録"}\n受付日時：${new Date().toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}`,
+    );
     if (app.userId) {
       await notifyUser(
         app.userId,
@@ -1816,6 +1826,11 @@ router.patch("/van/invoices/:id/status", requireAuth, requireAdmin, async (req: 
       if (activated && invoice.user_id != null) {
         await notifyUser(Number(invoice.user_id), "Chat VAN - 入金確認完了",
           "ご入金を確認しました。車両のお引渡し手続きへ進みます。");
+        void notifyCriticalEmail(
+          `payment-completed:invoice:${invoice.id}`,
+          "Chat VAN - 請求書払いの入金を確認しました",
+          `請求書払いの入金を確認しました。\n\n請求書ID：${invoice.id}\n契約ID：${invoice.contract_id}`,
+        );
       }
     }
     return res.json({ ok: true, contractActivated: activated });
@@ -1850,6 +1865,11 @@ router.post("/van/contracts/:id/activate-invoice", requireAuth, requireAdmin, as
 
     await notifyUser(contract.userId, "Chat VAN - 入金確認完了",
       "ご入金を確認しました。車両のお引渡し手続きへ進みます。");
+    void notifyCriticalEmail(
+      `payment-completed:invoice-contract:${id}`,
+      "Chat VAN - 請求書払いの入金を確認しました",
+      `請求書払いの入金を確認しました。\n\n契約番号：${contract.contractNumber ?? `#${contract.id}`}\n契約ID：${id}`,
+    );
 
     return res.json({ ok: true, status: "active" });
   } catch (err) {
@@ -2257,6 +2277,11 @@ router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request
         SET status = 'pending_payment', updated_at = NOW()
         WHERE id = ${id} AND status = 'payment_processing'
       `);
+      void notifyCriticalEmail(
+        `payment-failed:initial:${id}:${initialPeriodMonth}`,
+        "Chat VAN - 初回決済に失敗しました",
+        `初回決済に失敗しました。\n\n契約番号：${contract.contractNumber ?? `#${contract.id}`}\n対象月：${initialPeriodMonth}\n金額：¥${totalAmount.toLocaleString()}\n理由：${errMsg}`,
+      );
       return res.status(502).json({ error: errMsg });
     }
 
@@ -2344,6 +2369,11 @@ router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request
 
     await notifyUser(contract.userId, "Chat VAN - 決済完了・ご利用開始",
       `カード決済が完了しました（¥${totalAmount.toLocaleString()}）。レンタル会社から受け取り案内が届きます。`);
+    void notifyCriticalEmail(
+      `payment-completed:initial:${id}:${initialPeriodMonth}`,
+      "Chat VAN - 初回決済が完了しました",
+      `初回決済が完了しました。\n\n契約番号：${contract.contractNumber ?? `#${contract.id}`}\n対象月：${initialPeriodMonth}\n金額：¥${totalAmount.toLocaleString()}`,
+    );
 
     // 協力会社へ通知（受け取り準備）
     if (contract.vehicleId) {
@@ -2407,6 +2437,11 @@ router.post("/van/payment-retries/:id/retry", requireAuth, requireAdmin, async (
           UPDATE payment_retries SET result = 'failed', failure_reason = ${errMsg}, attempted_at = NOW()
           WHERE id = ${id}
         `);
+        void notifyCriticalEmail(
+          `payment-failed:retry:${id}`,
+          "Chat VAN - 再決済に失敗しました",
+          `再決済に失敗しました。\n\n契約ID：${pr.contract_id}\n対象月：${pr.period_month ?? "不明"}\n金額：¥${amount.toLocaleString()}\n理由：${errMsg}`,
+        );
         return res.status(502).json({ error: errMsg });
       }
 
@@ -2427,6 +2462,11 @@ router.post("/van/payment-retries/:id/retry", requireAuth, requireAdmin, async (
           `契約番号 ${pr.contract_number ?? `#${pr.contract_id}`} の${pr.period_month ?? ''}分の月額料金（¥${amount.toLocaleString()}）の決済が完了しました。`,
         );
       }
+      void notifyCriticalEmail(
+        `payment-completed:retry-card:${id}`,
+        "Chat VAN - 再決済が完了しました",
+        `再決済が完了しました。\n\n契約ID：${pr.contract_id}\n対象月：${pr.period_month ?? "不明"}\n金額：¥${amount.toLocaleString()}`,
+      );
       return res.json({ ok: true, method: 'card' });
 
     } else {
@@ -2449,6 +2489,11 @@ router.post("/van/payment-retries/:id/retry", requireAuth, requireAdmin, async (
           `契約番号 ${pr.contract_number ?? `#${pr.contract_id}`} の${pr.period_month ?? ''}分のお支払い（¥${amount.toLocaleString()}）を確認しました。`,
         );
       }
+      void notifyCriticalEmail(
+        `payment-completed:manual:${id}`,
+        "Chat VAN - 手動入金を確認しました",
+        `手動入金を確認しました。\n\n契約ID：${pr.contract_id}\n対象月：${pr.period_month ?? "不明"}\n金額：¥${amount.toLocaleString()}`,
+      );
       return res.json({ ok: true, method: 'manual' });
     }
   } catch (err) {
@@ -2494,7 +2539,13 @@ router.post("/van/contracts/:id/additional-charge", requireAuth, requireAdmin, a
           INSUFFICIENT_FUNDS: "残高が不足しています",
           GENERIC_DECLINE: "カードが拒否されました",
         };
-        return res.status(502).json({ error: msgs[code] ?? "カード決済に失敗しました" });
+        const errorMessage = msgs[code] ?? "カード決済に失敗しました";
+        void notifyCriticalEmail(
+          `payment-failed:additional:${contractId}:${description}`,
+          "Chat VAN - 追加決済に失敗しました",
+          `追加決済に失敗しました。\n\n契約ID：${contractId}\n金額：¥${chargeAmount.toLocaleString()}\n内容：${description}\n理由：${errorMessage}`,
+        );
+        return res.status(502).json({ error: errorMessage });
       }
       // payment_retries に成功記録
       await db.execute(sql`
@@ -2512,6 +2563,11 @@ router.post("/van/contracts/:id/additional-charge", requireAuth, requireAdmin, a
           `契約番号 ${contract.contractNumber ?? `#${contract.id}`} の追加決済（¥${chargeAmount.toLocaleString()}）が完了しました。`,
         );
       }
+      void notifyCriticalEmail(
+        `payment-completed:additional:${contractId}:${description}`,
+        "Chat VAN - 追加決済が完了しました",
+        `追加決済が完了しました。\n\n契約番号：${contract.contractNumber ?? `#${contract.id}`}\n金額：¥${chargeAmount.toLocaleString()}\n内容：${description}`,
+      );
       return res.json({ ok: true, method: 'card' });
 
     } else {
@@ -2761,6 +2817,11 @@ router.post("/van/applications/:id/request-return", requireAuth, async (req: Req
     await notifyAdmins(
       "Chat VAN - 解約申請",
       `申込ID: ${appId} から解約申請が届きました。${reason ? `理由: ${reason}` : ""}`,
+    );
+    void notifyCriticalEmail(
+      `cancellation-requested:${appId}`,
+      "Chat VAN - 解約申請",
+      `解約申請が届きました。\n\n申込ID：${appId}\n利用者ID：${app.userId ?? "未登録"}${reason ? `\n理由：${reason}` : ""}`,
     );
 
     // 協力会社へ通知（解約申請）
@@ -3529,6 +3590,11 @@ router.post("/van/breakdowns", requireAuth, async (req: Request, res: Response) 
         // Notify admin
         await notifyAdmins('⚠️ Chat VAN - 故障報告',
           `故障が報告されました。症状: ${info.symptom}`);
+        void notifyCriticalEmail(
+          `breakdown:${breakdownId}`,
+          "Chat VAN - 故障報告",
+          `故障が報告されました。\n\n故障ID：${breakdownId}\n契約ID：${contractId ?? "未登録"}\n症状：${info.symptom ?? "不明"}\n場所：${info.location ?? "不明"}\n走行可否：${info.can_drive ? "可" : "不可"}`,
+        );
       } catch {}
     }
 
@@ -4335,6 +4401,11 @@ export function startMonthlyBillingScheduler() {
             }
             await notifyUser(contract.userId, "Chat VAN - 月額決済に失敗しました",
               `月額料金（¥${amount.toLocaleString()}）の決済に失敗しました。お支払い情報をご確認ください。`);
+            void notifyCriticalEmail(
+              `payment-failed:monthly:${contract.id}:${periodMonth}`,
+              "Chat VAN - 月額決済に失敗しました",
+              `月額決済に失敗しました。\n\n契約番号：${contract.contractNumber ?? `#${contract.id}`}\n対象月：${periodMonth}\n金額：¥${amount.toLocaleString()}`,
+            );
           } else {
             const squarePaymentId = data.payment?.id;
             if (!squarePaymentId) {
@@ -4366,12 +4437,22 @@ export function startMonthlyBillingScheduler() {
                 `契約番号 ${contract.contractNumber ?? `#${contract.id}`} の月額料金（¥${amount.toLocaleString()}）の決済が完了しました。`,
               );
             }
+            void notifyCriticalEmail(
+              `payment-completed:monthly:${contract.id}:${periodMonth}`,
+              "Chat VAN - 月額決済が完了しました",
+              `月額決済が完了しました。\n\n契約番号：${contract.contractNumber ?? `#${contract.id}`}\n対象月：${periodMonth}\n金額：¥${amount.toLocaleString()}`,
+            );
           }
         } else {
           // カード情報未登録 → 管理者通知
           console.warn(`[月額決済] カード情報なし contract=${contract.id}`);
           await notifyAdmins("Chat VAN - カード情報未登録の契約があります",
             `契約ID: ${contract.id} のユーザーがカード情報を登録していません。確認してください。`);
+          void notifyCriticalEmail(
+            `payment-failed:card-missing:${contract.id}:${periodMonth}`,
+            "Chat VAN - 月額決済を実行できません",
+            `カード情報が未登録のため、月額決済を実行できませんでした。\n\n契約番号：${contract.contractNumber ?? `#${contract.id}`}\n対象月：${periodMonth}\n金額：¥${amount.toLocaleString()}`,
+          );
         }
       } catch (e) {
         console.error(`[月額決済] カードエラー contract=${contract.id}:`, e);

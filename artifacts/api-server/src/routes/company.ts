@@ -6,7 +6,7 @@ import {
   vehiclesTable, vanContractsTable, usersTable,
   rentalCompaniesTable, notificationsTable, settlementsTable,
 } from "@workspace/db";
-import { notifyAdmins } from "../lib/notifyHelpers";
+import { notifyAdmins, notifyCriticalEmail } from "../lib/notifyHelpers";
 
 const router = Router();
 
@@ -370,6 +370,11 @@ router.post("/company/register", async (req: Request, res: Response) => {
 
     // 管理者通知
     await notifyAdmins("協力会社登録申請", `${companyName} から登録申請が届きました`);
+    void notifyCriticalEmail(
+      `company-registration:${company.id}`,
+      "Chat VAN - 協力会社登録申請",
+      `新しい協力会社の登録申請が届きました。\n\n会社名：${companyName}\n担当者：${contactName}\nメール：${normalizedEmail}\n会社ID：${company.id}`,
+    );
     return res.json({ ok: true, id: company.id });
   } catch (err) {
     if (err instanceof CompanyAccountEmailConflictError) {

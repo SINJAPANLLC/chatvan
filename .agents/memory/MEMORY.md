@@ -9,5 +9,6 @@
 - [Square payment history](square-payment-history.md) — Squareの過去決済は、対応するローカル案件がなければChat VAN契約へ表示しない。
 - [Finance as-of reporting](finance-as-of-reporting.md) — 管理用BS/CFは、対象時点の入金日・JST月境界・入金手段を明示して集計する。
 - [Admin notification delivery](admin-notification-delivery.md) — 管理者通知は全員へのアプリ内通知と個別メール結果を不可分にし、再送は試行単位で排他する。
+- [Critical owner notifications](critical-owner-notifications.md) — オーナー把握用メールは通常の管理者通知を置き換えず、重要イベントだけを追加送信する。
 - [Rental company account synchronization](rental-company-account-synchronization.md) — 会社プロフィールと代表ログインの同期範囲、メール正規化、招待担当者を守るルール。
 - [Contract incident reporting](contract-incident-reporting.md) — 事故報告は正式記録と契約チャットの両方を扱い、協力会社表示で送信者ロールに依存しない。

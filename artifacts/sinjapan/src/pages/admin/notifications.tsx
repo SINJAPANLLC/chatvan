@@ -321,6 +321,7 @@ type NotificationRule = {
   recipients: string[];
   email: boolean;
   inApp: 'always' | 'registered_recipient' | 'none';
+  criticalEmail: boolean;
 };
 
 const PREVIEW_DATA: Record<string, { badge?: string; name: string; subject: string; body: string; cta: string; accentColor?: string }> = {
@@ -484,12 +485,13 @@ function AutoSettings() {
               <th className="px-5 py-3 text-left font-medium text-muted-foreground">トリガー条件</th>
               <th className="px-5 py-3 text-left font-medium text-muted-foreground">送信先</th>
               <th className="px-5 py-3 text-center font-medium text-muted-foreground">メール</th>
+              <th className="px-5 py-3 text-center font-medium text-muted-foreground">重要メール</th>
               <th className="px-5 py-3 text-center font-medium text-muted-foreground">システム内通知</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border bg-card">
             {loading ? (
-              <tr><td colSpan={6} className="px-5 py-12 text-center text-muted-foreground"><Loader2 className="inline h-4 w-4 animate-spin mr-2" />通知仕様を読み込み中です</td></tr>
+              <tr><td colSpan={7} className="px-5 py-12 text-center text-muted-foreground"><Loader2 className="inline h-4 w-4 animate-spin mr-2" />通知仕様を読み込み中です</td></tr>
             ) : rules.map(r => (
               <tr key={r.key} className="hover:bg-muted/20 transition-colors">
                 <td className="px-5 py-3.5 text-xs text-muted-foreground whitespace-nowrap">{r.category}</td>
@@ -499,11 +501,12 @@ function AutoSettings() {
                 <td className="px-5 py-3.5 text-muted-foreground">{r.trigger}</td>
                 <td className="px-5 py-3.5 text-xs text-muted-foreground">{r.recipients.join('・')}</td>
                 <td className="px-5 py-3.5 text-center">{r.email ? <span className="inline-flex items-center gap-1 text-green-700"><Mail className="h-3.5 w-3.5" />送信</span> : <span className="text-muted-foreground">なし</span>}</td>
+                <td className="px-5 py-3.5 text-center">{r.criticalEmail ? <span className="inline-flex items-center gap-1 text-red-700 font-medium"><AlertTriangle className="h-3.5 w-3.5" />info宛</span> : <span className="text-muted-foreground">—</span>}</td>
                 <td className="px-5 py-3.5 text-center text-xs">{inAppLabel(r.inApp)}</td>
               </tr>
             ))}
             {!loading && rules.length === 0 && (
-              <tr><td colSpan={6} className="px-5 py-12 text-center text-muted-foreground">通知仕様を取得できませんでした</td></tr>
+              <tr><td colSpan={7} className="px-5 py-12 text-center text-muted-foreground">通知仕様を取得できませんでした</td></tr>
             )}
           </tbody>
         </table>

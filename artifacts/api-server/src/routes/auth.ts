@@ -7,6 +7,7 @@ import { LoginBody, RegisterBody } from "@workspace/api-zod";
 import { generateToken, setToken, deleteToken, getToken } from "../lib/tokenStore";
 import { requireAuth } from "../middlewares/auth";
 import { sendEmail, buildEmailHtml } from "../lib/email";
+import { notifyCriticalEmail } from "../lib/notifyHelpers";
 import { logUserActivity } from "../lib/userLogger";
 
 const router: IRouter = Router();
@@ -90,6 +91,11 @@ router.post("/auth/register", async (req, res): Promise<void> => {
       ctaText: 'Chat VANを使ってみる →',
     })
   ).catch(() => {});
+  void notifyCriticalEmail(
+    `account-registered:${user.id}`,
+    "Chat VAN - 新規会員登録",
+    `新しい会員が登録されました。\n\n氏名：${user.name ?? "未入力"}\nメール：${user.email}\n電話番号：${user.phone ?? "未登録"}\n登録日時：${new Date().toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}`,
+  );
 
   logUserActivity({ userId: user.id, userName: user.name, userEmail: user.email, action: "register", req }).catch(() => {});
   res.status(201).json({ user: formatUser(user), token });

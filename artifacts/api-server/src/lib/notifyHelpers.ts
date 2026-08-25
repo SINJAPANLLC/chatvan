@@ -211,6 +211,25 @@ export async function notifyExternalEmail(input: {
   }
 }
 
+/** オーナーが把握する重要イベントを、通常の管理者通知とは別に送る。 */
+export async function notifyCriticalEmail(
+  eventKey: string,
+  title: string,
+  message: string,
+): Promise<EmailDeliveryStatus | "duplicate" | "failed"> {
+  const email = process.env.CRITICAL_NOTIFICATION_EMAIL?.trim();
+  if (!email) {
+    logger.error({ eventKey, title }, "[CRITICAL NOTIFICATION] 重要通知先が未設定です");
+    return "failed";
+  }
+  return notifyExternalEmail({
+    email,
+    title,
+    message,
+    attemptKey: `chat-van:critical:${eventKey}`,
+  });
+}
+
 /**
  * 管理者全員へアプリ内通知を作成し、各メールの送信結果も同じ通知レコードに記録する。
  * 通知基盤の失敗で、申請・登録など本来の業務イベントを失敗させない。
