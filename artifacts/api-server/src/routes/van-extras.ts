@@ -2,7 +2,7 @@
  * Chat VAN — extra routes (screenings, audit logs, incidents, notifications)
  */
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, notificationsTable, usersTable } from "@workspace/db";
+import { db, notificationsTable, usersTable, vanIncidentsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { notifyAdmins } from "../lib/notifyHelpers";
@@ -108,14 +108,24 @@ router.post("/van/incidents", requireAuth, async (req: Request, res: Response) =
     if (!toRow(contractRows)) {
       return res.status(403).json({ error: "この契約の事故を登録する権限がありません" });
     }
-    const raw = await db.execute(sql`
-      INSERT INTO van_incidents (contract_id, user_id, type, description, location, occurred_at, has_injuries, police_contacted, can_drive, counterpart_info, user_comment, status)
-      VALUES (${contractId}, ${userId}, ${b.type ?? 'accident'}, ${b.description}, ${b.location}, ${b.occurred_at}, ${b.has_injuries ?? false}, ${b.police_contacted ?? false}, ${b.can_drive ?? false}, ${b.counterpart_info}, ${b.user_comment ?? b.description}, 'reported')
-      RETURNING *
-    `);
+    const incidentType = b.type === "breakdown" ? "breakdown" : b.type === "other" || b.type === "theft" ? "other" : "accident";
+    const [saved] = await db.insert(vanIncidentsTable).values({
+      contractId,
+      userId,
+      incidentType,
+      status: "報告受付",
+      description: b.description ?? b.user_comment ?? null,
+      location: b.location ?? null,
+      hasInjuries: b.has_injuries ?? null,
+      policeContacted: b.police_contacted ?? null,
+      canDrive: b.can_drive ?? null,
+      counterpartInfo: b.counterpart_info ?? null,
+      symptom: b.symptom ?? null,
+      photos: b.photos ? JSON.stringify(b.photos) : null,
+    }).returning();
 
     await notifyAdmins('🚨 Chat VAN - 事故報告', `事故が報告されました。場所: ${b.location ?? '不明'}`);
-    return res.status(201).json(toRow(raw));
+    return res.status(201).json(saved);
   } catch (err) {
     console.error("create incident error:", err);
     return res.status(500).json({ error: "Internal error" });

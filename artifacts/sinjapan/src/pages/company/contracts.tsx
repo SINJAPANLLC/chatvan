@@ -4,6 +4,7 @@ import {
   Loader2, ChevronLeft, FileText, Calendar, Phone, Mail, Filter,
   User, Car, ScrollText, AlertTriangle,
   ClipboardList, Truck, RotateCcw, MapPin, Shield, BadgeCheck,
+  RefreshCw,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO, isValid } from 'date-fns';
@@ -91,8 +92,8 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
     } finally { setRelLoading(false); }
   };
 
-  const loadIncidents = async () => {
-    if (incidents !== null || incLoading || !contractId) return;
+  const loadIncidents = async (force = false) => {
+    if ((!force && incidents !== null) || incLoading || !contractId) return;
     setIncLoading(true);
     try {
       const r = await fetch(API(`/company/contracts/${contractId}/incidents`), { headers: { Authorization: `Bearer ${tok()}` } });
@@ -102,7 +103,12 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
   };
 
   useEffect(() => { if (RELATED_TABS.includes(tab)) loadRelated(); }, [tab]);
-  useEffect(() => { if (tab === 'incident') loadIncidents(); }, [tab]);
+  useEffect(() => {
+    if (tab !== 'incident') return;
+    void loadIncidents();
+    const refreshId = window.setInterval(() => { void loadIncidents(true); }, 15_000);
+    return () => window.clearInterval(refreshId);
+  }, [tab]);
 
   const confirmPickup = async () => {
     if (!appId || !confirm('受取確認を行いますか？')) return;
@@ -523,6 +529,17 @@ function ContractDetail({ contract, onBack }: { contract: any; onBack: () => voi
       {/* ════ TAB: 事故・故障 ════ */}
       {tab === 'incident' && (
         <div className="space-y-4">
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => { void loadIncidents(true); }}
+              disabled={incLoading}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${incLoading ? 'animate-spin' : ''}`} />
+              更新
+            </button>
+          </div>
           {incLoading ? (
             <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-muted-foreground" /></div>
           ) : !incidents?.length ? (

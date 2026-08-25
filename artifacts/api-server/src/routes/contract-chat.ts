@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { db } from "@workspace/db";
+import { db, vanIncidentsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth";
 import { usersTable, notificationsTable } from "@workspace/db";
@@ -11,6 +11,50 @@ function toRows(raw: unknown): unknown[] {
 }
 function toRow(raw: unknown): unknown | null {
   return toRows(raw)[0] ?? null;
+}
+
+type IncidentType = "accident" | "breakdown" | "other";
+
+function reportField(message: string, label: string): string | null {
+  const line = message.split("\n").find(value => value.trim().startsWith(`▶ ${label}：`));
+  return line?.trim().slice(`▶ ${label}：`.length).trim() || null;
+}
+
+/**
+ * 契約チャットの定型報告を、表示用メッセージだけでなく契約に紐づく正式な事故記録にもする。
+ * 送信者や画面側の検索条件が変わっても、協力会社が契約単位で必ず確認できるようにする。
+ */
+function parseIncidentReport(message: string): {
+  incidentType: IncidentType;
+  location: string | null;
+  hasInjuries: boolean | null;
+  policeContacted: boolean | null;
+  canDrive: boolean | null;
+  counterpartInfo: string | null;
+  symptom: string | null;
+} | null {
+  const firstLine = message.split("\n")[0]?.trim();
+  const incidentType = firstLine === "【交通事故】"
+    ? "accident"
+    : firstLine === "【車両故障】"
+      ? "breakdown"
+      : firstLine === "【盗難・不正使用】" || firstLine === "【その他トラブル】"
+        ? "other"
+        : null;
+  if (!incidentType) return null;
+
+  const injured = reportField(message, "負傷者");
+  const police = reportField(message, "警察への連絡") ?? reportField(message, "警察への届出");
+  const drivable = reportField(message, "走行可能");
+  return {
+    incidentType,
+    location: reportField(message, "発生場所") ?? reportField(message, "現在地") ?? reportField(message, "最後に確認した場所"),
+    hasInjuries: injured ? injured === "あり" : null,
+    policeContacted: police ? police === "済み" : null,
+    canDrive: drivable ? drivable === "可能" : null,
+    counterpartInfo: reportField(message, "相手方情報（車種・ナンバー等）"),
+    symptom: reportField(message, "症状"),
+  };
 }
 
 // 契約へのアクセス権チェック
@@ -104,6 +148,22 @@ router.post("/contract-chat/:contractId", requireAuth, async (req: Request, res:
       RETURNING *
     `);
     const saved = toRow(raw);
+    const report = userRole === "user" ? parseIncidentReport(message.trim()) : null;
+    if (report) {
+      await db.insert(vanIncidentsTable).values({
+        contractId,
+        userId,
+        incidentType: report.incidentType,
+        status: "報告受付",
+        description: message.trim(),
+        location: report.location,
+        hasInjuries: report.hasInjuries,
+        policeContacted: report.policeContacted,
+        canDrive: report.canDrive,
+        counterpartInfo: report.counterpartInfo,
+        symptom: report.symptom,
+      });
+    }
 
     // 送信者情報
     const [sender] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, userId)).limit(1);

@@ -19,8 +19,10 @@ async function uploadPhoto(file: File): Promise<string> {
     headers: { ...hdrs(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ filename: file.name, contentType: file.type }),
   });
+  if (!r.ok) throw new Error('写真のアップロード準備に失敗しました');
   const { uploadURL, objectPath } = await r.json();
-  await fetch(uploadURL, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
+  const uploadResponse = await fetch(uploadURL, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
+  if (!uploadResponse.ok) throw new Error('写真をアップロードできませんでした');
   return objectPath as string;
 }
 
@@ -82,6 +84,7 @@ function ReportSheet({
   const [photos, setPhotos] = useState<{ file: File; preview: string; path?: string }[]>([]);
   const [uploading, setUploading] = useState(false);
   const [done, setDone] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const sendMessage = useSendContractMessage();
@@ -100,6 +103,7 @@ function ReportSheet({
   const handleSubmit = async () => {
     const required = fields.filter(f => f.required);
     if (required.some(f => !values[f.id]?.trim())) return alert('必須項目を入力してください');
+    setSubmitError('');
     setUploading(true);
     try {
       // 写真アップロード
@@ -125,10 +129,14 @@ function ReportSheet({
         { contractId, data: { message: lines.join('\n') } },
         {
           onSuccess: () => { setDone(true); setTimeout(() => { onSent(); onClose(); }, 1800); },
+          onError: () => {
+            setSubmitError('報告を送信できませんでした。通信状況を確認して、もう一度お試しください。');
+          },
         },
       );
-    } catch {
+    } catch (error) {
       setUploading(false);
+      setSubmitError(error instanceof Error ? error.message : '報告を送信できませんでした。もう一度お試しください。');
     }
   };
 
@@ -260,6 +268,11 @@ function ReportSheet({
 
         {/* 送信ボタン */}
         <div className="shrink-0 px-5 py-4 border-t border-border">
+          {submitError && (
+            <p role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700">
+              {submitError}
+            </p>
+          )}
           <button
             onClick={handleSubmit}
             disabled={sending}

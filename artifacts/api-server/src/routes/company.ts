@@ -520,20 +520,51 @@ router.get("/company/contracts/:id/incidents", requireAuth, requireRentalCompany
       LIMIT 1
     `);
     if (!toRow(contractCheck)) return res.json([]);
-    // 事故・故障系のチャットメッセージを抽出
+    // 正式な事故記録を優先し、移行前の定型チャット報告も漏れなく表示する。
+    // 同じ本文が正式記録として保存済みの場合は、チャット側を重複表示しない。
     const raw = await db.execute(sql`
-      SELECT cm.id, cm.message, cm.created_at, u.name as user_name
-      FROM contract_messages cm
-      LEFT JOIN users u ON cm.sender_id = u.id
-      WHERE cm.contract_id = ${contractId}
-        AND cm.sender_role = 'user'
-        AND (
-          cm.message LIKE '【交通事故】%'
-          OR cm.message LIKE '【車両故障】%'
-          OR cm.message LIKE '【盗難・不正使用】%'
-          OR cm.message LIKE '【その他トラブル】%'
-        )
-      ORDER BY cm.created_at DESC
+      WITH incident_records AS (
+        SELECT
+          'incident-' || vi.id AS id,
+          CASE
+            WHEN vi.description LIKE '【%' THEN vi.description
+            WHEN vi.incident_type::text = 'accident' THEN '【交通事故】' || E'\n' || COALESCE(vi.description, '')
+            WHEN vi.incident_type::text = 'breakdown' THEN '【車両故障】' || E'\n' || COALESCE(vi.description, '')
+            ELSE '【その他トラブル】' || E'\n' || COALESCE(vi.description, '')
+          END AS message,
+          vi.created_at,
+          u.name AS user_name
+        FROM van_incidents vi
+        LEFT JOIN users u ON vi.user_id = u.id
+        WHERE vi.contract_id = ${contractId}
+      ),
+      legacy_messages AS (
+        SELECT
+          'message-' || cm.id AS id,
+          cm.message,
+          cm.created_at,
+          u.name AS user_name
+        FROM contract_messages cm
+        LEFT JOIN users u ON cm.sender_id = u.id
+        WHERE cm.contract_id = ${contractId}
+          AND (
+            cm.message LIKE '【交通事故】%'
+            OR cm.message LIKE '【車両故障】%'
+            OR cm.message LIKE '【盗難・不正使用】%'
+            OR cm.message LIKE '【その他トラブル】%'
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM van_incidents vi
+            WHERE vi.contract_id = cm.contract_id
+              AND vi.user_id = cm.sender_id
+              AND vi.description = cm.message
+          )
+      )
+      SELECT * FROM incident_records
+      UNION ALL
+      SELECT * FROM legacy_messages
+      ORDER BY created_at DESC
     `);
     return res.json(toRows(raw));
   } catch (err) {
