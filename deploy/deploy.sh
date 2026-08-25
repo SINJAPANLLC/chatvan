@@ -17,6 +17,12 @@ mkdir -p /var/log/pm2
 # アップロード済みファイルはアプリ本体と分離して保持する。
 mkdir -p "${UPLOAD_DIR}"
 chmod 750 /var/lib/chatvan "${UPLOAD_DIR}"
+# 本番VPSではローカル永続ディスクを使う。既存環境で設定が抜けていても
+# 次回デプロイ時に自動補完し、Replit Object Storageへ誤って切り替わらないようにする。
+if ! grep -q '^LOCAL_UPLOAD_DIR=' .env.production 2>/dev/null; then
+  printf '\nLOCAL_UPLOAD_DIR=%s\n' "${UPLOAD_DIR}" >> .env.production
+  log "LOCAL_UPLOAD_DIR を ${UPLOAD_DIR} に補完"
+fi
 
 log "=== Chat VAN デプロイ開始 ==="
 

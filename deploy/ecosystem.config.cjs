@@ -33,6 +33,7 @@ module.exports = {
         NODE_ENV: "production",
         PORT: "4820",                          // ← 他アプリと絶対に重複しない専用ポート
         APP_BASE_URL: "https://chat-van.com",
+        LOCAL_UPLOAD_DIR: "/var/lib/chatvan/uploads",
       },
 
       // ログ
