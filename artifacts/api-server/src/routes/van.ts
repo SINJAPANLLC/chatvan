@@ -3094,6 +3094,15 @@ router.post("/van/applications/:id/identity-verification", requireAuth, async (r
 
     const b = req.body;
 
+    const emergencyContactFields = [
+      b.emergency_contact_name,
+      b.emergency_contact_phone,
+      b.emergency_contact_relation,
+    ];
+    if (emergencyContactFields.some(value => typeof value !== "string" || !value.trim())) {
+      return res.status(400).json({ error: "Emergency contact name, phone, and relation are required" });
+    }
+
     // Validate uploaded document paths are in the private objects namespace
     const pathsToCheck = [b.license_front, b.license_back, ...(b.selfie_photo ? [b.selfie_photo] : [])];
     if (!isValidObjectPath(b.license_front) || !isValidObjectPath(b.license_back)) {

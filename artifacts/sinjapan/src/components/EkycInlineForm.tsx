@@ -243,9 +243,36 @@ export default function EkycInlineForm({ applicationId, rejectionReason, onSubmi
   const [frontImage, setFrontImage] = useState<UploadedImage | null>(null);
   const [backImage, setBackImage] = useState<UploadedImage | null>(null);
   const [selfieImage, setSelfieImage] = useState<UploadedImage | null>(null);
+  const [emergencyName, setEmergencyName] = useState('');
+  const [emergencyPhone, setEmergencyPhone] = useState('');
+  const [emergencyRelation, setEmergencyRelation] = useState('');
 
   const inputCls = 'w-full px-3 py-2 border border-border rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-foreground';
   const labelCls = 'text-xs font-medium text-muted-foreground block mb-1';
+
+  useEffect(() => {
+    let active = true;
+    fetch(apiUrl(`/van/applications/${applicationId}/identity-verification?_=${Date.now()}`), {
+      credentials: 'include',
+      headers: { Authorization: `Bearer ${token()}` },
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!active || !data) return;
+        if (data.fullName) setFullName(data.fullName);
+        if (data.birthDate) setBirthDate(data.birthDate);
+        if (data.address) setAddress(data.address);
+        if (data.phone) setPhone(data.phone);
+        if (data.licenseType) setLicenseType(data.licenseType);
+        if (data.licenseNumber) setLicenseNumber(data.licenseNumber);
+        if (data.licenseExpiry) setLicenseExpiry(data.licenseExpiry);
+        if (data.emergencyContactName) setEmergencyName(data.emergencyContactName);
+        if (data.emergencyContactPhone) setEmergencyPhone(data.emergencyContactPhone);
+        if (data.emergencyContactRelation) setEmergencyRelation(data.emergencyContactRelation);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [applicationId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -263,6 +290,9 @@ export default function EkycInlineForm({ applicationId, rejectionReason, onSubmi
           full_name: fullName, birth_date: birthDate, address, phone,
           license_type: licenseType, license_number: licenseNumber, license_expiry: licenseExpiry,
           license_front: frontImage.path, license_back: backImage.path, selfie_photo: selfieImage.path,
+           emergency_contact_name: emergencyName,
+           emergency_contact_phone: emergencyPhone,
+           emergency_contact_relation: emergencyRelation,
         }),
       });
       if (!res.ok) throw new Error('送信失敗');
@@ -326,6 +356,39 @@ export default function EkycInlineForm({ applicationId, rejectionReason, onSubmi
           <div>
             <label className={labelCls}>有効期限 *</label>
             <input required type="date" value={licenseExpiry} onChange={e => setLicenseExpiry(e.target.value)} className={inputCls} />
+          </div>
+        </div>
+      </div>
+
+      {/* 緊急連絡先 */}
+      <div className="rounded-xl border border-border p-4 space-y-3">
+        <p className="text-sm font-semibold">緊急連絡先</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className={labelCls}>氏名 *</label>
+            <input
+              required value={emergencyName} onChange={e => setEmergencyName(e.target.value)}
+              className={inputCls} placeholder="山田 花子"
+            />
+          </div>
+          <div>
+            <label className={labelCls}>電話番号 *</label>
+            <input
+              required type="tel" value={emergencyPhone} onChange={e => setEmergencyPhone(e.target.value)}
+              className={inputCls} placeholder="090-0000-0000"
+            />
+          </div>
+          <div>
+            <label className={labelCls}>続柄 *</label>
+            <select
+              required value={emergencyRelation} onChange={e => setEmergencyRelation(e.target.value)}
+              className={inputCls}
+            >
+              <option value="">選択してください</option>
+              {['配偶者', '父', '母', '子', '兄弟', '姉妹', '祖父', '祖母', '友人', 'その他'].map(r => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
