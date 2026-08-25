@@ -1,0 +1,70 @@
+Last login: Wed Aug 26 03:27:54 on ttys000
+kazuyaotani@kazuya-MacBook-Air-2 ~ % ssh root@212.85.24.206
+root@212.85.24.206's password: 
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-124-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Tue Aug 25 18:38:18 UTC 2026
+
+  System load:  0.24                Processes:             161
+  Usage of /:   21.2% of 192.69GB   Users logged in:       0
+  Memory usage: 24%                 IPv4 address for eth0: 212.85.24.206
+  Swap usage:   0%                  IPv6 address for eth0: 2a02:4780:59:cc86::1
+
+ * Strictly confined Kubernetes makes edge and IoT secure. Learn how MicroK8s
+   just raised the bar for easy, resilient and secure K8s cluster deployment.
+
+   https://ubuntu.com/engage/secure-kubernetes-at-the-edge
+
+Expanded Security Maintenance for Applications is not enabled.
+
+28 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+23 additional security updates can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+1 updates could not be installed automatically. For more details,
+see /var/log/unattended-upgrades/unattended-upgrades.log
+
+*** System restart required ***
+Last login: Tue Aug 25 18:28:07 2026 from 126.116.55.23
+root@srv1087935:~# cd /var/www/chatvan
+
+if grep -q '^LOCAL_UPLOAD_DIR=' .env.production; then
+  sed -i 's|^LOCAL_UPLOAD_DIR=.*|LOCAL_UPLOAD_DIR=/var/lib/chatvan/uploads|' .env.production
+else
+  printf '\nLOCAL_UPLOAD_DIR=/var/lib/chatvan/uploads\n' >> .env.production
+fi
+
+install -d -m 750 /var/lib/chatvan/uploads
+
+pm2 restart chatvan-api --update-env
+[PM2] Applying action restartProcessId on app [chatvan-api](ids: [ 0 ])
+[PM2] [chatvan-api](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 5  │ aiagent            │ fork     │ 4    │ online    │ 0%       │ 152.1mb  │
+│ 15 │ chatlogi-api       │ fork     │ 4608 │ online    │ 0%       │ 155.5mb  │
+│ 0  │ chatvan-api        │ fork     │ 68   │ online    │ 0%       │ 18.6mb   │
+│ 4  │ keimatch           │ fork     │ 0    │ online    │ 0%       │ 305.6mb  │
+│ 13 │ keisaiyou          │ fork     │ 0    │ online    │ 7.7%     │ 291.0mb  │
+│ 3  │ menz-esthe-town    │ fork     │ 0    │ online    │ 0%       │ 143.0mb  │
+│ 12 │ onlyu              │ fork     │ 0    │ online    │ 7.7%     │ 123.3mb  │
+│ 8  │ sinjapan-crm-api   │ fork     │ 600… │ online    │ 0%       │ 84.9mb   │
+│ 1  │ sinjapan-manager   │ fork     │ 0    │ online    │ 0%       │ 59.1mb   │
+│ 2  │ sinjapan-onlinesc… │ fork     │ 0    │ online    │ 0%       │ 98.9mb   │
+│ 14 │ sinjapan-sales-api │ fork     │ 64   │ online    │ 0%       │ 299.5mb  │
+│ 6  │ sinjapanai         │ fork     │ 0    │ online    │ 0%       │ 104.6mb  │
+│ 7  │ sinjapanailive-api │ fork     │ 0    │ online    │ 0%       │ 99.9mb   │
+│ 10 │ sinjapanaisite-api │ fork     │ 0    │ online    │ 0%       │ 191.8mb  │
+│ 11 │ tiktokshindan      │ fork     │ 0    │ online    │ 0%       │ 106.4mb  │
+│ 9  │ tramatch           │ fork     │ 0    │ online    │ 0%       │ 718.1mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+host metrics | cpu: 4.3% | ram usage: 24.2% | lo: ⇓ 0.001mb/s ⇑ 0.001mb/s | eth0: ⇓ 0.027mb/s ⇑ 0.008mb/s |
+root@srv1087935:/var/www/chatvan# 
