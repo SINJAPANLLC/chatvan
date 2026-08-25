@@ -35,10 +35,28 @@ export async function sendEmail(
   }
 }
 
+export type EmailBrand = "chatvan" | "chatlogi";
+
+const EMAIL_BRAND_NAME: Record<EmailBrand, string> = {
+  chatvan: "Chat VAN",
+  chatlogi: "Chat LOGI",
+};
+
+export function getEmailBrandName(brand: EmailBrand = "chatvan"): string {
+  return EMAIL_BRAND_NAME[brand];
+}
+
+export function brandedEmailSubject(subject: string, brand: EmailBrand = "chatvan"): string {
+  const plainSubject = subject.replace(/^【(?:Chat VAN|Chat LOGI)】\s*/, "");
+  return `【${getEmailBrandName(brand)}】${plainSubject}`;
+}
+
 export interface EmailOptions {
   subject: string;
   body: string;
   recipientName?: string;
+  /** メールに表示するサービスブランド。省略時はChat VAN */
+  brand?: EmailBrand;
   /** ステータスバッジ（例: "配車確定"） */
   statusBadge?: string;
   /** 案件IDへのリンク */
@@ -98,12 +116,12 @@ export function buildSalesEmailHtml(opts: SalesEmailOptions): string {
 
         <!-- ヘッダー -->
         <tr><td style="background:#000;padding:22px 28px;border-radius:12px 12px 0 0">
-          <span style="color:#fff;font-size:18px;font-weight:800;letter-spacing:1px">Chat LOGI</span>
+          <span style="color:#fff;font-size:18px;font-weight:800;letter-spacing:1px">Chat VAN</span>
         </td></tr>
 
         <!-- ヒーロー -->
         <tr><td style="background:#111;padding:28px 28px 22px">
-          <p style="margin:0;font-size:20px;font-weight:800;color:#fff;line-height:1.4">${esc(subject.replace(/【Chat LOGI】\s*/g, ""))}</p>
+           <p style="margin:0;font-size:20px;font-weight:800;color:#fff;line-height:1.4">${esc(subject.replace(/^【(?:Chat VAN|Chat LOGI)】\s*/, ""))}</p>
         </td></tr>
 
         <!-- ボディ -->
@@ -114,7 +132,7 @@ export function buildSalesEmailHtml(opts: SalesEmailOptions): string {
 
         <!-- サービス特長 -->
         <tr><td style="background:#f7f7f7;padding:20px 28px;border-top:1px solid #eee;border-bottom:1px solid #eee">
-          <p style="margin:0 0 14px;font-size:11px;font-weight:700;color:#999;letter-spacing:1px">Chat LOGI の特長</p>
+          <p style="margin:0 0 14px;font-size:11px;font-weight:700;color:#999;letter-spacing:1px">Chat VAN の特長</p>
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
             <tr>
               <td style="padding-right:10px;vertical-align:top;width:33%">
@@ -123,7 +141,7 @@ export function buildSalesEmailHtml(opts: SalesEmailOptions): string {
               </td>
               <td style="padding:0 5px;vertical-align:top;width:33%">
                 <p style="margin:0 0 3px;font-size:12px;font-weight:700;color:#111">プロが手配</p>
-                <p style="margin:0;font-size:11px;color:#666;line-height:1.6">Chat LOGIが全て手配します。</p>
+                <p style="margin:0;font-size:11px;color:#666;line-height:1.6">Chat VANが全て手配します。</p>
               </td>
               <td style="padding-left:10px;vertical-align:top;width:33%">
                 <p style="margin:0 0 3px;font-size:12px;font-weight:700;color:#111">状況を確認</p>
@@ -144,8 +162,8 @@ export function buildSalesEmailHtml(opts: SalesEmailOptions): string {
 
         <!-- フッター -->
         <tr><td style="background:#f7f7f7;padding:16px 28px;border-radius:0 0 12px 12px;border-top:1px solid #ebebeb">
-          <p style="margin:0 0 4px;font-size:10px;color:#bbb">このメールは Chat LOGI 営業チームより送信しています。</p>
-          <p style="margin:0;font-size:10px;color:#bbb">配信停止をご希望の場合はこのメールに返信ください。© ${new Date().getFullYear()} Chat LOGI</p>
+          <p style="margin:0 0 4px;font-size:10px;color:#bbb">このメールは Chat VAN 営業チームより送信しています。</p>
+          <p style="margin:0;font-size:10px;color:#bbb">配信停止をご希望の場合はこのメールに返信ください。© ${new Date().getFullYear()} Chat VAN</p>
         </td></tr>
 
       </table>
@@ -158,21 +176,25 @@ export function buildSalesEmailHtml(opts: SalesEmailOptions): string {
 export function buildEmailHtml(opts: EmailOptions | string, bodyArg?: string, recipientNameArg?: string): string {
   // 後方互換：buildEmailHtml(subject, body, name) の形式もサポート
   let subject: string, body: string, recipientName: string | undefined,
+      brand: EmailBrand,
       statusBadge: string | undefined, shipmentId: number | undefined, ctaText: string | undefined;
 
   if (typeof opts === "string") {
     subject = opts;
     body = bodyArg ?? "";
     recipientName = recipientNameArg;
+    brand = "chatvan";
   } else {
     subject = opts.subject;
     body = opts.body;
     recipientName = opts.recipientName;
+    brand = opts.brand ?? "chatvan";
     statusBadge = opts.statusBadge;
     shipmentId = opts.shipmentId;
     ctaText = opts.ctaText;
   }
 
+  const brandName = getEmailBrandName(brand);
   const greeting = recipientName ? `${recipientName} 様` : "お客様";
   const badgeColor = statusBadge ? (BADGE_COLOR[statusBadge] ?? "#1a1a1a") : null;
   const baseUrl = process.env.APP_BASE_URL ?? "https://chat-van.com";
@@ -195,7 +217,7 @@ export function buildEmailHtml(opts: EmailOptions | string, bodyArg?: string, re
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
             <tr>
               <td>
-                <span style="color:#ffffff;font-size:20px;font-weight:800;letter-spacing:1px">Chat LOGI</span>
+                <span style="color:#ffffff;font-size:20px;font-weight:800;letter-spacing:1px">${brandName}</span>
               </td>
               ${statusBadge ? `
               <td align="right">
@@ -229,7 +251,7 @@ export function buildEmailHtml(opts: EmailOptions | string, bodyArg?: string, re
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
             <tr>
               <td style="font-size:12px;color:#aaa;line-height:1.7">
-                <p style="margin:0 0 4px">このメールは <strong>Chat LOGI</strong> から自動送信されています。</p>
+                 <p style="margin:0 0 4px">このメールは <strong>${brandName}</strong> から自動送信されています。</p>
                 <p style="margin:0">心当たりのない場合や、ご不明な点は担当者までお問い合わせください。</p>
               </td>
             </tr>
@@ -240,7 +262,7 @@ export function buildEmailHtml(opts: EmailOptions | string, bodyArg?: string, re
         <tr><td style="background:#f7f7f7;padding:20px 40px;border-radius:0 0 12px 12px;border-top:1px solid #ebebeb">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
             <tr>
-              <td style="font-size:11px;color:#bbb">© ${new Date().getFullYear()} Chat LOGI</td>
+              <td style="font-size:11px;color:#bbb">© ${new Date().getFullYear()} ${brandName}</td>
               <td align="right" style="font-size:11px">
                 <a href="${baseUrl}" style="color:#bbb;text-decoration:none">マイページ</a>
               </td>

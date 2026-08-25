@@ -3,11 +3,11 @@
  */
 import { db, emailSendLogsTable, notificationsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
-import { sendEmail, buildEmailHtml } from "./email";
+import { sendEmail, buildEmailHtml, brandedEmailSubject, type EmailBrand } from "./email";
 import { logger } from "./logger";
 
 type EmailDeliveryStatus = "sent" | "failed" | "skipped";
-type NotificationOptions = { dedupeKey?: string };
+type NotificationOptions = { dedupeKey?: string; brand?: EmailBrand };
 
 export type AdminNotificationSummary = {
   adminCount: number;
@@ -33,6 +33,7 @@ async function deliverToAccount(input: {
   title: string;
   message: string;
   dedupeKey?: string;
+  brand?: EmailBrand;
 }): Promise<EmailDeliveryStatus | "duplicate" | "failed"> {
   try {
     const email = input.email?.trim() ?? "";
@@ -62,8 +63,8 @@ async function deliverToAccount(input: {
 
     const result = await sendEmail(
       email,
-      `【Chat VAN】${input.title.replace(/^【Chat VAN】\s*/, "")}`,
-      buildEmailHtml({ subject: input.title, body: input.message, recipientName: input.name ?? undefined }),
+      brandedEmailSubject(input.title, input.brand),
+      buildEmailHtml({ subject: input.title, body: input.message, recipientName: input.name ?? undefined, brand: input.brand }),
     );
     const status = toDeliveryStatus(result);
     await db.update(notificationsTable).set({
@@ -84,7 +85,15 @@ export async function notifyUser(userId: number, title: string, message: string,
   const raw = await db.execute(sql`SELECT email, name FROM users WHERE id = ${userId} LIMIT 1`);
   const u = toRows(raw)[0];
   if (!u) return "failed" as const;
-  return deliverToAccount({ userId, email: u.email, name: u.name, title, message, dedupeKey: options.dedupeKey });
+  return deliverToAccount({
+    userId,
+    email: u.email,
+    name: u.name,
+    title,
+    message,
+    dedupeKey: options.dedupeKey,
+    brand: options.brand,
+  });
 }
 
 /** メールを伴わないアプリ内通知。問い合わせのゲスト宛メールなどと併用する。 */
@@ -117,6 +126,7 @@ export async function notifyExternalEmail(input: {
   message: string;
   attemptKey?: string;
   companyName?: string | null;
+  brand?: EmailBrand;
 }): Promise<EmailDeliveryStatus | "duplicate" | "failed"> {
   const email = input.email.trim();
   if (!email) return "skipped";
@@ -127,7 +137,7 @@ export async function notifyExternalEmail(input: {
       attemptKey: input.attemptKey ?? null,
       email,
       companyName: input.companyName ?? null,
-      subject: `【Chat VAN】${input.title.replace(/^【Chat VAN】\s*/, "")}`,
+      subject: brandedEmailSubject(input.title, input.brand),
       bodyText: input.message,
       sent: false,
       reason: "送信中",
@@ -181,7 +191,12 @@ export async function notifyExternalEmail(input: {
       result = await sendEmail(
         email,
         values.subject,
-        buildEmailHtml({ subject: input.title, body: input.message, recipientName: input.recipientName ?? undefined }),
+        buildEmailHtml({
+          subject: input.title,
+          body: input.message,
+          recipientName: input.recipientName ?? undefined,
+          brand: input.brand,
+        }),
       );
     } catch (error: any) {
       const reason = error?.message ?? "メール送信処理中にエラーが発生しました";
@@ -234,7 +249,11 @@ export async function notifyCriticalEmail(
  * 管理者全員へアプリ内通知を作成し、各メールの送信結果も同じ通知レコードに記録する。
  * 通知基盤の失敗で、申請・登録など本来の業務イベントを失敗させない。
  */
-export async function notifyAdmins(title: string, message: string): Promise<AdminNotificationSummary> {
+export async function notifyAdmins(
+  title: string,
+  message: string,
+  options: NotificationOptions = {},
+): Promise<AdminNotificationSummary> {
   const summary: AdminNotificationSummary = {
     adminCount: 0,
     created: 0,
@@ -284,8 +303,13 @@ export async function notifyAdmins(title: string, message: string): Promise<Admi
 
       let result: { sent: boolean; reason?: string };
       try {
-        const html = buildEmailHtml({ subject: title, body: message, recipientName: admin.name ?? undefined });
-        result = await sendEmail(email, `【Chat VAN】${title}`, html);
+        const html = buildEmailHtml({
+          subject: title,
+          body: message,
+          recipientName: admin.name ?? undefined,
+          brand: options.brand,
+        });
+        result = await sendEmail(email, brandedEmailSubject(title, options.brand), html);
       } catch (error: any) {
         result = { sent: false, reason: error?.message ?? "メール送信に失敗しました" };
       }

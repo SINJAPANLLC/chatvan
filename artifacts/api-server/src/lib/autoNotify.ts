@@ -88,6 +88,7 @@ export async function sendAutoNotification(payload: AutoNotifyPayload): Promise<
         subject,
         body,
         recipientName: user.name ?? undefined,
+        brand: "chatlogi",
         statusBadge: status,
         shipmentId,
         ctaText: rule.cta,
@@ -106,7 +107,7 @@ export async function sendAutoNotification(payload: AutoNotifyPayload): Promise<
   await notifyAdmins(`Chat LOGI - ${status}`, [
     `案件 #${shipmentId} のステータスが「${status}」に更新されました。`,
     route ? `ルート：${route}` : "",
-  ].filter(Boolean).join("\n"));
+  ].filter(Boolean).join("\n"), { brand: "chatlogi" });
 }
 
 /** 管理者通知だけを送る必要がある、ユーザー不明の配送ステータス更新用。 */
@@ -118,5 +119,5 @@ export async function notifyShipmentStatusToAdmins(input: {
   await notifyAdmins(`Chat LOGI - ${input.status}`, [
     `案件 #${input.shipmentId} のステータスが「${input.status}」に更新されました。`,
     input.route ? `ルート：${input.route}` : "",
-  ].filter(Boolean).join("\n"));
+  ].filter(Boolean).join("\n"), { brand: "chatlogi" });
 }
