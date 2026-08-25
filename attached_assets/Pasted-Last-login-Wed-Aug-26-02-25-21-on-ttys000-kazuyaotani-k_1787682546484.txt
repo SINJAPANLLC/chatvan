@@ -1,0 +1,62 @@
+Last login: Wed Aug 26 02:25:21 on ttys000
+kazuyaotani@kazuya-MacBook-Air-2 ~ % ssh root@212.85.24.206
+root@212.85.24.206's password: 
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-124-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Tue Aug 25 18:28:07 UTC 2026
+
+  System load:  0.36                Processes:             165
+  Usage of /:   21.2% of 192.69GB   Users logged in:       0
+  Memory usage: 24%                 IPv4 address for eth0: 212.85.24.206
+  Swap usage:   0%                  IPv6 address for eth0: 2a02:4780:59:cc86::1
+
+ * Strictly confined Kubernetes makes edge and IoT secure. Learn how MicroK8s
+   just raised the bar for easy, resilient and secure K8s cluster deployment.
+
+   https://ubuntu.com/engage/secure-kubernetes-at-the-edge
+
+Expanded Security Maintenance for Applications is not enabled.
+
+28 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+23 additional security updates can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+1 updates could not be installed automatically. For more details,
+see /var/log/unattended-upgrades/unattended-upgrades.log
+
+*** System restart required ***
+Last login: Tue Aug 25 18:26:39 2026 from 126.116.55.23
+root@srv1087935:~# cd /var/www/chatvan
+nano .env.production
+
+  GNU nano 7.2                     .env.production                              
+
+NEON_DATABASE_URL=postgresql://neondb_owner:npg_BwSUET14nbrI@ep-blue-hill-aymdo>
+
+SESSION_SECRET=j23IVOuBQN+wNEZHIq0bzFLEeUf/WhIdl0pzpIdview+vZ5cqQc3dfG03iy+0QSg>
+
+OPENAI_API_KEY=sk-proj-P2IjEQaKB80Fh9be6d-tth_5-E34kZ4ZPuBjLzXxEPgmxe2TbLKA8rGP>
+
+SQUARE_ACCESS_TOKEN=EAAAl7CV9GwaMFkccRVO1Xlm1LVHgoIk2lV7PJ_YPXvrC5qo_5Z83FfV7KG>
+SQUARE_ENVIRONMENT=production
+SQUARE_APPLICATION_ID=sq0idp-QftsA0A14JN6dHkikeGt3A
+SQUARE_LOCATION_ID=LD95R63AEZZRH
+
+SMTP_HOST=smtp.hostinger.com
+SMTP_PORT=465
+SMTP_USER=info@chat-van.com
+SMTP_PASS=@Kazuya8008
+SMTP_FROM=Chat VAN <noreply@chat-van.com>
+LINE_CHANNEL_SECRET=e57c4b8ad27fa329a8794229ebba8f39
+LINE_CHANNEL_ACCESS_TOKEN=4LSiWy0CPD8xXG962JS4uDm2MT2HlzzJw8gkctVjVJbm5bwm2HBA9>
+
+
+^G Help      ^O Write Out ^W Where Is  ^K Cut       ^T Execute   ^C Location
+^X Exit      ^R Read File ^\ Replace   ^U Paste     ^J Justify   ^/ Go To Line
