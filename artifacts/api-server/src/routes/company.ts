@@ -25,15 +25,22 @@ async function getMyCompanyId(userId: number): Promise<number | null> {
   const raw = await db.execute(sql`SELECT rental_company_id, email FROM users WHERE id = ${userId}`);
   const user = toRow(raw) as any;
   if (!user) return null;
-  if (user.rental_company_id) return user.rental_company_id;
+  if (user.rental_company_id) return Number(user.rental_company_id);
 
-  // フォールバック: メールが一致する rental_companies を探して自動修正
+  // フォールバック: 正規化したメールが一社だけ一致する場合のみ自動修正する。
+  // 同じメールを複数社が使っている曖昧なデータは、勝手に紐付けない。
   if (user.email) {
-    const rcRaw = await db.execute(sql`SELECT id FROM rental_companies WHERE email = ${user.email} LIMIT 1`);
-    const rc = toRow(rcRaw) as any;
-    if (rc?.id) {
-      await db.execute(sql`UPDATE users SET rental_company_id = ${rc.id} WHERE id = ${userId}`);
-      return rc.id;
+    const rcRaw = await db.execute(sql`
+      SELECT id
+      FROM rental_companies
+      WHERE LOWER(BTRIM(email)) = LOWER(BTRIM(${user.email}))
+      ORDER BY id
+      LIMIT 2
+    `);
+    const matchingCompanies = toRows(rcRaw) as any[];
+    if (matchingCompanies.length === 1 && matchingCompanies[0]?.id) {
+      await db.execute(sql`UPDATE users SET rental_company_id = ${matchingCompanies[0].id} WHERE id = ${userId}`);
+      return Number(matchingCompanies[0].id);
     }
   }
   return null;
@@ -43,6 +50,8 @@ async function getMyCompanyId(userId: number): Promise<number | null> {
 router.get("/company/me", requireAuth, requireRentalCompany, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
+    const companyId = await getMyCompanyId(userId);
+    if (!companyId) return res.status(403).json({ error: "会社が紐付けられていません" });
     const raw = await db.execute(sql`
       SELECT u.id, u.email, u.name, u.company_name AS user_company_name, u.phone, u.role, u.rental_company_id,
         rc.name as company_name, rc.corporate_name, rc.contact_name, rc.phone as company_phone,
@@ -50,7 +59,7 @@ router.get("/company/me", requireAuth, requireRentalCompany, async (req: Request
         rc.fleet_size, rc.status, rc.business_hours, rc.bank_information, rc.payment_info
       FROM users u
       LEFT JOIN rental_companies rc ON rc.id = u.rental_company_id
-      WHERE u.id = ${userId}
+      WHERE u.id = ${userId} AND rc.id = ${companyId}
     `);
     const user = toRow(raw);
     if (!user) return res.status(404).json({ error: "Not found" });

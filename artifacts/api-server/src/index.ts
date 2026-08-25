@@ -418,6 +418,28 @@ async function runMigrations() {
     logger.warn({ err: e.message }, "rental_company migration (non-fatal)");
   }
 
+  // 既存の協力会社ユーザーは、メールが一社だけ一致する場合に限って会社IDを補完する。
+  // 複数社に一致する曖昧なメールは自動変更せず、管理者の確認対象として残す。
+  try {
+    await db.execute(sql`
+      UPDATE users u
+      SET rental_company_id = rc.id
+      FROM rental_companies rc
+      WHERE u.rental_company_id IS NULL
+        AND u.role = 'rental_company'
+        AND u.email IS NOT NULL
+        AND LOWER(BTRIM(rc.email)) = LOWER(BTRIM(u.email))
+        AND (
+          SELECT COUNT(*)
+          FROM rental_companies rc2
+          WHERE LOWER(BTRIM(rc2.email)) = LOWER(BTRIM(u.email))
+        ) = 1
+    `);
+    logger.info("migration: existing rental company links backfilled");
+  } catch (e: any) {
+    logger.warn({ err: e.message }, "rental company link backfill (non-fatal)");
+  }
+
   // 車両 — 絶対必要な追加フィールド
   try {
     await db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS inspection_certificate_owner TEXT`);
