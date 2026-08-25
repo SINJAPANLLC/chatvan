@@ -43,7 +43,7 @@ const ListShipmentsQueryParams = z.object({
   limit: z.coerce.number().optional(),
 });
 import { requireAuth, requireAdmin } from "../middlewares/auth";
-import { authorizeOnFile } from "../lib/square-authorize";
+import { chargeOnFileBeforePickup } from "../lib/square-authorize";
 import { sendAutoNotification, notifyShipmentStatusToAdmins } from "../lib/autoNotify";
 import { notifyAdmins } from "../lib/notifyHelpers";
 import { calcPriceWithConfig, parsePricingConfig, DEFAULT_CONFIG } from "../lib/pricing";
@@ -288,6 +288,26 @@ router.patch("/shipments/:id/status", requireAuth, async (req, res): Promise<voi
     return;
   }
 
+  const [current] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, id)).limit(1);
+  if (!current) { res.status(404).json({ error: "案件が見つかりません" }); return; }
+
+  // 配車確定以降は集荷・受け取りライフサイクルに入る。任意のステータス文字列を
+  // 受け取れる旧APIでは途中の「配車確定」を飛ばせるため、集荷・配送・納品を含む
+  // 全ての後続状態でカード決済済みを必須にする。請求書払いは既存の与信・請求書
+  // フローで管理されるため、このカード決済APIから請求しない。
+  const pickupLifecycleStatuses = new Set(["配車確定", "集荷完了", "配送中", "納品完了"]);
+  if (
+    pickupLifecycleStatuses.has(parsed.data.status)
+    && current.paymentMethod !== "invoice"
+    && current.squareCaptured !== "true"
+  ) {
+    const payment = await chargeOnFileBeforePickup(id);
+    if ("error" in payment) {
+      res.status(402).json({ error: `受け取り前のカード決済に失敗しました: ${payment.error}` });
+      return;
+    }
+  }
+
   const [shipment] = await db
     .update(shipmentsTable)
     .set({ status: parsed.data.status as any, updatedAt: new Date() })
@@ -298,15 +318,10 @@ router.patch("/shipments/:id/status", requireAuth, async (req, res): Promise<voi
     .returning();
 
   if (!shipment) {
-    const [current] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, id)).limit(1);
-    if (!current) { res.status(404).json({ error: "案件が見つかりません" }); return; }
-    res.json(formatShipment(current));
+    const [latest] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, id)).limit(1);
+    if (!latest) { res.status(404).json({ error: "案件が見つかりません" }); return; }
+    res.json(formatShipment(latest));
     return;
-  }
-
-  // 配車確定になったら登録済みカードで自動オーソリ
-  if (parsed.data.status === '配車確定' && !shipment.squarePaymentId) {
-    authorizeOnFile(id).catch(() => {});
   }
 
   // 自動通知（非同期・失敗しても案件更新は成功扱い）

@@ -287,7 +287,8 @@ async function runAIScreening(appId: number) {
 
     // 審査結果は申込ステータスだけでなく、管理画面の履歴としても残す。
     // 同一トランザクションにして、片方だけ更新される状態を防ぐ。
-    if (!app.userId) throw new Error("AI審査対象の利用者情報がありません");
+    const screeningUserId = app.userId;
+    if (!screeningUserId) throw new Error("AI審査対象の利用者情報がありません");
     await db.transaction(async (tx) => {
       const [updatedApplication] = await tx.update(vanApplicationsTable).set({
         status: result,
@@ -300,7 +301,7 @@ async function runAIScreening(appId: number) {
 
       await tx.insert(screeningsTable).values({
         applicationId: appId,
-        userId: app.userId,
+        userId: screeningUserId,
         result,
         reason: reason || null,
         notes: "AI自動審査",
@@ -2177,6 +2178,10 @@ router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request
     const existingInitialRow = ((existingInitial as any)?.rows ?? existingInitial ?? [])[0];
     if (existingInitialRow) {
       await db.execute(sql`UPDATE van_contracts SET status = 'active', payment_method = 'card', updated_at = NOW() WHERE id = ${id}`);
+      if (contract.applicationId) {
+        await db.update(vanApplicationsTable).set({ status: "delivery_pending", updatedAt: new Date() })
+          .where(eq(vanApplicationsTable.id, contract.applicationId));
+      }
       return res.json({ ok: true, alreadyPaid: true, paymentId: existingInitialRow.square_payment_id });
     }
     const monthlyBase = Number(contract.monthlyPrice) + Number(contract.sinJapanFee ?? 0);
@@ -2242,8 +2247,6 @@ router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request
             await db.update(vanApplicationsTable).set({ status: "delivery_pending", updatedAt: new Date() })
               .where(eq(vanApplicationsTable.id, contract.applicationId));
           }
-          await db.update(vehiclesTable).set({ status: "rented", updatedAt: new Date() })
-            .where(eq(vehiclesTable.id, contract.vehicleId));
           return res.json({ ok: true, recovered: true, paymentId: recoveredPayment.id });
         }
       } catch (error) {
@@ -2301,15 +2304,15 @@ router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request
       RETURNING id
     `);
     const initialLedgerInserted = ((initialLedgerInsert as any)?.rows ?? initialLedgerInsert ?? []).length > 0;
-    // 決済成功 → contract/application/vehicle をアクティブに
+    // 決済成功 → 契約を有効化し受け取り待ちへ。車両は物理的な受け取り確認まで
+    // 貸出中にしない。
     await db.execute(sql`UPDATE van_contracts SET status = 'active', payment_method = 'card', updated_at = NOW() WHERE id = ${id}`);
-    if (!initialLedgerInserted) {
-      return res.json({ ok: true, alreadyPaid: true, paymentId: data.payment?.id ?? null });
-    }
     if (contract.applicationId) {
       await db.update(vanApplicationsTable).set({ status: "delivery_pending", updatedAt: new Date() }).where(eq(vanApplicationsTable.id, contract.applicationId));
     }
-    await db.update(vehiclesTable).set({ status: "rented", updatedAt: new Date() }).where(eq(vehiclesTable.id, contract.vehicleId));
+    if (!initialLedgerInserted) {
+      return res.json({ ok: true, alreadyPaid: true, paymentId: data.payment?.id ?? null });
+    }
 
     // カード情報 + Square Customer/Card on file を保存
     const card = data.payment?.card_details?.card;
@@ -2367,7 +2370,7 @@ router.post("/van/contracts/:id/square-charge", requireAuth, async (req: Request
       `);
     }
 
-    await notifyUser(contract.userId, "Chat VAN - 決済完了・ご利用開始",
+    await notifyUser(contract.userId, "Chat VAN - 初回決済完了・受け取りのご案内",
       `カード決済が完了しました（¥${totalAmount.toLocaleString()}）。レンタル会社から受け取り案内が届きます。`);
     void notifyCriticalEmail(
       `payment-completed:initial:${id}:${initialPeriodMonth}`,
@@ -2719,6 +2722,31 @@ router.post("/van/applications/:id/confirm-pickup", requireAuth, async (req: Req
     // company-owned contract/vehicle rather than an arbitrary application row.
     const contract = authz.value.contract;
     if (app.status !== "delivery_pending") return res.status(400).json({ error: "受け取り確認は delivery_pending 状態のみ可能です" });
+    if (!contract || contract.status !== "active") {
+      return res.status(409).json({ error: "初回決済または入金確認が完了していないため、受け取り確認はできません" });
+    }
+    if (!["card", "invoice"].includes(contract.paymentMethod ?? "")) {
+      return res.status(409).json({ error: "支払方法が確定していないため、受け取り確認はできません" });
+    }
+    if (contract.paymentMethod === "card") {
+      const startDate = parseCalendarDate(contract.startDate);
+      if (!startDate) {
+        return res.status(409).json({ error: "契約開始日が未設定のため、初回決済を確認できません" });
+      }
+      const initialPayment = await db.execute(sql`
+        SELECT id
+        FROM payment_retries
+        WHERE contract_id = ${contract.id}
+          AND period_month = ${startDate.slice(0, 7)}
+          AND failure_reason = '[初回決済]'
+          AND result = 'success'
+          AND square_payment_id IS NOT NULL
+        LIMIT 1
+      `);
+      if (((initialPayment as any)?.rows ?? initialPayment ?? []).length === 0) {
+        return res.status(409).json({ error: "初回カード決済が完了していないため、受け取り確認はできません" });
+      }
+    }
 
     await db.update(vanApplicationsTable)
       .set({ status: "active", updatedAt: new Date() })

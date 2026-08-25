@@ -166,17 +166,17 @@ export function isInvoiceRequested(requested: unknown): boolean {
  *
  * This mirrors the end-state reached by the verified Square card-success path
  * (POST /van/contracts/:id/square-charge): contract → active (payment_method
- * 'invoice'), application → delivery_pending, vehicle → rented. It is the ONLY
- * place invoice contracts become active, so the card and invoice lifecycles
- * converge on the same, consistent end-state.
+ * 'invoice'), application → delivery_pending. Vehicle state stays unchanged
+ * until the physical handover is confirmed, so settlement never marks a vehicle
+ * as already handed over.
  *
  * Guarantees:
  *   - It ONLY promotes a contract that is currently in `payment_processing`
  *     (the state a valid invoice customer reaches after POST .../pay). It never
  *     activates from `pending_payment` — that would bypass admin invoice
  *     issuance / payment confirmation — nor re-activates an already-active one.
- *   - All three writes (contract / application / vehicle) happen atomically in a
- *     single transaction, so partial activation cannot occur.
+ *   - The contract and application writes happen atomically in a single
+ *     transaction. The vehicle becomes rented only from the handover endpoint.
  *   - It is caller-agnostic on ownership: authorization is the responsibility of
  *     the calling route (admin-only, or the verified provider flow). This helper
  *     never trusts client input for state.
@@ -196,7 +196,7 @@ export async function activateInvoiceContract(
       UPDATE van_contracts
       SET status = 'active', payment_method = 'invoice', updated_at = NOW()
       WHERE id = ${contractId} AND status = 'payment_processing'
-      RETURNING id, application_id, vehicle_id
+      RETURNING id, application_id
     `);
     const row = ((claim as any)?.rows ?? claim ?? [])[0];
     if (!row) {
@@ -208,12 +208,6 @@ export async function activateInvoiceContract(
         .update(vanApplicationsTable)
         .set({ status: "delivery_pending", updatedAt: new Date() })
         .where(eq(vanApplicationsTable.id, Number(row.application_id)));
-    }
-    if (row.vehicle_id != null) {
-      await tx
-        .update(vehiclesTable)
-        .set({ status: "rented", updatedAt: new Date() })
-        .where(eq(vehiclesTable.id, Number(row.vehicle_id)));
     }
     return { activated: true };
   });

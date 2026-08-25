@@ -52,9 +52,6 @@ export default function AdminShipmentDetail() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const [showCaptureConfirm, setShowCaptureConfirm] = useState(false);
-  const [capturing, setCapturing] = useState(false);
-
   const { data: shipment, isLoading } = useGetShipment(shipmentId, {
     query: { enabled: !!shipmentId, queryKey: getGetShipmentQueryKey(shipmentId) }
   });
@@ -778,7 +775,7 @@ export default function AdminShipmentDetail() {
             const s = shipment as any;
             const paymentId = s.squarePaymentId;
             const captured = s.squareCaptured;
-            if (!paymentId && shipment.status !== '納品完了') return null;
+            if (!paymentId) return null;
             return (
               <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
                 <div className="px-5 py-4 border-b border-border">
@@ -790,47 +787,20 @@ export default function AdminShipmentDetail() {
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">ステータス</span>
                         <span className={`font-semibold ${captured === 'true' ? 'text-green-600' : 'text-amber-600'}`}>
-                          {captured === 'true' ? '決済完了' : 'オーソリ済み（未キャプチャ）'}
+                          {captured === 'true' ? '決済完了' : '旧オーソリ／要確認'}
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Square Payment ID</span>
                         <span className="font-mono text-xs text-muted-foreground truncate max-w-[140px]">{paymentId}</span>
                       </div>
-                      {captured !== 'true' && shipment.status === '納品完了' && (
-                        <Button
-                          className="w-full mt-2"
-                          onClick={() => setShowCaptureConfirm(true)}
-                        >
-                          キャプチャ（決済確定）
-                        </Button>
+                      {captured !== 'true' && (
+                        <p className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs leading-relaxed text-amber-800">
+                          後日キャプチャは廃止されています。受け取り前の本決済が完了していない場合は、カード状況を確認してから再度決済してください。
+                        </p>
                       )}
                     </>
-                  ) : (
-                    <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">カード未登録またはオーソリ未実行</p>
-                      <Button variant="outline" size="sm" className="w-full text-xs"
-                        onClick={async () => {
-                          try {
-                            const token = localStorage.getItem('sinjapan_auth_token');
-                            const res = await fetch(`/api/square/authorize-on-file/${shipmentId}`, {
-                              method: 'POST',
-                              headers: { Authorization: `Bearer ${token}` },
-                            });
-                            if (!res.ok) {
-                              const d = await res.json();
-                              throw new Error(d.error ?? '失敗');
-                            }
-                            queryClient.invalidateQueries({ queryKey: getGetShipmentQueryKey(shipmentId) });
-                            toast({ title: 'オーソリを実行しました' });
-                          } catch (e: any) {
-                            toast({ variant: 'destructive', title: `オーソリ失敗: ${e.message}` });
-                          }
-                        }}>
-                        手動でオーソリを実行
-                      </Button>
-                    </div>
-                  )}
+                  ) : null}
                 </div>
               </div>
             );
@@ -1144,71 +1114,6 @@ export default function AdminShipmentDetail() {
         </div>
       )}
 
-      {/* キャプチャ確認ダイアログ */}
-      <Dialog open={showCaptureConfirm} onOpenChange={setShowCaptureConfirm}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
-              キャプチャ（決済確定）の確認
-            </DialogTitle>
-            <DialogDescription className="space-y-2 pt-2 text-left">
-              <p>登録済みカードに対して実金額を請求します。</p>
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800 space-y-1">
-                <p className="font-semibold">⚠️ 実行前に確認してください</p>
-                <p>・お客様がすでに決済画面から支払い済みの場合、<strong>二重請求</strong>になります</p>
-                <p>・管理画面の「決済」欄でお客様の支払い状況を確認してから実行してください</p>
-              </div>
-              {shipment && (
-                <div className="bg-muted rounded-lg p-3 text-sm space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">案件</span>
-                    <span className="font-medium">#{String(shipmentId).padStart(6, '0')}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">請求金額（税込）</span>
-                    <span className="font-bold">¥{fmt(Math.round(Number((shipment as any).customerPrice || 0) * 1.1))}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">現在のステータス</span>
-                    <span className="font-medium">{shipment.status}</span>
-                  </div>
-                </div>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowCaptureConfirm(false)}>
-              キャンセル
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={capturing}
-              onClick={async () => {
-                setCapturing(true);
-                try {
-                  const token = localStorage.getItem('sinjapan_auth_token');
-                  const paymentId = (shipment as any)?.squarePaymentId;
-                  const res = await fetch(`/api/square/capture/${paymentId}`, {
-                    method: 'POST',
-                    headers: { Authorization: `Bearer ${token}` },
-                  });
-                  if (!res.ok) throw new Error();
-                  queryClient.invalidateQueries({ queryKey: getGetShipmentQueryKey(shipmentId) });
-                  toast({ title: 'キャプチャ完了・請求完了に更新しました' });
-                  setShowCaptureConfirm(false);
-                } catch {
-                  toast({ variant: 'destructive', title: 'キャプチャに失敗しました' });
-                } finally {
-                  setCapturing(false);
-                }
-              }}
-            >
-              {capturing ? <><Loader2 className="h-4 w-4 animate-spin mr-1" />処理中…</> : '確認して請求する'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

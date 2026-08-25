@@ -1,10 +1,9 @@
 import { Router, type IRouter } from "express";
-import { db, shipmentsTable, usersTable, notificationsTable } from "@workspace/db";
+import { db, shipmentsTable, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { randomUUID } from "crypto";
-import { squareFetch, authorizeOnFile, getSquareConfigError } from "../lib/square-authorize";
-import { sendEmail, buildEmailHtml } from "../lib/email";
+import { squareFetch, chargeOnFileBeforePickup, getSquareConfigError } from "../lib/square-authorize";
 
 const SQUARE_ERROR_MESSAGES: Record<string, string> = {
   INVALID_CARD_DATA:              "カード情報が無効です。入力内容をご確認ください。",
@@ -91,7 +90,7 @@ router.post("/square/register-card", requireAuth, async (req, res): Promise<void
   res.json({ customerId, cardId: card.id, brand: card.card_brand, last4: card.last_4 });
 });
 
-// POST /square/authorize-on-file/:shipmentId — 配車確定時に登録済みカードでオーソリ
+// POST /square/authorize-on-file/:shipmentId — 互換URL: 1円確認後に受け取り前本決済
 router.post("/square/authorize-on-file/:shipmentId", requireAdmin, async (req, res): Promise<void> => {
   const cfgErr = getSquareConfigError();
   if (cfgErr) { res.status(503).json({ error: cfgErr }); return; }
@@ -99,7 +98,7 @@ router.post("/square/authorize-on-file/:shipmentId", requireAdmin, async (req, r
   const shipmentId = Number(req.params.shipmentId);
   if (isNaN(shipmentId)) { res.status(400).json({ error: "無効なID" }); return; }
 
-  const result = await authorizeOnFile(shipmentId);
+  const result = await chargeOnFileBeforePickup(shipmentId);
   if ("error" in result) { res.status(400).json(result); return; }
   res.json(result);
 });
@@ -144,9 +143,26 @@ router.post("/square/authorize", requireAuth, async (req, res): Promise<void> =>
   }
 
   const paymentId = data.payment?.id;
+  if (!paymentId) {
+    res.status(502).json({ error: "カード確認の決済IDを取得できませんでした" });
+    return;
+  }
 
   // 1円オーソリは即void（仮押さえを解放）
-  await squareFetch(`/v2/payments/${paymentId}/cancel`, "POST", {});
+  const cancelRes = await squareFetch(`/v2/payments/${paymentId}/cancel`, "POST", {});
+  const cancelData = await cancelRes.json() as any;
+  if (!cancelRes.ok) {
+    // 解放できなかったオーソリを追跡可能にし、カード確認済みとして先へ進めない。
+    await db.update(shipmentsTable).set({
+      squarePaymentId: paymentId,
+      squareCaptured: "void_pending",
+      paymentStatus: "未決済",
+      updatedAt: new Date(),
+    }).where(eq(shipmentsTable.id, Number(shipmentId)));
+    console.error("[Square] 1円オーソリの解放失敗:", JSON.stringify(cancelData.errors));
+    res.status(502).json({ error: "カード確認の事前承認を解放できませんでした。管理者へ確認を依頼してください。" });
+    return;
+  }
 
   // カード確認済みをDBに記録
   await db.update(shipmentsTable).set({
@@ -158,7 +174,7 @@ router.post("/square/authorize", requireAuth, async (req, res): Promise<void> =>
 });
 
 // POST /square/charge
-// payment画面：配送完了後に実金額を即時決済（オーソリ＋キャプチャ同時）
+// 互換用のpayment画面: 受け取り前に実金額を即時決済する。
 router.post("/square/charge", requireAuth, async (req, res): Promise<void> => {
   const cfgErr = getSquareConfigError();
   if (cfgErr) { res.status(503).json({ error: cfgErr }); return; }
@@ -179,6 +195,32 @@ router.post("/square/charge", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
+  // 同一案件の完了済み決済は必ず再利用する。古い実額オーソリが残っている
+  // 場合も、状態を解決するまで新しい請求を作らない。
+  if (shipment.squarePaymentId) {
+    const existingRes = await squareFetch(`/v2/payments/${shipment.squarePaymentId}`, "GET");
+    const existingData = await existingRes.json() as any;
+    if (!existingRes.ok) {
+      res.status(409).json({ error: "既存の決済状態を確認できません。管理者へ確認を依頼してください。" });
+      return;
+    }
+    const existingStatus = existingData.payment?.status;
+    if (existingStatus === "COMPLETED") {
+      await db.update(shipmentsTable).set({
+        squareCaptured: "true",
+        paymentMethod: "card",
+        paymentStatus: "決済完了",
+        updatedAt: new Date(),
+      }).where(eq(shipmentsTable.id, Number(shipmentId)));
+      res.json({ status: "paid", paymentId: shipment.squarePaymentId, alreadyPaid: true });
+      return;
+    }
+    if (!["CANCELED", "FAILED"].includes(existingStatus)) {
+      res.status(409).json({ error: "既存の決済またはカード確認が処理中です。管理者へ確認を依頼してください。" });
+      return;
+    }
+  }
+
   // 税込み請求金額（消費税10%）
   const baseAmount = Number(shipment.customerPrice) || 0;
   const taxAmount = Math.round(baseAmount * 0.1);
@@ -189,10 +231,12 @@ router.post("/square/charge", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  // 実金額を即時決済（autocomplete: true = オーソリ＋キャプチャ同時）
+  // 実金額を即時決済（autocomplete: true = オーソリ＋キャプチャ同時）。
+  // 受け取り前の登録済みカード決済と同じキーにし、経路をまたぐ再送でも
+  // Square側で一度しか請求されないようにする。
   const squareRes = await squareFetch("/v2/payments", "POST", {
     source_id: sourceId,
-    idempotency_key: randomUUID(),
+    idempotency_key: `shipment-pre-pickup-${shipment.id}`,
     amount_money: { amount: totalAmount, currency: "JPY" },
     location_id: process.env.SQUARE_LOCATION_ID,
     autocomplete: true,
@@ -213,63 +257,19 @@ router.post("/square/charge", requireAuth, async (req, res): Promise<void> => {
   await db.update(shipmentsTable).set({
     paymentMethod: "card",
     paymentStatus: "決済完了",
-    status: "請求完了",
     squarePaymentId: paymentId,
+    squareCaptured: "true",
     updatedAt: new Date(),
   }).where(eq(shipmentsTable.id, Number(shipmentId)));
 
   res.json({ status: "paid", paymentId });
 });
 
-// POST /square/capture/:paymentId — 納品完了後に管理者がキャプチャ
+// POST /square/capture/:paymentId — 廃止済み: 事前承認を納品後にキャプチャしない
 router.post("/square/capture/:squarePaymentId", requireAdmin, async (req, res): Promise<void> => {
-  const cfgErr = getSquareConfigError();
-  if (cfgErr) { res.status(503).json({ error: cfgErr }); return; }
-
-  const squarePaymentId = String(req.params.squarePaymentId);
-
-  const squareRes = await squareFetch(`/v2/payments/${squarePaymentId}/complete`, "POST", {});
-  const data = await squareRes.json() as any;
-
-  if (!squareRes.ok) {
-    res.status(502).json({ error: "Square キャプチャ失敗", detail: data.errors });
-    return;
-  }
-
-  // 案件のsquareCapturedを更新
-  const [updated] = await db.update(shipmentsTable).set({
-    squareCaptured: "true",
-    paymentStatus: "決済完了",
-    status: "請求完了",
-    updatedAt: new Date(),
-  }).where(eq(shipmentsTable.squarePaymentId, squarePaymentId)).returning();
-
-  // 決済完了メール通知（非同期）
-  if (updated?.userId) {
-    const [user] = await db.select({ name: usersTable.name, email: usersTable.email })
-      .from(usersTable).where(eq(usersTable.id, updated.userId)).limit(1);
-    if (user) {
-      const subject = "【Chat VAN】決済が完了しました";
-      const body = `クレジットカードの決済が完了いたしました。\n\nご利用いただきありがとうございました。\n領収書・請求書はマイページよりご確認いただけます。`;
-      await db.insert(notificationsTable).values({
-        userId: updated.userId,
-        shipmentId: updated.id,
-        title: subject,
-        message: body,
-        readStatus: false,
-      }).catch(() => {});
-      sendEmail(user.email, subject, buildEmailHtml({
-        subject,
-        recipientName: user.name ?? undefined,
-        body,
-        statusBadge: "決済完了",
-        shipmentId: updated.id,
-        ctaText: "領収書を確認する →",
-      })).catch(() => {});
-    }
-  }
-
-  res.json({ status: data.payment?.status });
+  res.status(410).json({
+    error: "事前承認の後日キャプチャは廃止されました。受け取り前に本決済を完了してください。",
+  });
 });
 
 // POST /square/cancel/:squarePaymentId — キャンセル

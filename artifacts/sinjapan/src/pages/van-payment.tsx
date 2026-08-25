@@ -286,7 +286,7 @@ export default function VanPayment() {
             ? (invoicePreApproved
                 ? ''
                 : '審査結果を2〜3営業日以内にメールでご連絡します。')
-            : 'お支払いが完了しました。レンタル会社へ連絡して車両を受け取ってください。'}
+            : '初回料金の決済が完了しました。レンタル会社の案内に従って車両を受け取ってください。'}
         </p>
         <button onClick={() => setLocation(`/van/${applicationId}/status`)}
           className="px-8 py-3 bg-foreground text-background text-sm font-medium rounded-full hover:opacity-90 transition-opacity">

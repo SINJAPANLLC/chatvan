@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, invoicesTable, invoiceItemsTable, shipmentsTable, usersTable } from "@workspace/db";
-import { eq, and, gte, lte, sql } from "drizzle-orm";
+import { eq, and, gte, lte, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -177,14 +177,31 @@ router.patch("/admin/invoices/:id/paid", requireAdmin, async (req, res): Promise
   const [invoice] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, id)).limit(1);
   if (!invoice) { res.status(404).json({ error: "請求書なし" }); return; }
 
-  await db.update(invoicesTable).set({ status: "paid", paidAt: new Date() }).where(eq(invoicesTable.id, id));
+  await db.transaction(async (tx) => {
+    await tx.update(invoicesTable).set({ status: "paid", paidAt: new Date() }).where(eq(invoicesTable.id, id));
 
-  // creditUsed を減算
-  if (invoice.userId) {
-    await db.update(usersTable).set({
-      creditUsed: sql`GREATEST(0, credit_used - ${Number(invoice.totalAmount)})`,
-    }).where(eq(usersTable.id, invoice.userId));
-  }
+    // 請求書の入金確認を、紐づく配送案件にも反映する。カード払いの状態を
+    // 上書きしないよう、請求書払いの案件だけを対象にする。
+    const invoiceItems = await tx.select({ shipmentId: invoiceItemsTable.shipmentId })
+      .from(invoiceItemsTable)
+      .where(eq(invoiceItemsTable.invoiceId, id));
+    const shipmentIds = invoiceItems.map((item) => item.shipmentId).filter((shipmentId): shipmentId is number => shipmentId != null);
+    if (shipmentIds.length > 0) {
+      await tx.update(shipmentsTable)
+        .set({ paymentStatus: "入金確認済み", updatedAt: new Date() })
+        .where(and(
+          inArray(shipmentsTable.id, shipmentIds),
+          eq(shipmentsTable.paymentMethod, "invoice"),
+        ));
+    }
+
+    // creditUsed を減算
+    if (invoice.userId) {
+      await tx.update(usersTable).set({
+        creditUsed: sql`GREATEST(0, credit_used - ${Number(invoice.totalAmount)})`,
+      }).where(eq(usersTable.id, invoice.userId));
+    }
+  });
 
   res.json({ ok: true });
 });

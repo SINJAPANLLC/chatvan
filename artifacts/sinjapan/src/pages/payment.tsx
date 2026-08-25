@@ -120,7 +120,7 @@ export default function Payment() {
           <CheckCircle className="h-8 w-8 text-background" />
         </div>
         <h1 className="text-2xl font-bold mb-2">決済が完了しました</h1>
-        <p className="text-muted-foreground mb-8">ご利用いただきありがとうございました。</p>
+          <p className="text-muted-foreground mb-8">決済が完了しました。受け取り案内をお待ちください。</p>
         <button
           onClick={() => setLocation(`/shipment/${shipmentId}`)}
           className="px-6 py-3 rounded-full bg-foreground text-background font-medium hover:opacity-90 transition-opacity"
@@ -172,7 +172,7 @@ export default function Payment() {
 
         <div>
           <h1 className="text-2xl font-bold tracking-tight">お支払い</h1>
-          <p className="text-muted-foreground mt-1 text-sm">配送完了後の決済手続きです</p>
+          <p className="text-muted-foreground mt-1 text-sm">受け取り前に行う決済手続きです</p>
         </div>
 
         {/* 請求内訳 */}

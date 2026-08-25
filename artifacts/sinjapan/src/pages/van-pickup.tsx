@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useGetVanApplication, getGetVanApplicationQueryKey } from '@workspace/api-client-react';
-import { Loader2, ChevronLeft, MapPin, Phone, Clock, AlertCircle, Truck, Copy, ExternalLink, CalendarDays, CheckCircle2, Camera, FileText } from 'lucide-react';
+import { Loader2, ChevronLeft, MapPin, Phone, Clock, AlertCircle, Truck, Copy, ExternalLink, CalendarDays, CheckCircle2, Camera, FileText, CreditCard } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const apiUrl = (path: string) => `${import.meta.env.BASE_URL}api${path}`;
@@ -147,6 +147,29 @@ export default function VanPickup() {
         <div className="text-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
           <p className="text-muted-foreground">契約情報を準備中です。しばらくお待ちください。</p>
+        </div>
+      </div>
+    );
+  }
+
+  if ((application as any)?.status !== 'delivery_pending') {
+    const awaitingPayment = ['payment_pending', 'payment_processing', 'payment_issue'].includes((application as any)?.status);
+    return (
+      <div className="flex-1 max-w-2xl mx-auto w-full px-4 py-8">
+        <button onClick={() => setLocation(`/van/${applicationId}/status`)}
+          className="flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors mb-8">
+          <ChevronLeft className="h-4 w-4 mr-1" /> 進捗に戻る
+        </button>
+        <div className="rounded-xl border border-border bg-card p-8 text-center">
+          <CreditCard className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
+          <h1 className="text-lg font-bold mb-2">
+            {awaitingPayment ? '初回料金の決済完了後に受け取りできます' : '現在は受け取り確認を行えません'}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {awaitingPayment
+              ? '決済が完了すると、レンタル会社の案内に従って受け取り確認へ進めます。'
+              : '受け取り可能な状態になってから、もう一度お試しください。'}
+          </p>
         </div>
       </div>
     );

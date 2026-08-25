@@ -1430,7 +1430,9 @@ export default function AdminApplicationDetail() {
                         📄 契約書PDF
                       </a>
                       <span className="text-xs px-2.5 py-1 rounded-full border border-border bg-muted">
-                        {CONTRACT_STATUS[c.status] ?? c.status}
+                        {c.application_status === 'delivery_pending'
+                          ? '決済完了・受取待ち'
+                          : (CONTRACT_STATUS[c.status] ?? c.status)}
                       </span>
                     </div>
                   </div>

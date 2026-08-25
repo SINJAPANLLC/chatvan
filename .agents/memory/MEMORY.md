@@ -13,3 +13,4 @@
 - [Rental company account synchronization](rental-company-account-synchronization.md) — 会社プロフィールと代表ログインの同期範囲、メール正規化、招待担当者を守るルール。
 - [Contract incident reporting](contract-incident-reporting.md) — 事故報告は正式記録と契約チャットの両方を扱い、協力会社表示で送信者ロールに依存しない。
 - [Vehicle OCR on VPS](vehicle-ocr-vps.md) — PDF車検証OCRはVPSのPDF→画像変換ツールを前提にする。
+- [Pre-pickup card settlement](pre-pickup-card-settlement.md) — 1円確認は必ず解放し、本決済・受け取り・車両状態を明確に分離する。

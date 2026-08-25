@@ -144,6 +144,7 @@ router.post("/line/webhook", async (req: any, res) => {
       );
     }
   }
+  return;
 });
 
 async function sendLineReply(replyToken: string, text: string) {
