@@ -43,6 +43,8 @@ LOCAL_UPLOAD_DIR=/var/lib/chatvan/uploads
 
 NEON_DATABASE_URL=postgresql://...?sslmode=verify-full
 SESSION_SECRET=（openssl rand -hex 32 で生成）
+OPENAI_API_KEY=（OpenAI APIキー）
+OPENAI_BASE_URL=https://api.openai.com/v1
 SQUARE_ACCESS_TOKEN=（Square本番トークン）
 SQUARE_ENV=production
 

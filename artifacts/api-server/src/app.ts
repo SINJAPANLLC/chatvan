@@ -47,7 +47,9 @@ app.use(
 );
 
 app.use(express.json({
-  limit: "5mb",
+  // OCR sends a Base64-encoded document. The browser compresses photos first,
+  // while this limit still leaves room for larger PDFs behind nginx's 20M cap.
+  limit: "20mb",
   verify: (req: any, _res, buf) => {
     req.rawBody = buf.toString("utf8");
   },

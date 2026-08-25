@@ -21,10 +21,44 @@ const PHOTO_LABELS = ['前面', '後面', '左側面', '右側面', '内装', '�
 type DocType = 'shaken' | 'kensakusho' | 'jibaiseki' | 'ninniHoken';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
+async function fileToBase64(file: File): Promise<{ base64: string; mimeType: string }> {
+  const canCompress = file.type.startsWith('image/')
+    && !['image/gif', 'image/heic', 'image/heif'].includes(file.type.toLowerCase());
+
+  if (canCompress && typeof createImageBitmap === 'function') {
+    try {
+      const bitmap = await createImageBitmap(file);
+      const maxDimension = 2200;
+      const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      canvas.getContext('2d')?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close();
+
+      const compressed = await new Promise<Blob | null>(resolve =>
+        canvas.toBlob(resolve, 'image/jpeg', 0.82),
+      );
+      if (compressed) {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = reject;
+          reader.readAsDataURL(compressed);
+        });
+        return { base64: dataUrl.split(',')[1], mimeType: 'image/jpeg' };
+      }
+    } catch {
+      // Fall back to the original file if the browser cannot decode it.
+    }
+  }
+
+  return await new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve((reader.result as string).split(',')[1]);
+    reader.onload = () => resolve({
+      base64: String(reader.result).split(',')[1],
+      mimeType: file.type || 'image/jpeg',
+    });
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
@@ -148,13 +182,13 @@ export default function AdminVehicles() {
     }
     setShakenParsing(true);
     try {
-      const b64 = await fileToBase64(file);
+      const encoded = await fileToBase64(file);
       const r = await fetch(API('/van/vehicles/parse-shaken'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok()}` },
-        body: JSON.stringify({ imageBase64: b64, mimeType: file.type }),
+        body: JSON.stringify({ imageBase64: encoded.base64, mimeType: encoded.mimeType }),
       });
-      const json = await r.json();
+      const json = await r.json().catch(() => ({ error: `OCRリクエストに失敗しました（HTTP ${r.status}）` }));
       if (!r.ok) throw new Error(json.error);
       // フォームに自動入力
       setFormData(prev => ({
