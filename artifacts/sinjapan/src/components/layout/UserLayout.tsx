@@ -3,7 +3,8 @@ import { Link, useLocation } from 'wouter';
 import { useGetMe, useLogout } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  Plus, LayoutDashboard, LogOut, Settings, Menu, X, MessageSquare, PanelLeftClose, PanelLeftOpen, User as UserIcon, Building2, History
+  Plus, LayoutDashboard, LogOut, Settings, Menu, X, MessageSquare, PanelLeftClose, PanelLeftOpen, User as UserIcon, Building2, History,
+  MapPin, RefreshCw, CircleCheck, AlertTriangle,
 } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 
@@ -21,13 +22,48 @@ function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number) 
   return radius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+type LocationSharingStatus =
+  | 'idle'
+  | 'requesting'
+  | 'sharing'
+  | 'permission_denied'
+  | 'location_error'
+  | 'save_error'
+  | 'unavailable';
+
+const GEOLOCATION_OPTIONS: PositionOptions = {
+  enableHighAccuracy: true,
+  maximumAge: 30_000,
+  timeout: 15_000,
+};
+
+function geolocationErrorMessage(error: GeolocationPositionError) {
+  if (error.code === error.PERMISSION_DENIED) {
+    return 'ブラウザの位置情報を許可してください。';
+  }
+  if (error.code === error.TIMEOUT) {
+    return '位置情報の取得がタイムアウトしました。通信状況を確認して再試行してください。';
+  }
+  return '現在地を取得できませんでした。屋外・通信状況を確認して再試行してください。';
+}
+
 /** 利用中かつ位置情報同意済みの契約だけ、利用者アプリを開いている間に追跡する。 */
 function ActiveContractLocationTracker({ enabled }: { enabled: boolean }) {
   const lastSentAt = useRef(0);
   const lastSentPosition = useRef<{ latitude: number; longitude: number } | null>(null);
+  const sending = useRef(false);
+  const [activeContractId, setActiveContractId] = useState<number | null>(null);
+  const [status, setStatus] = useState<LocationSharingStatus>('idle');
+  const [statusDetail, setStatusDetail] = useState('');
+  const [lastSentLabel, setLastSentLabel] = useState('');
+  const [retryVersion, setRetryVersion] = useState(0);
 
   useEffect(() => {
-    if (!enabled || !navigator.geolocation) return;
+    if (!enabled) {
+      setActiveContractId(null);
+      setStatus('idle');
+      return;
+    }
 
     let disposed = false;
     let activeContractId: number | null = null;
@@ -43,10 +79,26 @@ function ActiveContractLocationTracker({ enabled }: { enabled: boolean }) {
       heartbeatId = null;
       lastSentAt.current = 0;
       lastSentPosition.current = null;
+      sending.current = false;
     };
 
     const startTracking = (contractId: number) => {
-      const sendLocation = (position: GeolocationPosition, force = false) => {
+      if (!navigator.geolocation) {
+        setStatus('unavailable');
+        setStatusDetail('この端末・ブラウザでは位置情報を利用できません。');
+        return;
+      }
+
+      setStatus('requesting');
+      setStatusDetail('現在地を確認して送信しています。');
+
+      const handleGeolocationError = (error: GeolocationPositionError) => {
+        if (disposed || activeContractId !== contractId) return;
+        setStatus(error.code === error.PERMISSION_DENIED ? 'permission_denied' : 'location_error');
+        setStatusDetail(geolocationErrorMessage(error));
+      };
+
+      const sendLocation = async (position: GeolocationPosition, force = false) => {
         if (disposed || activeContractId !== contractId) return;
         const { latitude, longitude, accuracy } = position.coords;
         const now = Date.now();
@@ -56,45 +108,84 @@ function ActiveContractLocationTracker({ enabled }: { enabled: boolean }) {
           : true;
         const dueForHeartbeat = now - lastSentAt.current >= 5 * 60 * 1000;
         if (!force && !moved && !dueForHeartbeat) return;
+        if (sending.current) return;
 
-        lastSentAt.current = now;
-        lastSentPosition.current = { latitude, longitude };
-        fetch(apiUrl('/van/location'), {
-          method: 'POST',
-          credentials: 'include',
-          headers: { ...headers, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ latitude, longitude, accuracy, contractId }),
-        }).catch(() => {});
+        sending.current = true;
+        setStatus('requesting');
+        setStatusDetail('現在地を保存しています。');
+        try {
+          const response = await fetch(apiUrl('/van/location'), {
+            method: 'POST',
+            credentials: 'include',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ latitude, longitude, accuracy, contractId }),
+          });
+          if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            throw new Error(body.error || '位置情報を保存できませんでした。');
+          }
+          if (disposed || activeContractId !== contractId) return;
+          lastSentAt.current = now;
+          lastSentPosition.current = { latitude, longitude };
+          setLastSentLabel(new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }));
+          setStatus('sharing');
+          setStatusDetail('位置情報を管理者へ共有しています。');
+        } catch (error) {
+          if (disposed || activeContractId !== contractId) return;
+          setStatus('save_error');
+          setStatusDetail(error instanceof Error ? error.message : '位置情報を保存できませんでした。');
+        } finally {
+          sending.current = false;
+        }
       };
 
       watchId = navigator.geolocation.watchPosition(
         sendLocation,
-        () => {},
-        { enableHighAccuracy: true, maximumAge: 30_000, timeout: 10_000 },
+        handleGeolocationError,
+        GEOLOCATION_OPTIONS,
+      );
+      navigator.geolocation.getCurrentPosition(
+        position => { void sendLocation(position, true); },
+        handleGeolocationError,
+        GEOLOCATION_OPTIONS,
       );
       heartbeatId = window.setInterval(() => {
         navigator.geolocation.getCurrentPosition(
           position => sendLocation(position, true),
-          () => {},
-          { enableHighAccuracy: true, maximumAge: 30_000, timeout: 10_000 },
+          handleGeolocationError,
+          GEOLOCATION_OPTIONS,
         );
       }, 5 * 60 * 1000);
     };
 
     const refreshActiveContract = async () => {
-      const response = await fetch(apiUrl('/van/location/active-contract'), {
-        credentials: 'include',
-        headers,
-      });
-      if (!response.ok || disposed) return;
+      try {
+        const response = await fetch(apiUrl('/van/location/active-contract'), {
+          credentials: 'include',
+          headers,
+        });
+        if (!response.ok) throw new Error('契約状況を確認できませんでした。');
+        if (disposed) return;
 
-      const data = await response.json();
-      const nextContractId = Number(data.contractId) || null;
-      if (nextContractId === activeContractId) return;
+        const data = await response.json();
+        const nextContractId = Number(data.contractId) || null;
+        if (nextContractId === activeContractId) return;
 
-      stopTracking();
-      activeContractId = nextContractId;
-      if (nextContractId) startTracking(nextContractId);
+        stopTracking();
+        activeContractId = nextContractId;
+        setActiveContractId(nextContractId);
+        setLastSentLabel('');
+        if (nextContractId) {
+          startTracking(nextContractId);
+        } else {
+          setStatus('idle');
+          setStatusDetail('');
+        }
+      } catch (error) {
+        if (disposed) return;
+        setStatus('save_error');
+        setStatusDetail(error instanceof Error ? error.message : '契約状況を確認できませんでした。');
+      }
     };
 
     refreshActiveContract().catch(() => {});
@@ -107,9 +198,48 @@ function ActiveContractLocationTracker({ enabled }: { enabled: boolean }) {
       window.clearInterval(contractPollId);
       stopTracking();
     };
-  }, [enabled]);
+  }, [enabled, retryVersion]);
 
-  return null;
+  if (!enabled || !activeContractId) return null;
+
+  const hasProblem = ['permission_denied', 'location_error', 'save_error', 'unavailable'].includes(status);
+  return (
+    <aside
+      className={`fixed z-50 bottom-4 right-4 left-4 sm:left-auto sm:w-[360px] rounded-xl border p-4 shadow-lg ${
+        hasProblem ? 'border-amber-300 bg-amber-50 text-amber-950' : 'border-emerald-200 bg-white'
+      }`}
+      aria-live="polite"
+    >
+      <div className="flex gap-3">
+        <div className={`mt-0.5 shrink-0 ${hasProblem ? 'text-amber-700' : 'text-emerald-600'}`}>
+          {hasProblem ? <AlertTriangle className="h-5 w-5" /> : <MapPin className="h-5 w-5" />}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold">
+            {status === 'sharing' ? '位置情報を共有中です' : '位置情報の確認が必要です'}
+          </p>
+          <p className="mt-1 text-xs leading-5">{statusDetail}</p>
+          {lastSentLabel && (
+            <p className="mt-1.5 flex items-center gap-1 text-xs text-emerald-700">
+              <CircleCheck className="h-3.5 w-3.5" />最終送信 {lastSentLabel}
+            </p>
+          )}
+          {hasProblem && (
+            <button
+              type="button"
+              onClick={() => setRetryVersion(version => version + 1)}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-amber-400 bg-white px-2.5 py-1.5 text-xs font-medium hover:bg-amber-100"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />位置情報を再試行
+            </button>
+          )}
+          <p className="mt-2 text-[11px] leading-4 text-muted-foreground">
+            位置情報はChat VANを開いている間に共有されます。ブラウザを閉じている間は取得されません。
+          </p>
+        </div>
+      </div>
+    </aside>
+  );
 }
 
 function appLink(app: VanApp): string {

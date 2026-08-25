@@ -3309,6 +3309,20 @@ router.post("/van/location", requireAuth, async (req: Request, res: Response) =>
       latitude: number; longitude: number; accuracy?: number; contractId?: number | string;
     };
     if (latitude == null || longitude == null) return res.status(400).json({ error: "latitude/longitude required" });
+    const numericLatitude = Number(latitude);
+    const numericLongitude = Number(longitude);
+    const numericAccuracy = accuracy == null ? null : Number(accuracy);
+    if (
+      !Number.isFinite(numericLatitude)
+      || !Number.isFinite(numericLongitude)
+      || numericLatitude < -90
+      || numericLatitude > 90
+      || numericLongitude < -180
+      || numericLongitude > 180
+      || (numericAccuracy != null && (!Number.isFinite(numericAccuracy) || numericAccuracy < 0))
+    ) {
+      return res.status(400).json({ error: "有効な位置情報を送信してください" });
+    }
     const contractId = Number(rawContractId);
     if (!Number.isInteger(contractId) || contractId <= 0) {
       return res.status(400).json({ error: "有効な契約IDが必要です" });
@@ -3331,7 +3345,7 @@ router.post("/van/location", requireAuth, async (req: Request, res: Response) =>
 
     await db.execute(sql`
       INSERT INTO user_locations (user_id, contract_id, latitude, longitude, accuracy, recorded_at)
-      VALUES (${userId}, ${contractId}, ${String(latitude)}, ${String(longitude)}, ${accuracy ?? null}, NOW())
+      VALUES (${userId}, ${contractId}, ${String(numericLatitude)}, ${String(numericLongitude)}, ${numericAccuracy}, NOW())
     `);
     return res.json({ ok: true });
   } catch (err) {

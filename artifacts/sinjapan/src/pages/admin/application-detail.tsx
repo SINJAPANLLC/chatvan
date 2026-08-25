@@ -167,7 +167,7 @@ function createInvoicePdfPages(invoice: any): HTMLDivElement[] {
 }
 
 // ─── GPS Map Component ────────────────────────────────────────────────────────
-const GpsMap: React.FC<{ locs: any[] }> = ({ locs }) => {
+const GpsMap: React.FC<{ locs: any[]; emptyMessage?: string }> = ({ locs, emptyMessage }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
 
@@ -232,7 +232,9 @@ const GpsMap: React.FC<{ locs: any[] }> = ({ locs }) => {
   }, [locs]);
 
   if (locs.length === 0) return (
-    <p className="text-sm text-muted-foreground py-4 text-center">位置情報はまだ送信されていません。</p>
+    <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-5 text-center">
+      <p className="text-sm text-muted-foreground">{emptyMessage ?? '位置情報はまだ送信されていません。'}</p>
+    </div>
   );
 
   return <div ref={mapRef} style={{ height: 420, borderRadius: 8 }} />;
@@ -1859,6 +1861,15 @@ export default function AdminApplicationDetail() {
               {(() => {
                 const locs: any[] = related?.userLocations ?? [];
                 const latest = locs[0];
+                const contracts: any[] = related?.contracts ?? [];
+                const hasActiveLocationContract = contracts.some(contract =>
+                  contract.status === 'active' && Boolean(contract.gps_consent ?? contract.gpsConsent),
+                );
+                const emptyMessage = hasActiveLocationContract
+                  ? '利用者端末からの初回位置情報を待っています。利用者がChat VANを開き、ブラウザの位置情報を許可すると表示されます。'
+                  : contracts.length === 0
+                    ? '位置情報は、利用中かつGPS同意済みの契約でのみ取得されます。'
+                    : 'この相談には、位置情報を取得できる利用中・GPS同意済みの契約がありません。';
                 return (
                   <Section title={`位置情報（${locs.length}件）`}>
                     {/* メタ情報バー */}
@@ -1877,7 +1888,7 @@ export default function AdminApplicationDetail() {
                       </div>
                     )}
                     {/* Leaflet マップ */}
-                    <GpsMap locs={locs} />
+                    <GpsMap locs={locs} emptyMessage={emptyMessage} />
                     {/* 直近ログ */}
                     {locs.length > 0 && (
                       <div className="mt-3 border-t border-border pt-3">
