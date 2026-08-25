@@ -10,6 +10,7 @@ import {
 import { Loader2, Plus, Edit, Trash2, Save, Upload, X, ImageIcon, FileSearch, Camera, FileText, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AuthenticatedImage } from '@/components/AuthenticatedImage';
 
 const BASE = import.meta.env.BASE_URL;
 const API = (p: string) => `${BASE}api${p}`;
@@ -288,7 +289,16 @@ export default function AdminVehicles() {
                   {(() => {
                     try {
                       const photos = JSON.parse((v as any).photos || '[]');
-                      if (photos[0]) return <img src={API(`/storage${photos[0]}`)} alt="" className="w-10 h-10 rounded-md object-cover border border-border" />;
+                      if (photos[0]) {
+                        return (
+                          <AuthenticatedImage
+                            src={API(`/storage${photos[0]}`)}
+                            alt=""
+                            className="w-10 h-10 rounded-md object-cover border border-border"
+                            fallback={<div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center"><ImageIcon className="h-4 w-4 text-muted-foreground" /></div>}
+                          />
+                        );
+                      }
                     } catch {}
                     return <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center"><ImageIcon className="h-4 w-4 text-muted-foreground" /></div>;
                   })()}
@@ -353,7 +363,12 @@ export default function AdminVehicles() {
                     <div className="relative aspect-video rounded-lg overflow-hidden border border-border bg-muted">
                       {path ? (
                         <>
-                          <img src={API(`/storage${path}`)} alt="" className="w-full h-full object-cover" />
+                          <AuthenticatedImage
+                            src={API(`/storage${path}`)}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            fallback={<div className="w-full h-full flex items-center justify-center text-muted-foreground"><ImageIcon className="h-5 w-5" /></div>}
+                          />
                           <button type="button"
                             onClick={() => setPhotoPaths(prev => { const n = [...prev]; n[i] = null; return n; })}
                             className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 hover:bg-black/80">
