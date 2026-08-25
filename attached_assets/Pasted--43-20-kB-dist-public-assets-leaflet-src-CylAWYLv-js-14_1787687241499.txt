@@ -1,0 +1,58 @@
+  43.20 kB
+dist/public/assets/leaflet-src-CylAWYLv.js                       149.91 kB │ gzip:  43.49 kB
+dist/public/assets/index.es-CP_9bQ63.js                          159.05 kB │ gzip:  53.11 kB
+dist/public/assets/html2canvas.esm-DXEQVQnt.js                   201.04 kB │ gzip:  47.43 kB
+dist/public/assets/index-BvBDUewH.js                             273.24 kB │ gzip:  83.63 kB
+dist/public/assets/jspdf.es.min-BlpJV6PX.js                      386.32 kB │ gzip: 126.46 kB
+✓ built in 11.40s
+[2026-08-25 19:47:11] [5/5] PM2 起動
+[PM2] Applying action stopProcessId on app [chatvan-api](ids: [ 0 ])
+[PM2] [chatvan-api](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 5  │ aiagent            │ fork     │ 4    │ online    │ 0%       │ 153.2mb  │
+│ 15 │ chatlogi-api       │ fork     │ 4608 │ online    │ 0%       │ 155.8mb  │
+│ 0  │ chatvan-api        │ fork     │ 68   │ stopped   │ 0%       │ 0b       │
+│ 4  │ keimatch           │ fork     │ 0    │ online    │ 0%       │ 295.9mb  │
+│ 13 │ keisaiyou          │ fork     │ 0    │ online    │ 0%       │ 291.5mb  │
+│ 3  │ menz-esthe-town    │ fork     │ 0    │ online    │ 0%       │ 143.3mb  │
+│ 12 │ onlyu              │ fork     │ 0    │ online    │ 0%       │ 122.9mb  │
+│ 8  │ sinjapan-crm-api   │ fork     │ 611… │ online    │ 0%       │ 85.2mb   │
+│ 1  │ sinjapan-manager   │ fork     │ 0    │ online    │ 0%       │ 58.7mb   │
+│ 2  │ sinjapan-onlinesc… │ fork     │ 0    │ online    │ 0%       │ 98.5mb   │
+│ 14 │ sinjapan-sales-api │ fork     │ 64   │ online    │ 0%       │ 292.9mb  │
+│ 6  │ sinjapanai         │ fork     │ 0    │ online    │ 0%       │ 104.7mb  │
+│ 7  │ sinjapanailive-api │ fork     │ 0    │ online    │ 0%       │ 99.2mb   │
+│ 10 │ sinjapanaisite-api │ fork     │ 0    │ online    │ 0%       │ 191.9mb  │
+│ 11 │ tiktokshindan      │ fork     │ 0    │ online    │ 0%       │ 106.6mb  │
+│ 9  │ tramatch           │ fork     │ 0    │ online    │ 0%       │ 718.3mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+host metrics | cpu: 4.1% | ram usage: 24.4% | eth0: ⇓ 0.017mb/s ⇑ 0.007mb/s |
+[PM2] Applying action reloadProcessId on app [chatvan-api](ids: [ 0 ])
+[PM2] [chatvan-api](0) ✓
+[2026-08-25 19:47:16]   → pm2 reload/start 完了
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 5  │ aiagent            │ fork     │ 4    │ online    │ 0%       │ 153.1mb  │
+│ 15 │ chatlogi-api       │ fork     │ 4608 │ online    │ 0%       │ 155.8mb  │
+│ 0  │ chatvan-api        │ fork     │ 68   │ online    │ 0%       │ 82.1mb   │
+│ 4  │ keimatch           │ fork     │ 0    │ online    │ 0%       │ 296.1mb  │
+│ 13 │ keisaiyou          │ fork     │ 0    │ online    │ 0%       │ 291.5mb  │
+│ 3  │ menz-esthe-town    │ fork     │ 0    │ online    │ 0%       │ 142.9mb  │
+│ 12 │ onlyu              │ fork     │ 0    │ online    │ 0%       │ 123.4mb  │
+│ 8  │ sinjapan-crm-api   │ fork     │ 611… │ online    │ 0%       │ 85.6mb   │
+│ 1  │ sinjapan-manager   │ fork     │ 0    │ online    │ 0%       │ 59.1mb   │
+│ 2  │ sinjapan-onlinesc… │ fork     │ 0    │ online    │ 0%       │ 99.0mb   │
+│ 14 │ sinjapan-sales-api │ fork     │ 64   │ online    │ 0%       │ 293.5mb  │
+│ 6  │ sinjapanai         │ fork     │ 0    │ online    │ 0%       │ 104.4mb  │
+│ 7  │ sinjapanailive-api │ fork     │ 0    │ online    │ 0%       │ 99.3mb   │
+│ 10 │ sinjapanaisite-api │ fork     │ 0    │ online    │ 0%       │ 192.3mb  │
+│ 11 │ tiktokshindan      │ fork     │ 0    │ online    │ 0%       │ 106.6mb  │
+│ 9  │ tramatch           │ fork     │ 0    │ online    │ 0%       │ 719.1mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+host metrics | cpu: 27.8% | ram usage: 24.5% | lo: ⇓ 0.001mb/s ⇑ 0.001mb/s | eth0: ⇓ 0.032mb/s ⇑ 0.01mb/s |
+[2026-08-25 19:47:16] === デプロイ完了 ✅ ===
+[2026-08-25 19:47:16] ポート確認: curl -s http://127.0.0.1:4820/api/public/seo | head -c 100
+root@srv1087935:/var/www/chatvan# 
