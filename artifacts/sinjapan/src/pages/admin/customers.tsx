@@ -179,15 +179,16 @@ export default function AdminCustomers() {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error();
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || '削除に失敗しました');
       queryClient.setQueryData(['/api/users'], (old: any[]) =>
         old?.filter(u => u.id !== selected.id)
       );
       setSelected(null);
       setConfirmDelete(false);
       toast({ title: 'ユーザーを削除しました' });
-    } catch {
-      toast({ variant: 'destructive', title: '削除に失敗しました' });
+    } catch (error) {
+      toast({ variant: 'destructive', title: error instanceof Error ? error.message : '削除に失敗しました' });
     } finally {
       setDeleting(false);
     }
@@ -468,7 +469,7 @@ export default function AdminCustomers() {
           <AlertDialogHeader>
             <AlertDialogTitle>ユーザーを削除しますか？</AlertDialogTitle>
             <AlertDialogDescription>
-              <span className="font-semibold">{selected?.name}</span>（{selected?.email}）を削除します。この操作は取り消せません。
+              <span className="font-semibold">{selected?.name}</span>（{selected?.email}）と、このユーザーに紐づく申込・契約・請求・通知などの関連データを削除します。この操作は取り消せません。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/auth";
+import { deleteUserAccount, UserDeletionError } from "../lib/userDeletion";
 
 const router: IRouter = Router();
 
@@ -51,9 +52,26 @@ router.delete("/users/:id", requireAdmin, async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "無効なID" }); return; }
 
-  const [deleted] = await db.delete(usersTable).where(eq(usersTable.id, id)).returning();
-  if (!deleted) { res.status(404).json({ error: "ユーザーが見つかりません" }); return; }
-  res.json({ success: true });
+  const actorUserId = req.session.userId;
+  if (!actorUserId) {
+    res.status(401).json({ error: "認証が必要です" });
+    return;
+  }
+
+  try {
+    await deleteUserAccount(id, actorUserId);
+    res.json({ success: true });
+  } catch (error) {
+    if (error instanceof UserDeletionError) {
+      res.status(error.statusCode).json({ error: error.message });
+      return;
+    }
+    req.log.error(
+      { err: error, userId: id },
+      "Failed to delete user account and related records",
+    );
+    res.status(500).json({ error: "ユーザーの削除に失敗しました。" });
+  }
 });
 
 export default router;
