@@ -45,6 +45,15 @@ const objectStorage = new ObjectStorageService();
 
 class RentalCompanyAccountEmailConflictError extends Error {}
 
+const screeningRetryNotBefore = new Map<number, number>();
+const SCREENING_TIMEOUT_MS = 45_000;
+const SCREENING_RETRY_DELAY_MS = 60_000;
+
+function scheduleAIScreening(appId: number) {
+  if (Date.now() < (screeningRetryNotBefore.get(appId) ?? 0)) return;
+  setImmediate(() => { void runAIScreening(appId); });
+}
+
 function parseCalendarDate(value: unknown): string | null {
   const dateString = String(value ?? "").slice(0, 10);
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
@@ -161,7 +170,7 @@ ${selfieB64 ? "3枚目: 本人セルフィー（免許証の顔写真と照合�
       const [app] = await db.select().from(vanApplicationsTable)
         .where(eq(vanApplicationsTable.id, data.applicationId));
       if (app && app.status === "application_received") {
-        setImmediate(() => runAIScreening(data.applicationId));
+        scheduleAIScreening(data.applicationId);
       }
     }
   } catch (err) {
@@ -232,8 +241,15 @@ function parseStartDate(raw: string | null | undefined): { date: string; payment
 
 async function runAIScreening(appId: number) {
   try {
-    const [app] = await db.select().from(vanApplicationsTable).where(eq(vanApplicationsTable.id, appId));
-    if (!app || app.status !== "application_received") return;
+    // application_received → screening の更新を取得処理として使い、同一申込の二重審査を防ぐ。
+    const [app] = await db.update(vanApplicationsTable).set({
+      status: "screening",
+      updatedAt: new Date(),
+    }).where(and(
+      eq(vanApplicationsTable.id, appId),
+      eq(vanApplicationsTable.status, "application_received"),
+    )).returning();
+    if (!app) return;
 
     // 審査プロンプトをDB優先で取得
     let screeningSystemPrompt = `あなたは軽バン月額レンタルサービスの申込審査AIです。\n申込データを分析し、以下のJSONのみ返してください:\n{"result": "approved" | "rejected", "reason": "理由（日本語、50文字以内）"}\n\n【審査方針】\n初めて車を借りるユーザーがほとんどのため、保険・黒ナンバー・配送経験は一切審査対象にしない。\n以下の2条件のみで判断する:\n1. 利用目的が明らかに違法（麻薬・密輸・犯罪等）でないこと\n2. 申込内容が明らかな嫌がらせ・テスト・無意味な入力でないこと\n上記に該当しない限り、必ず approved にすること。`;
@@ -242,24 +258,27 @@ async function runAIScreening(appId: number) {
       if (row?.value) screeningSystemPrompt = row.value;
     } catch { /* fallback */ }
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-5.4-mini",
-      messages: [
-        {
-          role: "system",
-          content: screeningSystemPrompt
-        },
-        {
-          role: "user",
-          content: `【申込データ】
+    const completion = await openai.chat.completions.create(
+      {
+        model: "gpt-5.4-mini",
+        messages: [
+          {
+            role: "system",
+            content: screeningSystemPrompt
+          },
+          {
+            role: "user",
+            content: `【申込データ】
 エリア: ${app.area ?? "未記入"}
 月額予算: ${app.monthlyBudget ? `¥${Number(app.monthlyBudget).toLocaleString()}` : "未記入"}
 利用目的: ${app.purpose ?? "未記入"}
 利用期間: ${app.durationMonths ?? "未記入"}ヶ月`
-        }
-      ],
-      response_format: { type: "json_object" },
-    });
+          }
+        ],
+        response_format: { type: "json_object" },
+      },
+      { timeout: SCREENING_TIMEOUT_MS },
+    );
 
     const parsed = JSON.parse(completion.choices[0]?.message?.content ?? "{}");
     const result: "approved" | "rejected" = parsed.result === "rejected" ? "rejected" : "approved";
@@ -267,7 +286,11 @@ async function runAIScreening(appId: number) {
 
     await db.update(vanApplicationsTable).set({
       status: result, updatedAt: new Date(),
-    }).where(eq(vanApplicationsTable.id, appId));
+    }).where(and(
+      eq(vanApplicationsTable.id, appId),
+      eq(vanApplicationsTable.status, "screening"),
+    ));
+    screeningRetryNotBefore.delete(appId);
 
     if (result === "approved") {
       // ── 審査通過 → 契約書を自動生成 ────────────────────────────────────
@@ -326,6 +349,17 @@ async function runAIScreening(appId: number) {
     }
   } catch (err) {
     console.error("[AI Screening] エラー:", err);
+    screeningRetryNotBefore.set(appId, Date.now() + SCREENING_RETRY_DELAY_MS);
+    // 通信・AI側の一時障害で画面が永遠に止まらないよう、次回の定期更新から再試行できる状態へ戻す。
+    await db.update(vanApplicationsTable).set({
+      status: "application_received",
+      updatedAt: new Date(),
+    }).where(and(
+      eq(vanApplicationsTable.id, appId),
+      eq(vanApplicationsTable.status, "screening"),
+    )).catch((recoveryErr) => {
+      console.error("[AI Screening] 再試行状態への復旧エラー:", recoveryErr);
+    });
   }
 }
 
@@ -1056,7 +1090,7 @@ router.post("/van/applications/:id/accept", requireAuth, async (req: Request, re
       `);
       const kycRow = ((existingKyc as any)?.rows ?? existingKyc)[0];
       if (kycRow) {
-        setImmediate(() => runAIScreening(appId));
+        scheduleAIScreening(appId);
       }
     }
     return res.json(app);
@@ -3018,10 +3052,10 @@ router.get("/van/applications/:id/identity-verification", requireAuth, async (re
       `);
       result = ((rows as any)?.rows ?? rows)[0] ?? null;
 
-      // 既存 verified 記録でスキップ且つ application_received のまま → AI 審査を起動
-      if (result && app.status === "application_received") {
-        setImmediate(() => runAIScreening(appId));
-      }
+    }
+    // eKYC完了後にAI呼び出しが失敗・中断しても、画面の定期更新をきっかけに安全に再開する。
+    if (result?.status === "verified" && app.status === "application_received") {
+      scheduleAIScreening(appId);
     }
     return res.json(result ?? null);
   } catch (err) {
