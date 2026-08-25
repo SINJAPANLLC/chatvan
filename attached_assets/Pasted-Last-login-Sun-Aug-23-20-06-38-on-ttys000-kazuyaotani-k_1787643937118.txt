@@ -1,0 +1,244 @@
+Last login: Sun Aug 23 20:06:38 on ttys000
+kazuyaotani@kazuya-MacBook-Air-2 ~ % ssh root@212.85.24.206
+root@212.85.24.206's password: 
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-124-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Tue Aug 25 07:44:06 UTC 2026
+
+  System load:  0.25                Processes:             167
+  Usage of /:   21.0% of 192.69GB   Users logged in:       0
+  Memory usage: 25%                 IPv4 address for eth0: 212.85.24.206
+  Swap usage:   0%                  IPv6 address for eth0: 2a02:4780:59:cc86::1
+
+ * Strictly confined Kubernetes makes edge and IoT secure. Learn how MicroK8s
+   just raised the bar for easy, resilient and secure K8s cluster deployment.
+
+   https://ubuntu.com/engage/secure-kubernetes-at-the-edge
+
+Expanded Security Maintenance for Applications is not enabled.
+
+30 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+23 additional security updates can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+1 updates could not be installed automatically. For more details,
+see /var/log/unattended-upgrades/unattended-upgrades.log
+
+*** System restart required ***
+Last login: Sun Aug 23 11:07:30 2026 from 126.116.55.23
+root@srv1087935:~# bash /var/www/chatvan/deploy/deploy.sh
+[2026-08-25 07:44:55] === Chat VAN デプロイ開始 ===
+Now using node v20.20.0 (npm v10.8.2)
+[2026-08-25 07:44:57] Node.js: v20.20.0, pnpm: 9.15.9
+[2026-08-25 07:44:57] [1/5] git pull
+remote: Enumerating objects: 29, done.
+remote: Counting objects: 100% (29/29), done.
+remote: Compressing objects: 100% (4/4), done.
+remote: Total 15 (delta 11), reused 15 (delta 11), pack-reused 0 (from 0)
+Unpacking objects: 100% (15/15), 7.84 KiB | 205.00 KiB/s, done.
+From https://github.com/SINJAPANLLC/chatvan
+ * branch            main       -> FETCH_HEAD
+   e956589..c6ecdf8  main       -> origin/main
+Updating e956589..c6ecdf8
+Fast-forward
+ artifacts/api-server/src/lib/objectStorage.ts | 249 +++++++++++++++++++++++++-
+ artifacts/api-server/src/routes/storage.ts    |  86 ++++++---
+ artifacts/api-server/src/routes/van.ts        |   3 +-
+ deploy/.env.production.example                |   5 +
+ deploy/README.md                              |   9 +
+ deploy/deploy.sh                              |   4 +
+ deploy/setup.sh                               |   5 +
+ 7 files changed, 333 insertions(+), 28 deletions(-)
+[2026-08-25 07:44:58] [2/5] pnpm install
+Scope: all 12 workspace projects
+Lockfile is up to date, resolution step is skipped
+Already up to date
+
+   ╭───────────────────────────────────────────────────────────────────╮
+   │                                                                   │
+   │                Update available! 9.15.9 → 11.23.0.                │
+   │   Changelog: https://github.com/pnpm/pnpm/releases/tag/v11.23.0   │
+   │                 Run "pnpm add -g pnpm" to update.                 │
+   │                                                                   │
+   ╰───────────────────────────────────────────────────────────────────╯
+
+. preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_use…
+└─ Done in 20ms
+Done in 4.8s using pnpm v9.15.9
+[2026-08-25 07:45:03] [3/5] API サーバービルド
+
+> @workspace/api-server@0.0.0 build /var/www/chatvan/artifacts/api-server
+> node ./build.mjs
+
+
+  dist/index.mjs                       3.4mb ⚠️
+  dist/pino-worker.mjs               153.4kb
+  dist/pino-file.mjs                 142.0kb
+  dist/pino-pretty.mjs               114.4kb
+  dist/thread-stream-worker.mjs        7.3kb
+  dist/index.mjs.map                   7.7mb
+  dist/pino-worker.mjs.map           256.9kb
+  dist/pino-file.mjs.map             229.0kb
+  dist/pino-pretty.mjs.map           203.6kb
+  dist/thread-stream-worker.mjs.map   12.0kb
+
+⚡ Done in 1207ms
+[2026-08-25 07:45:05] [4/5] フロントエンドビルド（静的ファイル生成）
+
+> @workspace/sinjapan@0.0.0 build /var/www/chatvan/artifacts/sinjapan
+> vite build --config vite.config.ts
+
+vite v7.3.6 building client environment for production...
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 3147 modules transformed.
+Generated an empty chunk: "vendor-react".
+dist/public/index.html                                             2.89 kB │ gzip:   0.99 kB
+dist/public/assets/leaflet-CIGW-MKW.css                           15.61 kB │ gzip:   6.46 kB
+dist/public/assets/index-YqFAWZ_S.css                            164.95 kB │ gzip:  25.17 kB
+dist/public/assets/vendor-react-l0sNRNKZ.js                        0.00 kB │ gzip:   0.02 kB
+dist/public/assets/textarea-ALLcySs0.js                            0.50 kB │ gzip:   0.35 kB
+dist/public/assets/input-CiRn-cg-.js                               0.60 kB │ gzip:   0.37 kB
+dist/public/assets/label-Cee_OFcV.js                               0.67 kB │ gzip:   0.45 kB
+dist/public/assets/button-B4F2cnb8.js                              1.32 kB │ gzip:   0.66 kB
+dist/public/assets/company-yB7Ifc5q.js                             1.45 kB │ gzip:   0.84 kB
+dist/public/assets/shipments-carriers-conversations-BjYn3Qql.js    1.47 kB │ gzip:   0.55 kB
+dist/public/assets/dialog-Dw4CGXof.js                              2.23 kB │ gzip:   0.88 kB
+dist/public/assets/forgot-password-41Vbw1XG.js                     2.63 kB │ gzip:   1.30 kB
+dist/public/assets/parseISO-BuOw8hXq.js                            2.67 kB │ gzip:   1.18 kB
+dist/public/assets/select-CRqdYVBo.js                              3.13 kB │ gzip:   1.16 kB
+dist/public/assets/home-45zlxhoj.js                                3.14 kB │ gzip:   1.59 kB
+dist/public/assets/login-kLl5E0uV.js                               3.30 kB │ gzip:   1.51 kB
+dist/public/assets/gps-Cl-bXSsB.js                                 3.43 kB │ gzip:   1.50 kB
+dist/public/assets/tokusho-dcJgtDeP.js                             3.64 kB │ gzip:   2.00 kB
+dist/public/assets/contracts-ClH3G5vT.js                           3.66 kB │ gzip:   1.56 kB
+dist/public/assets/settings-w2fRJ7_m.js                            3.92 kB │ gzip:   1.79 kB
+dist/public/assets/register-CwchcTmF.js                            3.92 kB │ gzip:   1.67 kB
+dist/public/assets/contact-D0VJEMxj.js                             4.03 kB │ gzip:   1.72 kB
+dist/public/assets/shipments-CFbxBBCE.js                           4.11 kB │ gzip:   1.55 kB
+dist/public/assets/invoice-detail-CIos0PXS.js                      4.25 kB │ gzip:   1.54 kB
+dist/public/assets/audit-logs-D1e1heef.js                          4.36 kB │ gzip:   1.66 kB
+dist/public/assets/payments-van-CIeDjA0a.js                        4.40 kB │ gzip:   1.93 kB
+dist/public/assets/contact-BF3nnkK3.js                             4.42 kB │ gzip:   1.73 kB
+dist/public/assets/insurance-CORYDOOf.js                           4.61 kB │ gzip:   1.73 kB
+dist/public/assets/vendor-router-BTidj2DY.js                       4.92 kB │ gzip:   2.39 kB
+dist/public/assets/van-history-Bs53hJiO.js                         5.47 kB │ gzip:   1.97 kB
+dist/public/assets/notifications-C_YmH5oE.js                       5.64 kB │ gzip:   2.02 kB
+dist/public/assets/ja-BNmDrzzg.js                                  5.72 kB │ gzip:   2.08 kB
+dist/public/assets/company-vehicles-Ab8h24Ob.js                    6.55 kB │ gzip:   2.54 kB
+dist/public/assets/incidents-BP1yl2PH.js                           6.56 kB │ gzip:   2.10 kB
+dist/public/assets/seo-D67r3Jc_.js                                 6.89 kB │ gzip:   2.62 kB
+dist/public/assets/contacts-UWrG4TM0.js                            7.00 kB │ gzip:   2.67 kB
+dist/public/assets/index-CiteyBC-.js                               7.16 kB │ gzip:   2.65 kB
+dist/public/assets/breakdown-DLpONZE-.js                           7.19 kB │ gzip:   2.50 kB
+dist/public/assets/register-DX-a6Rdi.js                            7.24 kB │ gzip:   2.36 kB
+dist/public/assets/applications-BxRQH53o.js                        7.50 kB │ gzip:   2.77 kB
+dist/public/assets/privacy-CRE_wmfA.js                             7.55 kB │ gzip:   2.75 kB
+dist/public/assets/screening-Bu0qo8IT.js                           7.80 kB │ gzip:   2.50 kB
+dist/public/assets/invoices-sgHZwIvM.js                            7.88 kB │ gzip:   2.90 kB
+dist/public/assets/settings-DXKBJR-N.js                            8.12 kB │ gzip:   2.98 kB
+dist/public/assets/user-logs-BRDsJRfY.js                           8.54 kB │ gzip:   2.93 kB
+dist/public/assets/terms-CVU9hQw7.js                               8.87 kB │ gzip:   2.86 kB
+dist/public/assets/van-proposal-CkLueKk9.js                        9.07 kB │ gzip:   3.46 kB
+dist/public/assets/recovery-CEU0a9px.js                            9.14 kB │ gzip:   2.86 kB
+dist/public/assets/corporate-B7BksXU0.js                           9.18 kB │ gzip:   2.74 kB
+dist/public/assets/gps-CbjJrS4o.js                                 9.88 kB │ gzip:   2.75 kB
+dist/public/assets/insurance-DUvAgYfP.js                           9.98 kB │ gzip:   2.93 kB
+dist/public/assets/article-2cwAl4Yd.js                            10.02 kB │ gzip:   3.45 kB
+dist/public/assets/dashboard-ChDqS4mX.js                          11.78 kB │ gzip:   3.94 kB
+dist/public/assets/settlements-BT8Vh3Pl.js                        11.84 kB │ gzip:   4.13 kB
+dist/public/assets/rental-companies-oYJ87C-a.js                   12.70 kB │ gzip:   3.78 kB
+dist/public/assets/identity-verification-DDGvAqtW.js              12.83 kB │ gzip:   3.82 kB
+dist/public/assets/pricing-DBr7OAvL.js                            12.87 kB │ gzip:   4.50 kB
+dist/public/assets/dashboard-DACzowrp.js                          13.15 kB │ gzip:   4.49 kB
+dist/public/assets/van-pickup-DvzewVjt.js                         13.26 kB │ gzip:   3.96 kB
+dist/public/assets/mypage-DzbS0HfU.js                             13.75 kB │ gzip:   4.59 kB
+dist/public/assets/van-payment-XfGKn5Kn.js                        13.79 kB │ gzip:   4.18 kB
+dist/public/assets/invoices-BJtDMyd2.js                           13.79 kB │ gzip:   4.10 kB
+dist/public/assets/contract-chat-B7PY2M26.js                      13.89 kB │ gzip:   4.53 kB
+dist/public/assets/master-card-C3raPyAG.js                        16.81 kB │ gzip:   4.86 kB
+dist/public/assets/customers-DTLt-ktW.js                          19.60 kB │ gzip:   5.38 kB
+dist/public/assets/format-DoPCwC_x.js                             19.76 kB │ gzip:   5.63 kB
+dist/public/assets/blog-DPctoiJ9.js                               20.45 kB │ gzip:   6.41 kB
+dist/public/assets/vehicles-DvcUGQVx.js                           20.81 kB │ gzip:   6.40 kB
+dist/public/assets/lp-company-JEdT0-Nl.js                         23.04 kB │ gzip:   7.08 kB
+dist/public/assets/lp-BRzOPL7R.js                                 23.57 kB │ gzip:   7.00 kB
+dist/public/assets/vehicles-C_DGriDa.js                           26.23 kB │ gzip:   7.55 kB
+dist/public/assets/contracts-DCVfDKk4.js                          26.86 kB │ gzip:   7.16 kB
+dist/public/assets/purify.es-4eNOHKSq.js                          28.74 kB │ gzip:  11.02 kB
+dist/public/assets/email-marketing-CN9HC8Z2.js                    30.84 kB │ gzip:   9.05 kB
+dist/public/assets/van-contract-B6pOjXYH.js                       30.98 kB │ gzip:  10.61 kB
+dist/public/assets/finance-CBTtMjrd.js                            31.47 kB │ gzip:   6.12 kB
+dist/public/assets/notifications-DW76_rCs.js                      33.20 kB │ gzip:   8.69 kB
+dist/public/assets/shipment-detail-BCWguotA.js                    41.66 kB │ gzip:   9.27 kB
+dist/public/assets/van-status-dvn1aqo-.js                         42.90 kB │ gzip:   9.76 kB
+dist/public/assets/vendor-query-ChLhbXNe.js                       44.69 kB │ gzip:  13.71 kB
+dist/public/assets/application-detail-TmGGlmiM.js                 67.10 kB │ gzip:  17.31 kB
+dist/public/assets/form-DabxJqOR.js                               88.89 kB │ gzip:  24.97 kB
+dist/public/assets/van-chat-DJUbJqA-.js                          122.85 kB │ gzip:  38.21 kB
+dist/public/assets/vendor-ui-BgKVhDJZ.js                         126.82 kB │ gzip:  43.20 kB
+dist/public/assets/leaflet-src-CylAWYLv.js                       149.91 kB │ gzip:  43.49 kB
+dist/public/assets/index.es-B1gB5sT0.js                          159.05 kB │ gzip:  53.11 kB
+dist/public/assets/html2canvas.esm-DXEQVQnt.js                   201.04 kB │ gzip:  47.43 kB
+dist/public/assets/index-D9gp5dic.js                             270.16 kB │ gzip:  82.51 kB
+dist/public/assets/jspdf.es.min-DuKI2RWp.js                      386.32 kB │ gzip: 126.46 kB
+✓ built in 13.38s
+[2026-08-25 07:45:20] [5/5] PM2 起動
+[PM2] Applying action stopProcessId on app [chatvan-api](ids: [ 0 ])
+[PM2] [chatvan-api](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 5  │ aiagent            │ fork     │ 4    │ online    │ 0%       │ 121.5mb  │
+│ 15 │ chatlogi-api       │ fork     │ 4608 │ online    │ 0%       │ 153.3mb  │
+│ 0  │ chatvan-api        │ fork     │ 67   │ stopped   │ 0%       │ 0b       │
+│ 4  │ keimatch           │ fork     │ 0    │ online    │ 0%       │ 322.4mb  │
+│ 13 │ keisaiyou          │ fork     │ 0    │ online    │ 0%       │ 284.8mb  │
+│ 3  │ menz-esthe-town    │ fork     │ 0    │ online    │ 0%       │ 142.7mb  │
+│ 12 │ onlyu              │ fork     │ 0    │ online    │ 0%       │ 123.4mb  │
+│ 8  │ sinjapan-crm-api   │ fork     │ 496… │ online    │ 6.7%     │ 85.1mb   │
+│ 1  │ sinjapan-manager   │ fork     │ 0    │ online    │ 0%       │ 59.1mb   │
+│ 2  │ sinjapan-onlinesc… │ fork     │ 0    │ online    │ 0%       │ 98.6mb   │
+│ 14 │ sinjapan-sales-api │ fork     │ 0    │ online    │ 0%       │ 398.2mb  │
+│ 6  │ sinjapanai         │ fork     │ 0    │ online    │ 0%       │ 104.3mb  │
+│ 7  │ sinjapanailive-api │ fork     │ 0    │ online    │ 0%       │ 98.7mb   │
+│ 10 │ sinjapanaisite-api │ fork     │ 0    │ online    │ 0%       │ 188.3mb  │
+│ 11 │ tiktokshindan      │ fork     │ 0    │ online    │ 0%       │ 105.0mb  │
+│ 9  │ tramatch           │ fork     │ 0    │ online    │ 0%       │ 699.5mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+host metrics | cpu: 24.2% | ram usage: 28.4% | lo: ⇓ 0.001mb/s ⇑ 0.001mb/s | eth0: ⇓ 0.054mb/s ⇑ 0.009mb/s |
+[PM2] Applying action reloadProcessId on app [chatvan-api](ids: [ 0 ])
+[PM2] [chatvan-api](0) ✓
+[2026-08-25 07:45:26]   → pm2 reload/start 完了
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 5  │ aiagent            │ fork     │ 4    │ online    │ 0%       │ 121.5mb  │
+│ 15 │ chatlogi-api       │ fork     │ 4608 │ online    │ 0%       │ 153.3mb  │
+│ 0  │ chatvan-api        │ fork     │ 67   │ online    │ 100%     │ 71.8mb   │
+│ 4  │ keimatch           │ fork     │ 0    │ online    │ 0%       │ 322.4mb  │
+│ 13 │ keisaiyou          │ fork     │ 0    │ online    │ 0%       │ 284.8mb  │
+│ 3  │ menz-esthe-town    │ fork     │ 0    │ online    │ 0%       │ 143.0mb  │
+│ 12 │ onlyu              │ fork     │ 0    │ online    │ 0%       │ 123.1mb  │
+│ 8  │ sinjapan-crm-api   │ fork     │ 496… │ online    │ 100%     │ 57.8mb   │
+│ 1  │ sinjapan-manager   │ fork     │ 0    │ online    │ 0%       │ 59.6mb   │
+│ 2  │ sinjapan-onlinesc… │ fork     │ 0    │ online    │ 0%       │ 98.5mb   │
+│ 14 │ sinjapan-sales-api │ fork     │ 0    │ online    │ 0%       │ 398.2mb  │
+│ 6  │ sinjapanai         │ fork     │ 0    │ online    │ 0%       │ 104.4mb  │
+│ 7  │ sinjapanailive-api │ fork     │ 0    │ online    │ 0%       │ 97.7mb   │
+│ 10 │ sinjapanaisite-api │ fork     │ 0    │ online    │ 0%       │ 187.9mb  │
+│ 11 │ tiktokshindan      │ fork     │ 0    │ online    │ 0%       │ 105.0mb  │
+│ 9  │ tramatch           │ fork     │ 0    │ online    │ 0%       │ 698.9mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+host metrics | cpu: 24.2% | ram usage: 28.4% | lo: ⇓ 0.001mb/s ⇑ 0.001mb/s | eth0: ⇓ 0.054mb/s ⇑ 0.009mb/s |
+[2026-08-25 07:45:26] === デプロイ完了 ✅ ===
+[2026-08-25 07:45:26] ポート確認: curl -s http://127.0.0.1:4820/api/public/seo | head -c 100
+root@srv1087935:~# 
