@@ -18,6 +18,7 @@ import {
   ScrollText, Wallet, MapPinned, AlertTriangle, ClipboardCheck, Download,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { AuthenticatedImage } from '@/components/AuthenticatedImage';
 import { format } from 'date-fns';
 
 const formatYen = (value: unknown) => `¥${Number(value ?? 0).toLocaleString('ja-JP')}`;
@@ -1153,7 +1154,12 @@ export default function AdminApplicationDetail() {
                       ].filter(([, p]) => p).map(([label, path]) => (
                         <div key={label as string}>
                           <p className="text-xs text-muted-foreground mb-1">{label}</p>
-                          <img src={`${import.meta.env.BASE_URL}api/storage${path}`} alt={label as string} className="h-28 w-auto rounded-lg border border-border object-cover" />
+                          <AuthenticatedImage
+                            src={`${import.meta.env.BASE_URL}api/storage${path}`}
+                            alt={label as string}
+                            className="h-28 w-auto rounded-lg border border-border object-cover"
+                            fallback={<div className="h-28 w-24 rounded-lg border border-border bg-muted flex items-center justify-center text-xs text-muted-foreground">表示不可</div>}
+                          />
                         </div>
                       ))}
                     </div>
@@ -1212,7 +1218,7 @@ export default function AdminApplicationDetail() {
                     {photos.length > 0 && (
                       <div className="flex gap-1 overflow-x-auto bg-muted/30 p-2">
                         {photos.map((p: string, i: number) => (
-                          <img key={i} src={`${import.meta.env.BASE_URL}api/storage${p}`} alt={`車両写真${i+1}`}
+                          <AuthenticatedImage key={i} src={`${import.meta.env.BASE_URL}api/storage${p}`} alt={`車両写真${i+1}`}
                             className="h-40 w-auto rounded-lg object-cover shrink-0 border border-border" />
                         ))}
                       </div>
@@ -1402,7 +1408,7 @@ export default function AdminApplicationDetail() {
                 {vPhotos.length > 0 && (
                   <div className="flex gap-1 overflow-x-auto bg-muted/30 p-2">
                     {vPhotos.map((p, i) => (
-                      <img key={i} src={`${import.meta.env.BASE_URL}api/storage${p}`} alt={`車両写真${i+1}`}
+                      <AuthenticatedImage key={i} src={`${import.meta.env.BASE_URL}api/storage${p}`} alt={`車両写真${i+1}`}
                         className="h-36 w-auto rounded-lg object-cover shrink-0 border border-border" />
                     ))}
                   </div>
@@ -1515,7 +1521,7 @@ export default function AdminApplicationDetail() {
                     {pickupPhotos.length > 0 ? (
                       <div className="flex gap-2 flex-wrap mb-4">
                         {pickupPhotos.map((p, i) => (
-                          <img key={i} src={`${import.meta.env.BASE_URL}api/storage${p}`} alt={`納車写真${i+1}`}
+                          <AuthenticatedImage key={i} src={`${import.meta.env.BASE_URL}api/storage${p}`} alt={`納車写真${i+1}`}
                             className="h-28 w-auto rounded-lg border border-border object-cover" />
                         ))}
                       </div>
@@ -1529,10 +1535,12 @@ export default function AdminApplicationDetail() {
                         return (
                           <div key={key} className="border border-border rounded-xl overflow-hidden">
                             {path ? (
-                              <a href={`${import.meta.env.BASE_URL}api/storage${path}`} target="_blank" rel="noopener noreferrer">
-                                <img src={`${import.meta.env.BASE_URL}api/storage${path}`} alt={label}
-                                  className="w-full h-20 object-cover" />
-                              </a>
+                              <AuthenticatedImage
+                                src={`${import.meta.env.BASE_URL}api/storage${path}`}
+                                alt={label}
+                                className="w-full h-20 object-cover"
+                                fallback={<div className="w-full h-20 bg-muted flex items-center justify-center"><span className="text-xs text-muted-foreground">表示不可</span></div>}
+                              />
                             ) : (
                               <div className="w-full h-20 bg-muted flex items-center justify-center">
                                 <span className="text-xs text-muted-foreground">未提出</span>
@@ -1552,7 +1560,7 @@ export default function AdminApplicationDetail() {
                     {returnPhotos.length > 0 ? (
                       <div className="flex gap-2 flex-wrap mb-4">
                         {returnPhotos.map((p, i) => (
-                          <img key={i} src={`${import.meta.env.BASE_URL}api/storage${p}`} alt={`返却写真${i+1}`}
+                          <AuthenticatedImage key={i} src={`${import.meta.env.BASE_URL}api/storage${p}`} alt={`返却写真${i+1}`}
                             className="h-28 w-auto rounded-lg border border-border object-cover" />
                         ))}
                       </div>
@@ -1566,10 +1574,12 @@ export default function AdminApplicationDetail() {
                         return (
                           <div key={key} className="border border-border rounded-xl overflow-hidden">
                             {path ? (
-                              <a href={`${import.meta.env.BASE_URL}api/storage${path}`} target="_blank" rel="noopener noreferrer">
-                                <img src={`${import.meta.env.BASE_URL}api/storage${path}`} alt={label}
-                                  className="w-full h-20 object-cover" />
-                              </a>
+                              <AuthenticatedImage
+                                src={`${import.meta.env.BASE_URL}api/storage${path}`}
+                                alt={label}
+                                className="w-full h-20 object-cover"
+                                fallback={<div className="w-full h-20 bg-muted flex items-center justify-center"><span className="text-xs text-muted-foreground">表示不可</span></div>}
+                              />
                             ) : (
                               <div className="w-full h-20 bg-muted flex items-center justify-center">
                                 <span className="text-xs text-muted-foreground">未提出</span>
