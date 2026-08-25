@@ -474,6 +474,40 @@ async function runMigrations() {
   }
 
   logger.info("migration: all Chat VAN tables ready");
+  // 既存の協力会社アカウントは、入力済みの個人情報を上書きせず、欠けている会社名・電話番号だけを補完する。
+  try {
+    await db.execute(sql`
+      UPDATE users u
+      SET
+        company_name = CASE
+          WHEN u.company_name IS NULL OR BTRIM(u.company_name) = '' THEN rc.name
+          ELSE u.company_name
+        END,
+        phone = CASE
+          WHEN u.phone IS NULL OR BTRIM(u.phone) = '' THEN rc.phone
+          ELSE u.phone
+        END
+      FROM rental_companies rc
+      WHERE u.rental_company_id = rc.id
+        AND u.role = 'rental_company'
+        AND (
+          u.company_name IS NULL OR BTRIM(u.company_name) = ''
+          OR u.phone IS NULL OR BTRIM(u.phone) = ''
+        )
+    `);
+    logger.info("migration: rental company account details backfilled");
+  } catch (e: any) {
+    logger.warn({ err: e.message }, "rental company account detail backfill (non-fatal)");
+  }
+  try {
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS users_email_canonical_unique
+      ON users (LOWER(BTRIM(email)))
+    `);
+    logger.info("migration: canonical user email uniqueness ready");
+  } catch (e: any) {
+    logger.warn({ err: e.message }, "canonical user email uniqueness migration (non-fatal)");
+  }
   // 管理通知・お問い合わせの送信状態を既存データを保持したまま追跡可能にする。
   await db.execute(sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS email_status TEXT NOT NULL DEFAULT 'not_requested'`);
   await db.execute(sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS email_error TEXT`);

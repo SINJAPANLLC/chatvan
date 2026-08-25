@@ -43,6 +43,8 @@ import {
 
 const objectStorage = new ObjectStorageService();
 
+class RentalCompanyAccountEmailConflictError extends Error {}
+
 function parseCalendarDate(value: unknown): string | null {
   const dateString = String(value ?? "").slice(0, 10);
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
@@ -3602,14 +3604,21 @@ router.post("/van/rental-companies/:id/invite", requireAuth, requireAdmin, async
     const [company] = await db.select().from(rentalCompaniesTable).where(eq(rentalCompaniesTable.id, rcId)).limit(1);
     if (!company) return res.status(404).json({ error: "Not found" });
 
-    const inviteEmail = req.body.email || company.email;
+    const inviteEmail = String(req.body.email || company.email || "").trim().toLowerCase();
     if (!inviteEmail) return res.status(400).json({ error: "メールアドレスを指定してください" });
 
     // 既存ユーザーに権限付与
     const [existing] = await db.select({ id: usersTable.id }).from(usersTable)
-      .where(eq(usersTable.email, inviteEmail)).limit(1);
+      .where(sql`LOWER(BTRIM(${usersTable.email})) = ${inviteEmail}`).limit(1);
     if (existing) {
-      await db.execute(sql`UPDATE users SET role = 'rental_company', rental_company_id = ${rcId} WHERE id = ${existing.id}`);
+      await db.execute(sql`
+        UPDATE users
+        SET role = 'rental_company',
+            rental_company_id = ${rcId},
+            company_name = ${company.name},
+            phone = COALESCE(NULLIF(phone, ''), ${company.phone})
+        WHERE id = ${existing.id}
+      `);
       return res.json({ message: "既存アカウントに協力会社権限を付与しました", userId: existing.id, email: inviteEmail });
     }
 
@@ -3621,8 +3630,9 @@ router.post("/van/rental-companies/:id/invite", requireAuth, requireAdmin, async
     const passwordHash = await bcrypt.hash(tempPassword, 10);
 
     const raw = await db.execute(sql`
-      INSERT INTO users (email, password_hash, name, role, rental_company_id)
-      VALUES (${inviteEmail}, ${passwordHash}, ${req.body.name ?? company.name}, 'rental_company', ${rcId})
+      INSERT INTO users (email, password_hash, name, company_name, phone, role, rental_company_id)
+      VALUES (${inviteEmail}, ${passwordHash}, ${req.body.name ?? company.contactName ?? company.name},
+        ${company.name}, ${company.phone}, 'rental_company', ${rcId})
       RETURNING id, email, name
     `);
     const newUser = (raw as any).rows?.[0] ?? (raw as any)[0];
@@ -3795,7 +3805,17 @@ router.get("/van/rental-companies", requireAuth, requireAdmin, async (req: Reque
 
 router.post("/van/rental-companies", requireAuth, requireAdmin, async (req: Request, res: Response) => {
   try {
-    const [company] = await db.insert(rentalCompaniesTable).values(req.body).returning();
+    const { contactPerson, serviceArea, ...body } = req.body ?? {};
+    const normalizedEmail = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    if (!body.name || !normalizedEmail) {
+      return res.status(400).json({ error: "会社名・メールアドレスは必須です" });
+    }
+    const [company] = await db.insert(rentalCompaniesTable).values({
+      ...body,
+      email: normalizedEmail,
+      ...(contactPerson !== undefined ? { contactName: contactPerson } : {}),
+      ...(serviceArea !== undefined ? { serviceAreas: serviceArea } : {}),
+    }).returning();
     return res.status(201).json(company);
   } catch (err) {
     return res.status(500).json({ error: "Internal error" });
@@ -3816,10 +3836,66 @@ router.get("/van/rental-companies/:id", requireAuth, requireAdmin, async (req: R
 router.patch("/van/rental-companies/:id", requireAuth, requireAdmin, async (req: Request, res: Response) => {
   try {
     const id = parseInt(String(req.params.id));
-    const [updated] = await db.update(rentalCompaniesTable).set(req.body).where(eq(rentalCompaniesTable.id, id)).returning();
+    const { contactPerson, serviceArea, ...body } = req.body ?? {};
+    if (body.email !== undefined) {
+      const normalizedEmail = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+      if (!normalizedEmail) return res.status(400).json({ error: "メールアドレスは必須です" });
+      body.email = normalizedEmail;
+    }
+    const updated = await db.transaction(async (tx) => {
+      const [current] = await tx.select().from(rentalCompaniesTable)
+        .where(eq(rentalCompaniesTable.id, id)).limit(1);
+      if (!current) return null;
+
+      const [nextCompany] = await tx.update(rentalCompaniesTable).set({
+        ...body,
+        ...(contactPerson !== undefined ? { contactName: contactPerson } : {}),
+        ...(serviceArea !== undefined ? { serviceAreas: serviceArea } : {}),
+        updatedAt: new Date(),
+      }).where(eq(rentalCompaniesTable.id, id)).returning();
+
+      // 全ての紐づきアカウントには会社名を同期する。担当者情報は、
+      // 会社メールと一致する代表ログインアカウントだけに同期して個別担当者を上書きしない。
+      await tx.update(usersTable).set({ companyName: nextCompany.name })
+        .where(and(eq(usersTable.rentalCompanyId, id), eq(usersTable.role, "rental_company")));
+
+      const currentCompanyEmail = current.email?.trim().toLowerCase() || "";
+      if (currentCompanyEmail) {
+        const [primaryUser] = await tx.select({
+          id: usersTable.id,
+          email: usersTable.email,
+          name: usersTable.name,
+        }).from(usersTable).where(and(
+          eq(usersTable.rentalCompanyId, id),
+          eq(usersTable.role, "rental_company"),
+          sql`LOWER(BTRIM(${usersTable.email})) = ${currentCompanyEmail}`,
+        )).limit(1);
+
+        if (primaryUser) {
+          if (nextCompany.email && nextCompany.email !== primaryUser.email) {
+            const [emailOwner] = await tx.select({ id: usersTable.id }).from(usersTable)
+              .where(sql`LOWER(BTRIM(${usersTable.email})) = ${nextCompany.email}`).limit(1);
+            if (emailOwner && emailOwner.id !== primaryUser.id) {
+              throw new RentalCompanyAccountEmailConflictError();
+            }
+          }
+          await tx.update(usersTable).set({
+            name: nextCompany.contactName || primaryUser.name,
+            companyName: nextCompany.name,
+            phone: nextCompany.phone || null,
+            ...(nextCompany.email ? { email: nextCompany.email } : {}),
+          }).where(eq(usersTable.id, primaryUser.id));
+        }
+      }
+      return nextCompany;
+    });
     if (!updated) return res.status(404).json({ error: "Not found" });
     return res.json(updated);
   } catch (err) {
+    if (err instanceof RentalCompanyAccountEmailConflictError) {
+      return res.status(409).json({ error: "このメールアドレスは別のアカウントで使用されています" });
+    }
+    req.log.error({ err }, "rental company update error");
     return res.status(500).json({ error: "Internal error" });
   }
 });

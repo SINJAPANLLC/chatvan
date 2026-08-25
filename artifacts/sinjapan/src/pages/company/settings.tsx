@@ -55,11 +55,11 @@ export default function CompanySettings() {
           if (raw) bank = typeof raw === 'string' ? JSON.parse(raw) : raw;
         } catch {}
         setForm({
-          name:          j.name          ?? j.company_name    ?? '',
+          name:          j.company_name  ?? j.name            ?? '',
           corporateName: j.corporate_name ?? j.corporateName  ?? '',
           contactName:   j.contact_name   ?? j.contactName    ?? '',
-          phone:         j.phone          ?? '',
-          email:         j.email          ?? '',
+          phone:         j.company_phone  ?? j.phone           ?? '',
+          email:         j.company_email  ?? j.email           ?? '',
           address:       j.address        ?? '',
           serviceAreas:  j.service_areas  ?? j.serviceAreas   ?? '',
           fleetSize:     j.fleet_size     ?? j.fleetSize       ?? '',
@@ -76,6 +76,10 @@ export default function CompanySettings() {
   }, []);
 
   const handleSave = async () => {
+    if (!String(form.email ?? '').trim()) {
+      toast({ variant: 'destructive', title: 'メールアドレスは必須です' });
+      return;
+    }
     setIsSaving(true);
     try {
       const r = await fetch(API('/company/settings'), {
@@ -197,7 +201,7 @@ export default function CompanySettings() {
                 <input type="tel" value={form.phone ?? ''} onChange={set('phone')} placeholder="例: 03-0000-0000" className={inp} />
               </Field>
               <Field label="メールアドレス" full note="ログインに使用しているメールアドレスです">
-                <input type="email" value={form.email ?? ''} onChange={set('email')} className={inp} />
+                <input type="email" required value={form.email ?? ''} onChange={set('email')} className={inp} />
               </Field>
 
               <Section title="所在地・対応エリア" />

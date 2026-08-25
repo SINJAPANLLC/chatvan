@@ -38,7 +38,7 @@ export default function AdminRentalCompanies() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState<any>({ name: '', contactPerson: '', phone: '', email: '', address: '', serviceArea: '', notes: '', fleetSize: '' });
+  const [form, setForm] = useState<any>({ name: '', corporateName: '', contactPerson: '', phone: '', email: '', address: '', serviceArea: '', notes: '', fleetSize: '' });
   const [newPassword, setNewPassword] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -80,7 +80,7 @@ export default function AdminRentalCompanies() {
 
   const handleOpenCreate = () => {
     setEditingId(null);
-    setForm({ name: '', contactPerson: '', phone: '', email: '', address: '', serviceArea: '', notes: '', fleetSize: '' });
+    setForm({ name: '', corporateName: '', contactPerson: '', phone: '', email: '', address: '', serviceArea: '', notes: '', fleetSize: '' });
     setNewPassword(''); setIsModalOpen(true);
   };
 
@@ -91,6 +91,10 @@ export default function AdminRentalCompanies() {
   };
 
   const handleSave = async () => {
+    if (!String(form.email ?? '').trim()) {
+      toast({ variant: 'destructive', title: 'メールアドレスは必須です' });
+      return;
+    }
     setSaving(true);
     try {
       if (editingId) {
@@ -178,6 +182,7 @@ export default function AdminRentalCompanies() {
                     <div className="font-medium flex items-center gap-2">
                       <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />{c.name}
                     </div>
+                     {c.corporateName && <div className="text-xs text-muted-foreground mt-0.5 pl-6">{c.corporateName}</div>}
                     {c.address && <div className="text-xs text-muted-foreground mt-0.5 pl-6">{c.address}</div>}
                   </td>
                   <td className="px-5 py-4 text-sm">{c.contactPerson || c.contact_name || '—'}</td>
@@ -244,13 +249,14 @@ export default function AdminRentalCompanies() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             {[
-              { label: '会社名', key: 'name' }, { label: '担当者名', key: 'contactPerson' },
+              { label: '会社名', key: 'name' }, { label: '法人名 / 屋号', key: 'corporateName' },
+              { label: '担当者名', key: 'contactPerson' },
               { label: '電話番号', key: 'phone' }, { label: 'メールアドレス', key: 'email', type: 'email' },
               { label: '住所', key: 'address' }, { label: '対応エリア', key: 'serviceArea', placeholder: '例: 関東全域、神奈川県' },
             ].map(f => (
               <div key={f.key} className="space-y-1.5">
                 <label className="text-sm font-medium">{f.label}</label>
-                <input type={f.type ?? 'text'} value={form[f.key] || ''} placeholder={f.placeholder}
+                <input type={f.type ?? 'text'} required={f.key === 'email'} value={form[f.key] || ''} placeholder={f.placeholder}
                   onChange={e => setForm({ ...form, [f.key]: e.target.value })}
                   className="w-full px-3 py-2 border rounded-md text-sm outline-none focus:border-foreground/50" />
               </div>
