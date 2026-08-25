@@ -1118,6 +1118,8 @@ export default function AdminApplicationDetail() {
               </Section>
             );
             const statusLabel: Record<string, string> = { verified: '確認済み', approved: '承認済み', rejected: '却下', pending: '審査中' };
+            const ivValue = (camelCaseKey: string, snakeCaseKey: string) =>
+              iv[camelCaseKey] ?? iv[snakeCaseKey];
             return (
               <Section title="本人確認（eKYC）">
                 <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
@@ -1126,13 +1128,13 @@ export default function AdminApplicationDetail() {
                       {statusLabel[iv.status] ?? iv.status}
                     </span>
                   } />
-                  <DL label="提出日" value={iv.created_at ? format(new Date(iv.created_at), 'yyyy/MM/dd') : null} />
-                  <DL label="氏名" value={iv.full_name} />
-                  <DL label="生年月日" value={iv.birth_date} />
-                  <DL label="住所" value={iv.address} span2 />
-                  <DL label="免許証種別" value={iv.license_type} />
-                  <DL label="免許証番号" value={iv.license_number} />
-                  <DL label="有効期限" value={iv.license_expiry} />
+                  <DL label="提出日" value={ivValue('createdAt', 'created_at') ? format(new Date(ivValue('createdAt', 'created_at')), 'yyyy/MM/dd') : null} />
+                  <DL label="氏名" value={ivValue('fullName', 'full_name')} />
+                  <DL label="生年月日" value={ivValue('birthDate', 'birth_date')} />
+                  <DL label="住所" value={ivValue('address', 'address')} span2 />
+                  <DL label="免許証種別" value={ivValue('licenseType', 'license_type')} />
+                  <DL label="免許証番号" value={ivValue('licenseNumber', 'license_number')} />
+                  <DL label="有効期限" value={ivValue('licenseExpiry', 'license_expiry')} />
                   {(iv.emergencyContactName || iv.emergency_contact_name) && (
                     <>
                       <DL label="緊急連絡先（氏名）" value={iv.emergencyContactName ?? iv.emergency_contact_name} />
@@ -1140,9 +1142,13 @@ export default function AdminApplicationDetail() {
                       <DL label="続柄" value={iv.emergencyContactRelation ?? iv.emergency_contact_relation} />
                     </>
                   )}
-                  {(iv.license_front || iv.selfie_photo) && (
+                  {(ivValue('licenseFront', 'license_front') || ivValue('selfiePhoto', 'selfie_photo')) && (
                     <div className="col-span-2 sm:col-span-3 flex gap-3 flex-wrap">
-                      {[['免許証（表面）', iv.license_front], ['免許証（裏面）', iv.license_back], ['自撮り写真', iv.selfie_photo]].filter(([, p]) => p).map(([label, path]) => (
+                      {[
+                        ['免許証（表面）', ivValue('licenseFront', 'license_front')],
+                        ['免許証（裏面）', ivValue('licenseBack', 'license_back')],
+                        ['自撮り写真', ivValue('selfiePhoto', 'selfie_photo')],
+                      ].filter(([, p]) => p).map(([label, path]) => (
                         <div key={label as string}>
                           <p className="text-xs text-muted-foreground mb-1">{label}</p>
                           <img src={`${import.meta.env.BASE_URL}api/storage${path}`} alt={label as string} className="h-28 w-auto rounded-lg border border-border object-cover" />

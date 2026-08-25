@@ -15,6 +15,7 @@ import {
   usersTable,
   settingsTable,
   identityVerificationsTable,
+  screeningsTable,
   insurancePoliciesTable,
   gpsDevicesTable,
   gpsLocationsTable,
@@ -284,12 +285,27 @@ async function runAIScreening(appId: number) {
     const result: "approved" | "rejected" = parsed.result === "rejected" ? "rejected" : "approved";
     const reason: string = parsed.reason ?? "";
 
-    await db.update(vanApplicationsTable).set({
-      status: result, updatedAt: new Date(),
-    }).where(and(
-      eq(vanApplicationsTable.id, appId),
-      eq(vanApplicationsTable.status, "screening"),
-    ));
+    // 審査結果は申込ステータスだけでなく、管理画面の履歴としても残す。
+    // 同一トランザクションにして、片方だけ更新される状態を防ぐ。
+    if (!app.userId) throw new Error("AI審査対象の利用者情報がありません");
+    await db.transaction(async (tx) => {
+      const [updatedApplication] = await tx.update(vanApplicationsTable).set({
+        status: result,
+        updatedAt: new Date(),
+      }).where(and(
+        eq(vanApplicationsTable.id, appId),
+        eq(vanApplicationsTable.status, "screening"),
+      )).returning({ id: vanApplicationsTable.id });
+      if (!updatedApplication) return;
+
+      await tx.insert(screeningsTable).values({
+        applicationId: appId,
+        userId: app.userId,
+        result,
+        reason: reason || null,
+        notes: "AI自動審査",
+      });
+    });
     screeningRetryNotBefore.delete(appId);
 
     if (result === "approved") {
