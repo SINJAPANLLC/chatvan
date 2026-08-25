@@ -1100,6 +1100,13 @@ router.post("/van/applications/:id/accept", requireAuth, async (req: Request, re
     if (!app) return res.status(404).json({ error: "Not found" });
 
     await notifyAdmins('Chat VAN - 申込受付', `申込みを受け付けました（ID: ${appId}）`);
+    if (app.userId) {
+      await notifyUser(
+        app.userId,
+        "Chat VAN - お申込みを受け付けました",
+        "お申込みありがとうございます。内容を確認のうえ、次の手続きについてご案内します。",
+      );
+    }
     // 既にeKYC済みのユーザーはAI審査を即時実行
     if (app.userId) {
       const existingKyc = await db.execute(sql`
@@ -2364,7 +2371,8 @@ router.post("/van/payment-retries/:id/retry", requireAuth, requireAdmin, async (
 
     const rows = await db.execute(sql`
       SELECT pr.*,
-        u.square_customer_id, u.square_card_id, u.name as user_name
+        u.square_customer_id, u.square_card_id, u.name as user_name,
+        vc.rental_company_id, vc.contract_number
       FROM payment_retries pr
       LEFT JOIN van_contracts vc ON pr.contract_id = vc.id
       LEFT JOIN users u ON pr.user_id = u.id
@@ -2412,6 +2420,13 @@ router.post("/van/payment-retries/:id/retry", requireAuth, requireAdmin, async (
         await notifyUser(pr.user_id, "Chat VAN - 月額料金のお支払いが完了しました",
           `${pr.period_month ?? ''}分の月額料金（¥${amount.toLocaleString()}）のお支払いが完了しました。`);
       }
+      if (pr.rental_company_id) {
+        await notifyRcUsers(
+          pr.rental_company_id,
+          "Chat VAN - 月額料金のお支払いが完了しました",
+          `契約番号 ${pr.contract_number ?? `#${pr.contract_id}`} の${pr.period_month ?? ''}分の月額料金（¥${amount.toLocaleString()}）の決済が完了しました。`,
+        );
+      }
       return res.json({ ok: true, method: 'card' });
 
     } else {
@@ -2426,6 +2441,13 @@ router.post("/van/payment-retries/:id/retry", requireAuth, requireAdmin, async (
       if (pr.user_id) {
         await notifyUser(pr.user_id, "Chat VAN - お支払いを確認しました",
           `${pr.period_month ?? ''}分のお支払いを確認しました（¥${amount.toLocaleString()}）。`);
+      }
+      if (pr.rental_company_id) {
+        await notifyRcUsers(
+          pr.rental_company_id,
+          "Chat VAN - お支払いを確認しました",
+          `契約番号 ${pr.contract_number ?? `#${pr.contract_id}`} の${pr.period_month ?? ''}分のお支払い（¥${amount.toLocaleString()}）を確認しました。`,
+        );
       }
       return res.json({ ok: true, method: 'manual' });
     }
@@ -2482,6 +2504,13 @@ router.post("/van/contracts/:id/additional-charge", requireAuth, requireAdmin, a
       if (contract.userId) {
         await notifyUser(contract.userId, "Chat VAN - 追加決済が完了しました",
           `${description}（¥${chargeAmount.toLocaleString()}）の決済が完了しました。`);
+      }
+      if (contract.rentalCompanyId) {
+        await notifyRcUsers(
+          contract.rentalCompanyId,
+          "Chat VAN - 追加決済が完了しました",
+          `契約番号 ${contract.contractNumber ?? `#${contract.id}`} の追加決済（¥${chargeAmount.toLocaleString()}）が完了しました。`,
+        );
       }
       return res.json({ ok: true, method: 'card' });
 
@@ -2722,21 +2751,17 @@ router.post("/van/applications/:id/request-return", requireAuth, async (req: Req
     }
 
     if (app.userId != null) {
-      await db.insert(notificationsTable).values({
-        userId: app.userId,
-        title: "Chat VAN - 解約申請を受け付けました",
-        message: "解約申請を受け付けました。担当者より返却手続きのご連絡をいたします（2〜3営業日以内）。",
-      });
+      await notifyUser(
+        app.userId,
+        "Chat VAN - 解約申請を受け付けました",
+        "解約申請を受け付けました。担当者より返却手続きのご連絡をいたします（2〜3営業日以内）。",
+      );
     }
 
-    const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
-    for (const admin of admins) {
-      await db.insert(notificationsTable).values({
-        userId: admin.id,
-        title: "Chat VAN - 解約申請",
-        message: `申込ID: ${appId} から解約申請が届きました。${reason ? `理由: ${reason}` : ""}`,
-      });
-    }
+    await notifyAdmins(
+      "Chat VAN - 解約申請",
+      `申込ID: ${appId} から解約申請が届きました。${reason ? `理由: ${reason}` : ""}`,
+    );
 
     // 協力会社へ通知（解約申請）
     const contractForRc = await db.execute(sql`
@@ -2800,21 +2825,17 @@ router.post("/van/applications/:id/confirm-return", requireAuth, async (req: Req
     }
 
     if (app.userId != null) {
-      await db.insert(notificationsTable).values({
-        userId: app.userId,
-        title: "Chat VAN - 返却完了",
-        message: "車両の返却が完了しました。ご利用ありがとうございました。",
-      });
+      await notifyUser(
+        app.userId,
+        "Chat VAN - ご契約が終了しました",
+        "車両の返却が完了しました。ご利用ありがとうございました。",
+      );
     }
 
-    const admins = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
-    for (const admin of admins) {
-      await db.insert(notificationsTable).values({
-        userId: admin.id,
-        title: "Chat VAN - 返却完了",
-        message: `申込ID: ${appId} の車両返却が完了しました。`,
-      });
-    }
+    await notifyAdmins(
+      "Chat VAN - 契約終了",
+      `申込ID: ${appId} の車両返却が完了しました。`,
+    );
 
     // 協力会社へ通知（返却完了）
     if (contract?.vehicleId) {
@@ -4180,6 +4201,64 @@ db.execute(sql`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS compulsory_insuranc
 // 月額自動決済は契約・対象月ごとに一度だけ入金台帳へ残す。
 
 // ── 月額自動決済スケジューラー (毎日 JST 9:00 = UTC 0:00) ────────────────
+function jstCalendarDate(now = new Date()): string {
+  const date = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  return date.toISOString().slice(0, 10);
+}
+
+function daysBetweenCalendarDates(from: string, to: string): number | null {
+  const fromMs = Date.parse(`${from}T00:00:00Z`);
+  const toMs = Date.parse(`${to}T00:00:00Z`);
+  if (Number.isNaN(fromMs) || Number.isNaN(toMs)) return null;
+  return Math.round((toMs - fromMs) / (24 * 60 * 60 * 1000));
+}
+
+/**
+ * 返却予定日の7日前に、日本時間の日付単位で一度だけ通知する。
+ * 通知レコードのdedupe keyで、再起動や日次スケジュールの重複実行を防ぐ。
+ */
+export async function sendReturnReminderNotifications(now = new Date()): Promise<void> {
+  const today = jstCalendarDate(now);
+  try {
+    const contracts = await db.select({
+      id: vanContractsTable.id,
+      contractNumber: vanContractsTable.contractNumber,
+      userId: vanContractsTable.userId,
+      rentalCompanyId: vanContractsTable.rentalCompanyId,
+      plannedEndDate: vanContractsTable.plannedEndDate,
+    }).from(vanContractsTable).where(and(
+      inArray(vanContractsTable.status, ["active", "return_pending"] as any),
+      sql`${vanContractsTable.plannedEndDate} IS NOT NULL`,
+    ));
+
+    for (const contract of contracts) {
+      const endDate = parseCalendarDate(contract.plannedEndDate);
+      if (!endDate || daysBetweenCalendarDates(today, endDate) !== 7) continue;
+
+      const contractLabel = contract.contractNumber ?? `#${contract.id}`;
+      const userMessage = `ご契約の返却予定日は ${endDate.replaceAll("-", "/")} です。返却手続きについてご確認ください。`;
+      const companyMessage = `契約番号 ${contractLabel} の返却予定日は ${endDate.replaceAll("-", "/")} です。返却準備をご確認ください。`;
+      const keyBase = `chat-van:return-reminder:${contract.id}:${endDate}`;
+
+      await Promise.allSettled([
+        notifyUser(contract.userId, "Chat VAN - 返却予定日のご案内", userMessage, { dedupeKey: `${keyBase}:user` }),
+        contract.rentalCompanyId
+          ? notifyRcUsers(contract.rentalCompanyId, "Chat VAN - 返却予定日のご案内", companyMessage, { dedupeKey: `${keyBase}:company` })
+          : Promise.resolve(0),
+      ]);
+    }
+  } catch (error) {
+    console.error("[返却予定通知] スケジューラーエラー:", error);
+  }
+}
+
+export function startContractNotificationScheduler() {
+  cron.schedule("15 0 * * *", () => {
+    void sendReturnReminderNotifications();
+  }, { timezone: "UTC" });
+  void sendReturnReminderNotifications();
+}
+
 export function startMonthlyBillingScheduler() {
   cron.schedule("0 0 * * *", async () => {
   const jstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
@@ -4280,6 +4359,13 @@ export function startMonthlyBillingScheduler() {
             console.log(`[月額決済] カード成功 contract=${contract.id} ¥${amount}`);
             await notifyUser(contract.userId, "Chat VAN - 月額料金のお支払いが完了しました",
               `月額料金（¥${amount.toLocaleString()}）のお支払いが完了しました。`);
+            if (contract.rentalCompanyId) {
+              await notifyRcUsers(
+                contract.rentalCompanyId,
+                "Chat VAN - 月額料金のお支払いが完了しました",
+                `契約番号 ${contract.contractNumber ?? `#${contract.id}`} の月額料金（¥${amount.toLocaleString()}）の決済が完了しました。`,
+              );
+            }
           }
         } else {
           // カード情報未登録 → 管理者通知

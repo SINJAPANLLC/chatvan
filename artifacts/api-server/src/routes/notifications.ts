@@ -4,6 +4,7 @@ import { eq, and, ne, lt, isNull, desc, inArray, count, ilike, or, sql } from "d
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { sendEmail, buildEmailHtml } from "../lib/email";
 import { logAdminAudit } from "../lib/auditLogger";
+import { CHAT_VAN_NOTIFICATION_RULES } from "../lib/chatVanNotificationRules";
 
 const router: IRouter = Router();
 
@@ -97,6 +98,11 @@ router.patch("/notifications/:id/read", requireAuth, async (req, res): Promise<v
 });
 
 // ── 管理者向け ────────────────────────────────────────────────────────────────
+
+// 管理画面は固定の表示ではなく、サーバー側で管理するChat VAN通知仕様を表示する。
+router.get("/admin/notification-rules", requireAdmin, (_req, res): void => {
+  res.json({ rules: CHAT_VAN_NOTIFICATION_RULES });
+});
 
 // GET /admin/notifications — 送信済み通知の履歴
 router.get("/admin/notifications", requireAdmin, async (req, res): Promise<void> => {

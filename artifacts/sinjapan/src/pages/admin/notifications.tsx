@@ -313,19 +313,15 @@ function SendHistory() {
 }
 
 // ── 自動通知設定 ───────────────────────────────────────────────────────────────
-const AUTO_RULES = [
-  { category: '会員',     status: '会員登録',         trigger: 'ユーザーが新規登録した時',                         mail: true },
-  { category: '会員',     status: 'パスワードリセット', trigger: 'パスワードリセットをリクエストした時',             mail: true },
-  { category: '相談',     status: '提案送信',          trigger: '管理者が車両提案を送信した時',                     mail: true },
-  { category: '相談',     status: '申込受付',          trigger: 'ユーザーが申込みを確定した時',                     mail: true },
-  { category: '契約',     status: '利用開始',          trigger: '管理者がステータスを「利用開始」に変更した時',      mail: true },
-  { category: '契約',     status: '返却予定',          trigger: '返却予定日7日前',                                  mail: true },
-  { category: '契約',     status: '契約終了',          trigger: '契約が終了した時',                                 mail: true },
-  { category: '相談',     status: 'キャンセル',        trigger: 'キャンセルが承認された時',                         mail: true },
-  { category: '決済',     status: '決済完了',          trigger: '月次決済が完了した時',                             mail: true },
-  { category: 'お問合せ', status: '受付確認',          trigger: 'お問い合わせフォームが送信された時（ユーザーへ）',  mail: true },
-  { category: 'お問合せ', status: '返信通知',          trigger: '管理者がお問い合わせに返信した時（ユーザーへ）',    mail: true },
-];
+type NotificationRule = {
+  key: string;
+  category: string;
+  label: string;
+  trigger: string;
+  recipients: string[];
+  email: boolean;
+  inApp: 'always' | 'registered_recipient' | 'none';
+};
 
 const PREVIEW_DATA: Record<string, { badge?: string; name: string; subject: string; body: string; cta: string; accentColor?: string }> = {
   '会員登録': {
@@ -457,35 +453,58 @@ function EmailPreview() {
 }
 
 function AutoSettings() {
+  const [rules, setRules] = useState<NotificationRule[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiFetch('/admin/notification-rules')
+      .then(data => setRules(data.rules ?? []))
+      .catch(() => setRules([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const inAppLabel = (delivery: NotificationRule['inApp']) => {
+    if (delivery === 'always') return <span className="inline-flex items-center gap-1 text-green-700"><CheckCheck className="h-3.5 w-3.5" />送信</span>;
+    if (delivery === 'registered_recipient') return <span className="text-amber-700">アカウント保有者</span>;
+    return <span className="text-muted-foreground">なし</span>;
+  };
+
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-border bg-muted/30 px-5 py-4 text-sm text-muted-foreground leading-relaxed">
-        案件のステータスが変更されると、対象ユーザーへ自動的に通知メールが送信されます。<br />
-        以下のルールは常時有効です。SMTP設定を行うことで実際のメール送信が有効になります。
+        Chat VANの実際の配信仕様を表示しています。メール送信にはSMTP設定が必要です。<br />
+        「アカウント保有者」は、受信者にログイン用アカウントがある場合だけシステム内通知を作成します。アカウントがない送信先にもメールの送信結果は記録されます。
       </div>
       <div className="rounded-xl border border-border overflow-hidden shadow-sm">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm min-w-[820px]">
           <thead>
             <tr className="bg-muted/40 border-b border-border">
               <th className="px-5 py-3 text-left font-medium text-muted-foreground">カテゴリ</th>
               <th className="px-5 py-3 text-left font-medium text-muted-foreground">種別</th>
               <th className="px-5 py-3 text-left font-medium text-muted-foreground">トリガー条件</th>
+              <th className="px-5 py-3 text-left font-medium text-muted-foreground">送信先</th>
               <th className="px-5 py-3 text-center font-medium text-muted-foreground">メール</th>
               <th className="px-5 py-3 text-center font-medium text-muted-foreground">システム内通知</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border bg-card">
-            {AUTO_RULES.map(r => (
-              <tr key={r.category + r.status} className="hover:bg-muted/20 transition-colors">
+            {loading ? (
+              <tr><td colSpan={6} className="px-5 py-12 text-center text-muted-foreground"><Loader2 className="inline h-4 w-4 animate-spin mr-2" />通知仕様を読み込み中です</td></tr>
+            ) : rules.map(r => (
+              <tr key={r.key} className="hover:bg-muted/20 transition-colors">
                 <td className="px-5 py-3.5 text-xs text-muted-foreground whitespace-nowrap">{r.category}</td>
                 <td className="px-5 py-3.5 whitespace-nowrap">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-foreground text-background text-xs font-semibold">{r.status}</span>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-foreground text-background text-xs font-semibold">{r.label}</span>
                 </td>
                 <td className="px-5 py-3.5 text-muted-foreground">{r.trigger}</td>
-                <td className="px-5 py-3.5 text-center"><span className="inline-block w-2 h-2 rounded-full bg-green-500" /></td>
-                <td className="px-5 py-3.5 text-center"><span className="inline-block w-2 h-2 rounded-full bg-green-500" /></td>
+                <td className="px-5 py-3.5 text-xs text-muted-foreground">{r.recipients.join('・')}</td>
+                <td className="px-5 py-3.5 text-center">{r.email ? <span className="inline-flex items-center gap-1 text-green-700"><Mail className="h-3.5 w-3.5" />送信</span> : <span className="text-muted-foreground">なし</span>}</td>
+                <td className="px-5 py-3.5 text-center text-xs">{inAppLabel(r.inApp)}</td>
               </tr>
             ))}
+            {!loading && rules.length === 0 && (
+              <tr><td colSpan={6} className="px-5 py-12 text-center text-muted-foreground">通知仕様を取得できませんでした</td></tr>
+            )}
           </tbody>
         </table>
       </div>

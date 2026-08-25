@@ -19,6 +19,7 @@ export const notificationsTable = pgTable("notifications", {
   emailSentAt: timestamp("email_sent_at"),
   emailAttemptCount: integer("email_attempt_count").notNull().default(0),
   emailAttemptStartedAt: timestamp("email_attempt_started_at"),
+  dedupeKey: text("dedupe_key"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

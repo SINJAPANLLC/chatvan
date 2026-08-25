@@ -3,7 +3,7 @@ import { logger } from "./lib/logger";
 import { seedRequiredAccounts } from "./lib/seed";
 import { startScheduler } from "./lib/blogAutoGen";
 import { startScheduler as startAutoProspect } from "./lib/autoProspect";
-import { startMonthlyBillingScheduler } from "./routes/van";
+import { startContractNotificationScheduler, startMonthlyBillingScheduler } from "./routes/van";
 import { assertDatabaseReady, db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 
@@ -536,6 +536,14 @@ async function runMigrations() {
   await db.execute(sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMP`);
   await db.execute(sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS email_attempt_count INTEGER NOT NULL DEFAULT 0`);
   await db.execute(sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS email_attempt_started_at TIMESTAMP`);
+  // 返却予定通知の重複防止は業務上の必須制約。失敗時はサーバーを起動しない。
+  await db.execute(sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS dedupe_key TEXT`);
+  await db.execute(sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS notifications_user_dedupe_key_unique
+    ON notifications (user_id, dedupe_key)
+    WHERE dedupe_key IS NOT NULL
+  `);
+  logger.info("migration: notification dedupe key ready");
   await db.execute(sql`
     UPDATE notifications
     SET email_attempt_started_at = created_at
@@ -653,6 +661,7 @@ async function startServer() {
     }
     logger.info({ port }, "Server listening");
     startMonthlyBillingScheduler();
+    startContractNotificationScheduler();
     startScheduler();
     startAutoProspect();
   });

@@ -1,9 +1,9 @@
 import { Router, type IRouter } from "express";
-import { db, contactsTable } from "@workspace/db";
+import { db, contactsTable, usersTable } from "@workspace/db";
 import { eq, ne, desc, count, ilike, or, and } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/auth";
 import { sendEmail, buildEmailHtml } from "../lib/email";
-import { notifyAdmins } from "../lib/notifyHelpers";
+import { notifyAdmins, notifyExternalEmail, notifyUser, notifyUserInApp } from "../lib/notifyHelpers";
 import { logUserActivity } from "../lib/userLogger";
 import { logAdminAudit } from "../lib/auditLogger";
 
@@ -61,6 +61,25 @@ router.post("/contact", async (req, res): Promise<void> => {
     .insert(contactsTable)
     .values({ name, email, subject, message })
     .returning();
+
+  // 受付確認は問い合わせ先へ必ずメールを送り、登録済み利用者ならアプリ内通知も作成する。
+  const receiptTitle = "Chat VAN - お問い合わせを受け付けました";
+  const receiptMessage = "お問い合わせいただきありがとうございます。内容を確認のうえ、通常2営業日以内にご返信します。";
+  const [contactUser] = await db.select({ id: usersTable.id })
+    .from(usersTable)
+    .where(eq(usersTable.email, email))
+    .limit(1);
+  if (contactUser) {
+    await notifyUser(contactUser.id, receiptTitle, receiptMessage);
+  } else {
+    await notifyExternalEmail({
+      email,
+      recipientName: name,
+      title: receiptTitle,
+      message: receiptMessage,
+      attemptKey: `chat-van:contact-receipt:${contact.id}`,
+    });
+  }
 
   // 管理者全員へのアプリ内通知＋メール。集計結果は問い合わせにも残す。
   try {
@@ -166,6 +185,18 @@ router.post("/admin/contacts/:id/reply", requireAdmin, async (req, res): Promise
       replyEmailError: result.sent ? null : result.reason ?? "返信メールの送信に失敗しました",
       replyEmailSentAt: result.sent ? new Date() : null,
     }).where(eq(contactsTable.id, id)).returning();
+    const [contactUser] = await db.select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.email, contact.email))
+      .limit(1);
+    if (contactUser) {
+      await notifyUserInApp(
+        contactUser.id,
+        "Chat VAN - お問い合わせへ回答しました",
+        "お問い合わせへの回答をメールでお送りしました。内容をご確認ください。",
+        { dedupeKey: `chat-van:contact-reply:${contact.id}` },
+      );
+    }
     await logAdminAudit(req, { action: "reply", targetType: "contact", targetId: id, afterData: { emailStatus: status } });
     res.json(fmt(updated));
   } catch (error: any) {
