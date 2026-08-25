@@ -479,6 +479,12 @@ async function runMigrations() {
   await db.execute(sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS email_error TEXT`);
   await db.execute(sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMP`);
   await db.execute(sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS email_attempt_count INTEGER NOT NULL DEFAULT 0`);
+  await db.execute(sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS email_attempt_started_at TIMESTAMP`);
+  await db.execute(sql`
+    UPDATE notifications
+    SET email_attempt_started_at = created_at
+    WHERE email_status = 'sending' AND email_attempt_started_at IS NULL
+  `);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS notifications_created_at_idx ON notifications (created_at DESC)`);
   await db.execute(sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS replied_by INTEGER`);
   await db.execute(sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS reply_email_status TEXT NOT NULL DEFAULT 'not_sent'`);

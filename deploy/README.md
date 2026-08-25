@@ -51,7 +51,6 @@ SMTP_PORT=587
 SMTP_USER=
 SMTP_PASS=
 SMTP_FROM=Chat VAN <noreply@chat-van.com>
-ADMIN_NOTIFY_EMAIL=info@chat-van.com
 ```
 
 ### アップロードファイル

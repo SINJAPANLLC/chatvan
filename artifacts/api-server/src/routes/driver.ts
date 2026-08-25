@@ -3,9 +3,11 @@
  */
 import { Router, type IRouter } from "express";
 import { db, shipmentsTable, carriersTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, and, ne, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { sendEmail, buildEmailHtml, ADMIN_NOTIFY_EMAIL } from "../lib/email";
+import { notifyAdmins } from "../lib/notifyHelpers";
+import { sendAutoNotification, notifyShipmentStatusToAdmins } from "../lib/autoNotify";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -104,7 +106,29 @@ router.patch("/driver/:token/status", async (req, res): Promise<void> => {
   const { status } = req.body;
   if (!ALLOWED.includes(status)) { res.status(400).json({ error: "無効なステータス" }); return; }
 
-  await db.update(shipmentsTable).set({ status } as any).where(eq(shipmentsTable.id, shipment.id));
+  const [updatedShipment] = await db.update(shipmentsTable)
+    .set({ status } as any)
+    .where(and(eq(shipmentsTable.id, shipment.id), ne(shipmentsTable.status, status as any)))
+    .returning();
+  if (!updatedShipment) {
+    res.json({ ok: true, unchanged: true });
+    return;
+  }
+  if (shipment.userId != null) {
+    const route = shipment.pickupAddress && shipment.deliveryAddress
+      ? `${shipment.pickupAddress} → ${shipment.deliveryAddress}`
+      : undefined;
+    sendAutoNotification({ shipmentId: updatedShipment.id, userId: shipment.userId, status, route }).catch((error) =>
+      logger.error({ err: error, shipmentId: updatedShipment.id, status }, "[DRIVER STATUS NOTIFICATION ERROR]")
+    );
+  } else {
+    const route = shipment.pickupAddress && shipment.deliveryAddress
+      ? `${shipment.pickupAddress} → ${shipment.deliveryAddress}`
+      : undefined;
+    notifyShipmentStatusToAdmins({ shipmentId: updatedShipment.id, status, route }).catch((error) =>
+      logger.error({ err: error, shipmentId: updatedShipment.id, status }, "[DRIVER STATUS NOTIFICATION ERROR]")
+    );
+  }
   res.json({ ok: true });
 });
 
@@ -199,13 +223,10 @@ router.post("/master-card/:token/submit", async (req, res): Promise<void> => {
     .map(([k, v]) => `${k}：${v}`)
     .join("\n");
 
-  const subject = `【Chat LOGI】マスターカード登録 — ${d.companyName ?? "（社名未入力）"} — 案件 #${shipment.id}`;
-  const html = buildEmailHtml({
-    subject,
-    body: `運送会社からマスターカードが提出されました。\n\n${rows}`,
-    ctaText: "管理画面で確認する →",
-  });
-  await sendEmail(ADMIN_NOTIFY_EMAIL, subject, html).catch(() => {});
+  await notifyAdmins(
+    "Chat LOGI - マスターカード登録",
+    `運送会社からマスターカードが提出されました。\n\n案件 #${shipment.id}\n${rows}`,
+  );
 
   // 運送会社テーブルに情報を反映（アサイン済みの場合のみ）
   if ((shipment as any).assignedCarrierId && d.companyName) {

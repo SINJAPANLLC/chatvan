@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, shipmentsTable, usersTable, carriersTable } from "@workspace/db";
-import { eq, desc, and, gte, lte, inArray, sql } from "drizzle-orm";
+import { eq, ne, desc, and, gte, lte, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { insertShipmentSchema } from "@workspace/db";
 const CreateShipmentBody = insertShipmentSchema.partial();
@@ -44,8 +44,8 @@ const ListShipmentsQueryParams = z.object({
 });
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { authorizeOnFile } from "../lib/square-authorize";
-import { sendAutoNotification } from "../lib/autoNotify";
-import { sendEmail, buildEmailHtml, ADMIN_NOTIFY_EMAIL } from "../lib/email";
+import { sendAutoNotification, notifyShipmentStatusToAdmins } from "../lib/autoNotify";
+import { notifyAdmins } from "../lib/notifyHelpers";
 import { calcPriceWithConfig, parsePricingConfig, DEFAULT_CONFIG } from "../lib/pricing";
 import { settingsTable } from "@workspace/db";
 import { like } from "drizzle-orm";
@@ -153,7 +153,6 @@ router.post("/shipments", requireAuth, async (req, res): Promise<void> => {
   // 管理者への新規配送依頼通知（非同期）
   const [user] = await db.select({ name: usersTable.name, email: usersTable.email })
     .from(usersTable).where(eq(usersTable.id, req.session.userId!)).limit(1);
-  const adminSubject = `【Chat LOGI】新規配送依頼 #${shipment.id}`;
   const adminBody = [
     `新しい配送依頼が届きました。`,
     ``,
@@ -163,11 +162,7 @@ router.post("/shipments", requireAuth, async (req, res): Promise<void> => {
     `納品先：${shipment.deliveryAddress ?? "未設定"}`,
     `車格：${shipment.vehicleSize ?? "未設定"}`,
   ].join("\n");
-  sendEmail(
-    ADMIN_NOTIFY_EMAIL,
-    adminSubject,
-    buildEmailHtml({ subject: adminSubject, body: adminBody, ctaText: "管理画面で確認する →" }),
-  ).catch(() => {});
+  await notifyAdmins(`Chat LOGI - 新規配送依頼 #${shipment.id}`, adminBody);
 
   res.status(201).json(formatShipment(shipment));
 });
@@ -296,10 +291,18 @@ router.patch("/shipments/:id/status", requireAuth, async (req, res): Promise<voi
   const [shipment] = await db
     .update(shipmentsTable)
     .set({ status: parsed.data.status as any, updatedAt: new Date() })
-    .where(eq(shipmentsTable.id, id))
+    .where(and(
+      eq(shipmentsTable.id, id),
+      ne(shipmentsTable.status, parsed.data.status as any),
+    ))
     .returning();
 
-  if (!shipment) { res.status(404).json({ error: "案件が見つかりません" }); return; }
+  if (!shipment) {
+    const [current] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, id)).limit(1);
+    if (!current) { res.status(404).json({ error: "案件が見つかりません" }); return; }
+    res.json(formatShipment(current));
+    return;
+  }
 
   // 配車確定になったら登録済みカードで自動オーソリ
   if (parsed.data.status === '配車確定' && !shipment.squarePaymentId) {
@@ -312,6 +315,8 @@ router.patch("/shipments/:id/status", requireAuth, async (req, res): Promise<voi
     : undefined;
   if (shipment.userId != null) {
     sendAutoNotification({ shipmentId: id, userId: shipment.userId, status: parsed.data.status, route }).catch(() => {});
+  } else {
+    notifyShipmentStatusToAdmins({ shipmentId: id, status: parsed.data.status, route }).catch(() => {});
   }
 
   res.json(formatShipment(shipment));
@@ -338,8 +343,23 @@ router.post("/shipments/:id/cancel-request", requireAuth, async (req, res): Prom
       cancelPreviousStatus: newStatus === 'キャンセル申請中' ? current.status : null,
       updatedAt: new Date(),
     })
-    .where(eq(shipmentsTable.id, id))
+    .where(and(
+      eq(shipmentsTable.id, id),
+      eq(shipmentsTable.status, current.status),
+    ))
     .returning();
+
+  if (!shipment) {
+    const [latest] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, id)).limit(1);
+    if (!latest) { res.status(404).json({ error: "案件が見つかりません" }); return; }
+    res.json(formatShipment(latest));
+    return;
+  }
+
+  await notifyAdmins(
+    `Chat LOGI - ${newStatus === "キャンセル申請中" ? "キャンセル申請" : "キャンセル"}`,
+    `案件 #${shipment.id} の${newStatus === "キャンセル申請中" ? "キャンセル申請" : "キャンセル"}がユーザーから届きました。`,
+  );
 
   res.json(formatShipment(shipment));
 });
@@ -352,10 +372,15 @@ router.patch("/shipments/:id/cancel-approve", requireAdmin, async (req, res): Pr
   const [shipment] = await db
     .update(shipmentsTable)
     .set({ status: 'キャンセル' as any, cancelPreviousStatus: null, updatedAt: new Date() })
-    .where(eq(shipmentsTable.id, id))
+    .where(and(eq(shipmentsTable.id, id), ne(shipmentsTable.status, 'キャンセル' as any)))
     .returning();
 
-  if (!shipment) { res.status(404).json({ error: "案件が見つかりません" }); return; }
+  if (!shipment) {
+    const [current] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, id)).limit(1);
+    if (!current) { res.status(404).json({ error: "案件が見つかりません" }); return; }
+    res.json(formatShipment(current));
+    return;
+  }
 
   if (shipment.userId != null) {
     sendAutoNotification({ shipmentId: id, userId: shipment.userId, status: "キャンセル" }).catch(() => {});

@@ -18,6 +18,7 @@ export const notificationsTable = pgTable("notifications", {
   emailError: text("email_error"),
   emailSentAt: timestamp("email_sent_at"),
   emailAttemptCount: integer("email_attempt_count").notNull().default(0),
+  emailAttemptStartedAt: timestamp("email_attempt_started_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

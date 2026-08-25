@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, notificationsTable, usersTable } from "@workspace/db";
-import { eq, and, ne, desc, inArray, count, ilike, or, sql } from "drizzle-orm";
+import { eq, and, ne, lt, isNull, desc, inArray, count, ilike, or, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { sendEmail, buildEmailHtml } from "../lib/email";
 import { logAdminAudit } from "../lib/auditLogger";
@@ -27,6 +27,8 @@ type DeliveryResult = {
   reason?: string;
 };
 
+const STALE_EMAIL_SENDING_MS = 5 * 60 * 1000;
+
 function deliveryStatus(result: { sent: boolean; reason?: string }): DeliveryResult["status"] {
   if (result.sent) return "sent";
   return result.reason?.includes("SMTP未設定") ? "skipped" : "failed";
@@ -48,6 +50,7 @@ async function deliverAdminNotification(input: {
     readStatus: false,
     emailStatus: "sending",
     emailAttemptCount: 1,
+    emailAttemptStartedAt: new Date(),
   }).returning();
 
   try {
@@ -57,11 +60,12 @@ async function deliverAdminNotification(input: {
       emailStatus: status,
       emailError: result.sent ? null : result.reason ?? "メール送信に失敗しました",
       emailSentAt: result.sent ? new Date() : null,
+      emailAttemptStartedAt: null,
     }).where(eq(notificationsTable.id, notification.id));
     return { notificationId: notification.id, userId: input.userId, email: input.email, status, ...result };
   } catch (error: any) {
     const reason = error?.message ?? "メール送信に失敗しました";
-    await db.update(notificationsTable).set({ emailStatus: "failed", emailError: reason })
+    await db.update(notificationsTable).set({ emailStatus: "failed", emailError: reason, emailAttemptStartedAt: null })
       .where(eq(notificationsTable.id, notification.id));
     return { notificationId: notification.id, userId: input.userId, email: input.email, sent: false, status: "failed", reason };
   }
@@ -270,6 +274,7 @@ router.post("/admin/notifications/:id/resend", requireAdmin, async (req, res): P
     shipmentId: notificationsTable.shipmentId,
     emailStatus: notificationsTable.emailStatus,
     emailAttemptCount: notificationsTable.emailAttemptCount,
+    emailAttemptStartedAt: notificationsTable.emailAttemptStartedAt,
     userName: usersTable.name,
     userEmail: usersTable.email,
   }).from(notificationsTable)
@@ -278,15 +283,28 @@ router.post("/admin/notifications/:id/resend", requireAdmin, async (req, res): P
     .limit(1);
   if (!notification || !notification.userEmail) { res.status(404).json({ error: "通知または送信先が見つかりません" }); return; }
   if (notification.emailStatus === "sent") { res.status(409).json({ error: "このメールはすでに送信済みです" }); return; }
+  const staleSendingBefore = new Date(Date.now() - STALE_EMAIL_SENDING_MS);
+  const isFreshSending = notification.emailStatus === "sending"
+    && notification.emailAttemptStartedAt instanceof Date
+    && notification.emailAttemptStartedAt >= staleSendingBefore;
+  if (isFreshSending) {
+    res.status(409).json({ error: "このメールは送信処理中です。数分後にもう一度ご確認ください" });
+    return;
+  }
 
   const [claimed] = await db.update(notificationsTable).set({
     emailStatus: "sending",
     emailError: null,
     emailAttemptCount: sql`COALESCE(${notificationsTable.emailAttemptCount}, 0) + 1`,
+    emailAttemptStartedAt: new Date(),
   }).where(and(
     eq(notificationsTable.id, id),
     ne(notificationsTable.emailStatus, "sent"),
-    ne(notificationsTable.emailStatus, "sending"),
+    or(
+      ne(notificationsTable.emailStatus, "sending"),
+      isNull(notificationsTable.emailAttemptStartedAt),
+      lt(notificationsTable.emailAttemptStartedAt, staleSendingBefore),
+    ),
   )).returning({ id: notificationsTable.id });
   if (!claimed) {
     res.status(409).json({ error: "このメールはすでに送信済み、または送信処理中です" });
@@ -300,12 +318,13 @@ router.post("/admin/notifications/:id/resend", requireAdmin, async (req, res): P
       emailStatus: status,
       emailError: result.sent ? null : result.reason ?? "メール送信に失敗しました",
       emailSentAt: result.sent ? new Date() : null,
+      emailAttemptStartedAt: null,
     }).where(eq(notificationsTable.id, id));
     await logAdminAudit(req, { action: "resend", targetType: "notification", targetId: id, afterData: { status, sent: result.sent } });
     res.json({ notificationId: id, status, ...result });
   } catch (error: any) {
     const reason = error?.message ?? "メール送信に失敗しました";
-    await db.update(notificationsTable).set({ emailStatus: "failed", emailError: reason }).where(eq(notificationsTable.id, id));
+    await db.update(notificationsTable).set({ emailStatus: "failed", emailError: reason, emailAttemptStartedAt: null }).where(eq(notificationsTable.id, id));
     res.status(502).json({ error: reason });
   }
 });

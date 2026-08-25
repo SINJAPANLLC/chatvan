@@ -8,3 +8,4 @@
 - [GPS tracking lifecycle](gps-tracking-lifecycle.md) — 利用者アプリ表示中のGPSは、利用中かつ同意済みの契約だけを追跡する。
 - [Square payment history](square-payment-history.md) — Squareの過去決済は、対応するローカル案件がなければChat VAN契約へ表示しない。
 - [Finance as-of reporting](finance-as-of-reporting.md) — 管理用BS/CFは、対象時点の入金日・JST月境界・入金手段を明示して集計する。
+- [Admin notification delivery](admin-notification-delivery.md) — 管理者通知は全員へのアプリ内通知と個別メール結果を不可分にし、再送は試行単位で排他する。

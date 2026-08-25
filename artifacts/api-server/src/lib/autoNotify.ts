@@ -3,7 +3,9 @@
  */
 import { db, notificationsTable, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { sendEmail, buildEmailHtml, ADMIN_NOTIFY_EMAIL } from "./email";
+import { sendEmail, buildEmailHtml } from "./email";
+import { notifyAdmins } from "./notifyHelpers";
+import { logger } from "./logger";
 
 interface AutoNotifyPayload {
   shipmentId: number;
@@ -59,33 +61,62 @@ export async function sendAutoNotification(payload: AutoNotifyPayload): Promise<
   const rule = NOTIFY_MAP[status];
   if (!rule) return; // 通知不要なステータス
 
-  // ユーザー情報取得
-  const [user] = await db.select({ name: usersTable.name, email: usersTable.email })
-    .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
-  if (!user) return;
-
   const subject = rule.subject;
   const body = rule.body(route);
+  let user: { name: string; email: string } | undefined;
 
-  // DB通知レコード保存
-  await db.insert(notificationsTable).values({
-    userId,
-    shipmentId,
-    title: subject,
-    message: body,
-    readStatus: false,
-  });
+  try {
+    // ユーザー情報取得
+    [user] = await db.select({ name: usersTable.name, email: usersTable.email })
+      .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  } catch (error) {
+    logger.error({ err: error, shipmentId, userId }, "[AUTO NOTIFY] ユーザー情報の取得に失敗しました");
+  }
 
-  // メール送信（非同期、失敗してもOK）
-  const html = buildEmailHtml({
-    subject,
-    body,
-    recipientName: user.name ?? undefined,
-    statusBadge: status,
-    shipmentId,
-    ctaText: rule.cta,
-  });
-  sendEmail(user.email, subject, html, { bcc: ADMIN_NOTIFY_EMAIL }).catch((e) =>
-    console.error("[AUTO NOTIFY EMAIL ERROR]", e)
-  );
+  if (user) {
+    // ユーザー向け通知の失敗は、管理者通知の発火を妨げない。
+    try {
+      await db.insert(notificationsTable).values({
+        userId,
+        shipmentId,
+        title: subject,
+        message: body,
+        readStatus: false,
+      });
+
+      const html = buildEmailHtml({
+        subject,
+        body,
+        recipientName: user.name ?? undefined,
+        statusBadge: status,
+        shipmentId,
+        ctaText: rule.cta,
+      });
+      sendEmail(user.email, subject, html).catch((error) =>
+        logger.error({ err: error, shipmentId, userId }, "[AUTO NOTIFY] ユーザーメールの送信に失敗しました")
+      );
+    } catch (error) {
+      logger.error({ err: error, shipmentId, userId }, "[AUTO NOTIFY] ユーザー通知の保存に失敗しました");
+    }
+  } else {
+    logger.error({ shipmentId, userId }, "[AUTO NOTIFY] ユーザーが見つからないためユーザー通知をスキップしました");
+  }
+
+  // BCC の固定宛先ではなく、全管理者にアプリ内通知と個別メールを送る。
+  await notifyAdmins(`Chat LOGI - ${status}`, [
+    `案件 #${shipmentId} のステータスが「${status}」に更新されました。`,
+    route ? `ルート：${route}` : "",
+  ].filter(Boolean).join("\n"));
+}
+
+/** 管理者通知だけを送る必要がある、ユーザー不明の配送ステータス更新用。 */
+export async function notifyShipmentStatusToAdmins(input: {
+  shipmentId: number;
+  status: string;
+  route?: string;
+}): Promise<void> {
+  await notifyAdmins(`Chat LOGI - ${input.status}`, [
+    `案件 #${input.shipmentId} のステータスが「${input.status}」に更新されました。`,
+    input.route ? `ルート：${input.route}` : "",
+  ].filter(Boolean).join("\n"));
 }

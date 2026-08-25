@@ -2,7 +2,8 @@ import { Router, type IRouter } from "express";
 import { db, contactsTable } from "@workspace/db";
 import { eq, ne, desc, count, ilike, or, and } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/auth";
-import { sendEmail, buildEmailHtml, ADMIN_NOTIFY_EMAIL } from "../lib/email";
+import { sendEmail, buildEmailHtml } from "../lib/email";
+import { notifyAdmins } from "../lib/notifyHelpers";
 import { logUserActivity } from "../lib/userLogger";
 import { logAdminAudit } from "../lib/auditLogger";
 
@@ -61,23 +62,22 @@ router.post("/contact", async (req, res): Promise<void> => {
     .values({ name, email, subject, message })
     .returning();
 
-  // 管理者への通知メール。失敗も記録して、管理画面で見逃さない。
+  // 管理者全員へのアプリ内通知＋メール。集計結果は問い合わせにも残す。
   try {
-    const html = buildEmailHtml({
-      subject: `【Chat VAN】新規お問い合わせ：${subject}`,
-      body: `新しいお問い合わせが届きました。\n\n氏名：${name}\nメール：${email}\n件名：${subject}\n\n内容：\n${message}`,
-      ctaText: "管理画面で確認する →",
-    });
-    const result = await sendEmail(
-      ADMIN_NOTIFY_EMAIL,
-      `【Chat VAN】新規お問い合わせ：${subject}`,
-      html,
+    const summary = await notifyAdmins(
+      "Chat VAN - 新規お問い合わせ",
+      `新しいお問い合わせが届きました。\n\n氏名：${name}\nメール：${email}\n件名：${subject}\n\n内容：\n${message}`,
     );
-    const status = emailDeliveryStatus(result);
+    const status = summary.failed > 0 ? "failed" : summary.sent > 0 ? "sent" : "skipped";
+    const error = summary.failed > 0
+      ? `管理者${summary.adminCount}名中、${summary.failed}件の通知処理に失敗しました`
+      : summary.adminCount === 0
+        ? "送信対象の管理者が見つかりません"
+        : null;
     await db.update(contactsTable).set({
       adminNotifyStatus: status,
-      adminNotifyError: result.sent ? null : result.reason ?? "管理者通知の送信に失敗しました",
-      adminNotifiedAt: result.sent ? new Date() : null,
+      adminNotifyError: error,
+      adminNotifiedAt: summary.sent > 0 ? new Date() : null,
     }).where(eq(contactsTable.id, contact.id));
   } catch (error: any) {
     await db.update(contactsTable).set({

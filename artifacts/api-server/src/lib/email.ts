@@ -15,8 +15,6 @@ function createTransport() {
   };
 }
 
-export const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFY_EMAIL ?? "info@chat-van.com";
-
 export async function sendEmail(
   to: string,
   subject: string,
