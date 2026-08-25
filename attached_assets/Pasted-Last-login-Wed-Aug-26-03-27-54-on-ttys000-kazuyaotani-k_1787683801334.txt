@@ -1,0 +1,328 @@
+Last login: Wed Aug 26 03:27:54 on ttys000
+kazuyaotani@kazuya-MacBook-Air-2 ~ % ssh root@212.85.24.206
+root@212.85.24.206's password: 
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-124-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Tue Aug 25 18:38:18 UTC 2026
+
+  System load:  0.24                Processes:             161
+  Usage of /:   21.2% of 192.69GB   Users logged in:       0
+  Memory usage: 24%                 IPv4 address for eth0: 212.85.24.206
+  Swap usage:   0%                  IPv6 address for eth0: 2a02:4780:59:cc86::1
+
+ * Strictly confined Kubernetes makes edge and IoT secure. Learn how MicroK8s
+   just raised the bar for easy, resilient and secure K8s cluster deployment.
+
+   https://ubuntu.com/engage/secure-kubernetes-at-the-edge
+
+Expanded Security Maintenance for Applications is not enabled.
+
+28 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+23 additional security updates can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+1 updates could not be installed automatically. For more details,
+see /var/log/unattended-upgrades/unattended-upgrades.log
+
+*** System restart required ***
+Last login: Tue Aug 25 18:28:07 2026 from 126.116.55.23
+root@srv1087935:~# cd /var/www/chatvan
+
+if grep -q '^LOCAL_UPLOAD_DIR=' .env.production; then
+  sed -i 's|^LOCAL_UPLOAD_DIR=.*|LOCAL_UPLOAD_DIR=/var/lib/chatvan/uploads|' .env.production
+else
+  printf '\nLOCAL_UPLOAD_DIR=/var/lib/chatvan/uploads\n' >> .env.production
+fi
+
+install -d -m 750 /var/lib/chatvan/uploads
+
+pm2 restart chatvan-api --update-env
+[PM2] Applying action restartProcessId on app [chatvan-api](ids: [ 0 ])
+[PM2] [chatvan-api](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 5  │ aiagent            │ fork     │ 4    │ online    │ 0%       │ 152.1mb  │
+│ 15 │ chatlogi-api       │ fork     │ 4608 │ online    │ 0%       │ 155.5mb  │
+│ 0  │ chatvan-api        │ fork     │ 68   │ online    │ 0%       │ 18.6mb   │
+│ 4  │ keimatch           │ fork     │ 0    │ online    │ 0%       │ 305.6mb  │
+│ 13 │ keisaiyou          │ fork     │ 0    │ online    │ 7.7%     │ 291.0mb  │
+│ 3  │ menz-esthe-town    │ fork     │ 0    │ online    │ 0%       │ 143.0mb  │
+│ 12 │ onlyu              │ fork     │ 0    │ online    │ 7.7%     │ 123.3mb  │
+│ 8  │ sinjapan-crm-api   │ fork     │ 600… │ online    │ 0%       │ 84.9mb   │
+│ 1  │ sinjapan-manager   │ fork     │ 0    │ online    │ 0%       │ 59.1mb   │
+│ 2  │ sinjapan-onlinesc… │ fork     │ 0    │ online    │ 0%       │ 98.9mb   │
+│ 14 │ sinjapan-sales-api │ fork     │ 64   │ online    │ 0%       │ 299.5mb  │
+│ 6  │ sinjapanai         │ fork     │ 0    │ online    │ 0%       │ 104.6mb  │
+│ 7  │ sinjapanailive-api │ fork     │ 0    │ online    │ 0%       │ 99.9mb   │
+│ 10 │ sinjapanaisite-api │ fork     │ 0    │ online    │ 0%       │ 191.8mb  │
+│ 11 │ tiktokshindan      │ fork     │ 0    │ online    │ 0%       │ 106.4mb  │
+│ 9  │ tramatch           │ fork     │ 0    │ online    │ 0%       │ 718.1mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+host metrics | cpu: 4.3% | ram usage: 24.2% | lo: ⇓ 0.001mb/s ⇑ 0.001mb/s | eth0: ⇓ 0.027mb/s ⇑ 0.008mb/s |
+root@srv1087935:/var/www/chatvan# cd /var/www/chatvan
+bash deploy/deploy.sh
+[2026-08-25 18:49:25] === Chat VAN デプロイ開始 ===
+Now using node v20.20.0 (npm v10.8.2)
+[2026-08-25 18:49:26] Node.js: v20.20.0, pnpm: 9.15.9
+[2026-08-25 18:49:26] [1/5] git pull
+remote: Enumerating objects: 66, done.
+remote: Counting objects: 100% (66/66), done.
+remote: Compressing objects: 100% (14/14), done.
+remote: Total 49 (delta 35), reused 49 (delta 35), pack-reused 0 (from 0)
+Unpacking objects: 100% (49/49), 415.42 KiB | 5.39 MiB/s, done.
+From https://github.com/SINJAPANLLC/chatvan
+ * branch            main       -> FETCH_HEAD
+   4a7ad0e..21bbeab  main       -> origin/main
+Updating 4a7ad0e..21bbeab
+Fast-forward
+ artifacts/api-server/src/app.ts                    |   4 +-
+ .../sinjapan/src/components/AuthenticatedImage.tsx |  64 +++++
+ artifacts/sinjapan/src/pages/admin/vehicles.tsx    |  65 ++++-
+ ...5-21-on-ttys000-kazuyaotani-k_1787682546484.txt |  62 ++++
+ ...5-21-on-ttys000-kazuyaotani-k_1787682667506.txt | 319 +++++++++++++++++++++
+ ...7-54-on-ttys000-kazuyaotani-k_1787683111394.txt |  70 +++++
+ ...3\203\210_2026-08-26_3.33.39_1787682848566.png" | Bin 0 -> 288166 bytes
+ ...3\203\210_2026-08-26_3.39.59_1787683208331.png" | Bin 0 -> 204095 bytes
+ deploy/.env.production.example                     |   5 +
+ deploy/README.md                                   |   2 +
+ deploy/deploy.sh                                   |   6 +
+ deploy/ecosystem.config.cjs                        |   1 +
+ 12 files changed, 589 insertions(+), 9 deletions(-)
+ create mode 100644 artifacts/sinjapan/src/components/AuthenticatedImage.tsx
+ create mode 100644 attached_assets/Pasted-Last-login-Wed-Aug-26-02-25-21-on-ttys000-kazuyaotani-k_1787682546484.txt
+ create mode 100644 attached_assets/Pasted-Last-login-Wed-Aug-26-02-25-21-on-ttys000-kazuyaotani-k_1787682667506.txt
+ create mode 100644 attached_assets/Pasted-Last-login-Wed-Aug-26-03-27-54-on-ttys000-kazuyaotani-k_1787683111394.txt
+ create mode 100644 "attached_assets/\343\202\271\343\202\257\343\203\252\343\203\274\343\203\263\343\202\267\343\203\247\343\203\203\343\203\210_2026-08-26_3.33.39_1787682848566.png"
+ create mode 100644 "attached_assets/\343\202\271\343\202\257\343\203\252\343\203\274\343\203\263\343\202\267\343\203\247\343\203\203\343\203\210_2026-08-26_3.39.59_1787683208331.png"
+[2026-08-25 18:49:27] [2/5] pnpm install
+Scope: all 12 workspace projects
+Lockfile is up to date, resolution step is skipped
+Already up to date
+. preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_use…
+└─ Done in 20ms
+Done in 2.2s using pnpm v9.15.9
+[2026-08-25 18:49:30] [3/5] API サーバービルド
+
+> @workspace/api-server@0.0.0 build /var/www/chatvan/artifacts/api-server
+> node ./build.mjs
+
+
+  dist/index.mjs                       3.5mb ⚠️
+  dist/pino-worker.mjs               153.4kb
+  dist/pino-file.mjs                 142.0kb
+  dist/pino-pretty.mjs               114.4kb
+  dist/thread-stream-worker.mjs        7.3kb
+  dist/index.mjs.map                   7.8mb
+  dist/pino-worker.mjs.map           256.9kb
+  dist/pino-file.mjs.map             229.0kb
+  dist/pino-pretty.mjs.map           203.6kb
+  dist/thread-stream-worker.mjs.map   12.0kb
+
+⚡ Done in 411ms
+[2026-08-25 18:49:31] [4/5] フロントエンドビルド（静的ファイル生成）
+
+> @workspace/sinjapan@0.0.0 build /var/www/chatvan/artifacts/sinjapan
+> vite build --config vite.config.ts
+
+vite v7.3.6 building client environment for production...
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 3148 modules transformed.
+Generated an empty chunk: "vendor-react".
+dist/public/index.html                                             2.89 kB │ gzip:   0.99 kB
+dist/public/assets/leaflet-CIGW-MKW.css                           15.61 kB │ gzip:   6.46 kB
+dist/public/assets/index-CF2XqNew.css                            165.73 kB │ gzip:  25.32 kB
+dist/public/assets/vendor-react-l0sNRNKZ.js                        0.00 kB │ gzip:   0.02 kB
+dist/public/assets/textarea-DKzcUNQy.js                            0.50 kB │ gzip:   0.35 kB
+dist/public/assets/input-CtiUbryA.js                               0.60 kB │ gzip:   0.38 kB
+dist/public/assets/label-D5YTrSce.js                               0.67 kB │ gzip:   0.45 kB
+dist/public/assets/button-BRcvHLZv.js                              1.32 kB │ gzip:   0.67 kB
+dist/public/assets/company-yB7Ifc5q.js                             1.45 kB │ gzip:   0.84 kB
+dist/public/assets/shipments-carriers-conversations-BXTUmogl.js    1.47 kB │ gzip:   0.55 kB
+dist/public/assets/dialog-D82AJShE.js                              2.23 kB │ gzip:   0.89 kB
+dist/public/assets/forgot-password-ClCDEEUC.js                     2.63 kB │ gzip:   1.30 kB
+dist/public/assets/parseISO-BuOw8hXq.js                            2.67 kB │ gzip:   1.18 kB
+dist/public/assets/select-DjV8Pots.js                              3.13 kB │ gzip:   1.16 kB
+dist/public/assets/home-Coz4XxIX.js                                3.14 kB │ gzip:   1.59 kB
+dist/public/assets/login-B61Q0Gbg.js                               3.30 kB │ gzip:   1.51 kB
+dist/public/assets/gps-jgBS4VRj.js                                 3.43 kB │ gzip:   1.50 kB
+dist/public/assets/tokusho-dcJgtDeP.js                             3.64 kB │ gzip:   2.00 kB
+dist/public/assets/contracts-5qCPNWO_.js                           3.66 kB │ gzip:   1.56 kB
+dist/public/assets/settings-cSA-88hE.js                            3.92 kB │ gzip:   1.79 kB
+dist/public/assets/register-BStZAAVt.js                            3.92 kB │ gzip:   1.67 kB
+dist/public/assets/contact-DZo9pMvJ.js                             4.03 kB │ gzip:   1.72 kB
+dist/public/assets/shipments-DKu3Q7Zc.js                           4.11 kB │ gzip:   1.55 kB
+dist/public/assets/invoice-detail-DRy8WIuI.js                      4.25 kB │ gzip:   1.54 kB
+dist/public/assets/audit-logs-DAyVAS4A.js                          4.36 kB │ gzip:   1.65 kB
+dist/public/assets/payments-van-O7CMNMvy.js                        4.40 kB │ gzip:   1.93 kB
+dist/public/assets/contact-Dz__LKCj.js                             4.42 kB │ gzip:   1.73 kB
+dist/public/assets/insurance-DjlmPWJe.js                           4.61 kB │ gzip:   1.73 kB
+dist/public/assets/vendor-router-BTidj2DY.js                       4.92 kB │ gzip:   2.39 kB
+dist/public/assets/van-history-DWW7Z1E-.js                         5.47 kB │ gzip:   1.96 kB
+dist/public/assets/notifications-AZ_jI4rP.js                       5.64 kB │ gzip:   2.01 kB
+dist/public/assets/ja-BNmDrzzg.js                                  5.72 kB │ gzip:   2.08 kB
+dist/public/assets/company-vehicles-CE7PW8hR.js                    6.55 kB │ gzip:   2.54 kB
+dist/public/assets/incidents-CQpFxYWE.js                           6.56 kB │ gzip:   2.10 kB
+dist/public/assets/seo-Gort3EBF.js                                 6.89 kB │ gzip:   2.62 kB
+dist/public/assets/contacts-B2bmFsNw.js                            7.00 kB │ gzip:   2.67 kB
+dist/public/assets/index-DfZjD_nt.js                               7.16 kB │ gzip:   2.65 kB
+dist/public/assets/breakdown-DOblCk3h.js                           7.19 kB │ gzip:   2.50 kB
+dist/public/assets/register-DX-a6Rdi.js                            7.24 kB │ gzip:   2.36 kB
+dist/public/assets/applications-3RRkVdBE.js                        7.50 kB │ gzip:   2.77 kB
+dist/public/assets/privacy-CRE_wmfA.js                             7.55 kB │ gzip:   2.75 kB
+dist/public/assets/screening-Cy2rxziE.js                           7.80 kB │ gzip:   2.50 kB
+dist/public/assets/invoices-BC7zgJyc.js                            7.88 kB │ gzip:   2.90 kB
+dist/public/assets/settings--VrnxZiq.js                            8.28 kB │ gzip:   3.04 kB
+dist/public/assets/user-logs-ByidkHO9.js                           8.54 kB │ gzip:   2.93 kB
+dist/public/assets/terms-CVU9hQw7.js                               8.87 kB │ gzip:   2.86 kB
+dist/public/assets/van-proposal-B-nl654i.js                        9.07 kB │ gzip:   3.46 kB
+dist/public/assets/recovery-BT0FLwyJ.js                            9.14 kB │ gzip:   2.86 kB
+dist/public/assets/corporate-BYBAGHWi.js                           9.18 kB │ gzip:   2.74 kB
+dist/public/assets/gps-BZl7hYWx.js                                 9.87 kB │ gzip:   2.75 kB
+dist/public/assets/insurance-ByU81SGR.js                           9.98 kB │ gzip:   2.93 kB
+dist/public/assets/article-BAoHZcG1.js                            10.02 kB │ gzip:   3.45 kB
+dist/public/assets/dashboard-Cu2xy4Xa.js                          11.78 kB │ gzip:   3.94 kB
+dist/public/assets/settlements-BmkNCiGX.js                        11.84 kB │ gzip:   4.13 kB
+dist/public/assets/identity-verification-C6aMXbqT.js              12.83 kB │ gzip:   3.82 kB
+dist/public/assets/pricing-kLzN6ZZ9.js                            12.88 kB │ gzip:   4.50 kB
+dist/public/assets/rental-companies-DTjHqd30.js                   13.03 kB │ gzip:   3.88 kB
+dist/public/assets/dashboard-BCauxlcB.js                          13.15 kB │ gzip:   4.49 kB
+dist/public/assets/van-pickup-DYUrYU8m.js                         13.25 kB │ gzip:   3.96 kB
+dist/public/assets/mypage-CdK0Sx_N.js                             13.75 kB │ gzip:   4.59 kB
+dist/public/assets/van-payment-BpXHoqs5.js                        13.79 kB │ gzip:   4.18 kB
+dist/public/assets/invoices-D5t8KxZG.js                           13.79 kB │ gzip:   4.10 kB
+dist/public/assets/contract-chat-BZoiVY9O.js                      14.47 kB │ gzip:   4.74 kB
+dist/public/assets/master-card-N6JT728t.js                        16.81 kB │ gzip:   4.85 kB
+dist/public/assets/format-DoPCwC_x.js                             19.76 kB │ gzip:   5.63 kB
+dist/public/assets/customers-DJzSnT2Q.js                          19.80 kB │ gzip:   5.48 kB
+dist/public/assets/blog-Ch5fhm18.js                               20.45 kB │ gzip:   6.41 kB
+dist/public/assets/vehicles-BGHz2oWN.js                           22.62 kB │ gzip:   7.06 kB
+dist/public/assets/lp-company-JEdT0-Nl.js                         23.04 kB │ gzip:   7.08 kB
+dist/public/assets/lp-BRzOPL7R.js                                 23.57 kB │ gzip:   7.00 kB
+dist/public/assets/vehicles-Cs3tsmO-.js                           26.78 kB │ gzip:   7.81 kB
+dist/public/assets/contracts-C1og1GTJ.js                          27.31 kB │ gzip:   7.32 kB
+dist/public/assets/purify.es-4eNOHKSq.js                          28.74 kB │ gzip:  11.02 kB
+dist/public/assets/email-marketing-BRXVxNeJ.js                    30.84 kB │ gzip:   9.05 kB
+dist/public/assets/van-contract-BEWsbyNS.js                       30.98 kB │ gzip:  10.61 kB
+dist/public/assets/finance-CWnMcdgl.js                            31.46 kB │ gzip:   6.12 kB
+dist/public/assets/notifications-BV95ZAMm.js                      33.66 kB │ gzip:   8.74 kB
+dist/public/assets/shipment-detail-hmBBb1mG.js                    41.66 kB │ gzip:   9.26 kB
+dist/public/assets/van-status-BWKXDzBi.js                         44.66 kB │ gzip:  10.19 kB
+dist/public/assets/vendor-query-ChLhbXNe.js                       44.69 kB │ gzip:  13.71 kB
+dist/public/assets/application-detail-DEXDmoNt.js                 67.93 kB │ gzip:  17.65 kB
+dist/public/assets/form-CrMsWHlo.js                               88.89 kB │ gzip:  24.97 kB
+dist/public/assets/van-chat-EM-nN96M.js                          122.85 kB │ gzip:  38.21 kB
+dist/public/assets/vendor-ui-CudA7xvN.js                         126.82 kB │ gzip:  43.20 kB
+dist/public/assets/leaflet-src-CylAWYLv.js                       149.91 kB │ gzip:  43.49 kB
+dist/public/assets/index.es-BJkNPJ7v.js                          159.05 kB │ gzip:  53.11 kB
+dist/public/assets/html2canvas.esm-DXEQVQnt.js                   201.04 kB │ gzip:  47.43 kB
+dist/public/assets/index-BMGghSJ6.js                             273.20 kB │ gzip:  83.61 kB
+dist/public/assets/jspdf.es.min-DY92H9UM.js                      386.32 kB │ gzip: 126.46 kB
+✓ built in 11.01s
+[2026-08-25 18:49:43] [5/5] PM2 起動
+[PM2] Applying action stopProcessId on app [chatvan-api](ids: [ 0 ])
+[PM2] [chatvan-api](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 5  │ aiagent            │ fork     │ 4    │ online    │ 0%       │ 152.3mb  │
+│ 15 │ chatlogi-api       │ fork     │ 4608 │ online    │ 0%       │ 155.6mb  │
+│ 0  │ chatvan-api        │ fork     │ 68   │ stopped   │ 0%       │ 0b       │
+│ 4  │ keimatch           │ fork     │ 0    │ online    │ 0%       │ 300.2mb  │
+│ 13 │ keisaiyou          │ fork     │ 0    │ online    │ 0%       │ 288.1mb  │
+│ 3  │ menz-esthe-town    │ fork     │ 0    │ online    │ 0%       │ 142.4mb  │
+│ 12 │ onlyu              │ fork     │ 0    │ online    │ 0%       │ 122.8mb  │
+│ 8  │ sinjapan-crm-api   │ fork     │ 602… │ online    │ 0%       │ 83.7mb   │
+│ 1  │ sinjapan-manager   │ fork     │ 0    │ online    │ 0%       │ 59.2mb   │
+│ 2  │ sinjapan-onlinesc… │ fork     │ 0    │ online    │ 0%       │ 99.0mb   │
+│ 14 │ sinjapan-sales-api │ fork     │ 64   │ online    │ 0%       │ 300.2mb  │
+│ 6  │ sinjapanai         │ fork     │ 0    │ online    │ 0%       │ 104.7mb  │
+│ 7  │ sinjapanailive-api │ fork     │ 0    │ online    │ 0%       │ 99.2mb   │
+│ 10 │ sinjapanaisite-api │ fork     │ 0    │ online    │ 0%       │ 192.4mb  │
+│ 11 │ tiktokshindan      │ fork     │ 0    │ online    │ 0%       │ 106.4mb  │
+│ 9  │ tramatch           │ fork     │ 0    │ online    │ 0%       │ 718.8mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+host metrics | cpu: 26.6% | ram usage: 30.2% | lo: ⇓ 0.001mb/s ⇑ 0.001mb/s | eth0: ⇓ 0.036mb/s ⇑ 0.009mb/s |
+[PM2] Applying action reloadProcessId on app [chatvan-api](ids: [ 0 ])
+[PM2] [chatvan-api](0) ✓
+[2026-08-25 18:49:49]   → pm2 reload/start 完了
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 5  │ aiagent            │ fork     │ 4    │ online    │ 0%       │ 152.8mb  │
+│ 15 │ chatlogi-api       │ fork     │ 4608 │ online    │ 0%       │ 155.6mb  │
+│ 0  │ chatvan-api        │ fork     │ 68   │ online    │ 0%       │ 72.6mb   │
+│ 4  │ keimatch           │ fork     │ 0    │ online    │ 0%       │ 300.2mb  │
+│ 13 │ keisaiyou          │ fork     │ 0    │ online    │ 0%       │ 288.1mb  │
+│ 3  │ menz-esthe-town    │ fork     │ 0    │ online    │ 0%       │ 142.4mb  │
+│ 12 │ onlyu              │ fork     │ 0    │ online    │ 0%       │ 122.8mb  │
+│ 8  │ sinjapan-crm-api   │ fork     │ 602… │ online    │ 0%       │ 84.5mb   │
+│ 1  │ sinjapan-manager   │ fork     │ 0    │ online    │ 0%       │ 59.3mb   │
+│ 2  │ sinjapan-onlinesc… │ fork     │ 0    │ online    │ 0%       │ 98.5mb   │
+│ 14 │ sinjapan-sales-api │ fork     │ 64   │ online    │ 0%       │ 300.3mb  │
+│ 6  │ sinjapanai         │ fork     │ 0    │ online    │ 0%       │ 104.4mb  │
+│ 7  │ sinjapanailive-api │ fork     │ 0    │ online    │ 0%       │ 99.7mb   │
+│ 10 │ sinjapanaisite-api │ fork     │ 0    │ online    │ 0%       │ 192.1mb  │
+│ 11 │ tiktokshindan      │ fork     │ 0    │ online    │ 0%       │ 106.0mb  │
+│ 9  │ tramatch           │ fork     │ 0    │ online    │ 0%       │ 718.2mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+host metrics | cpu: 26.6% | ram usage: 30.2% | lo: ⇓ 0.001mb/s ⇑ 0.001mb/s | eth0: ⇓ 0.036mb/s ⇑ 0.009mb/s |
+[2026-08-25 18:49:49] === デプロイ完了 ✅ ===
+[2026-08-25 18:49:49] ポート確認: curl -s http://127.0.0.1:4820/api/public/seo | head -c 100
+root@srv1087935:/var/www/chatvan# cd /var/www/chatvan
+
+if grep -q '^OPENAI_API_KEY=.' .env.production; then
+  echo "OPENAI_API_KEY: configured"
+else
+  echo "OPENAI_API_KEY: missing"
+fi
+
+if grep -q '^OPENAI_BASE_URL=https://api.openai.com/v1' .env.production; then
+  echo "OPENAI_BASE_URL: configured"
+else
+  echo "OPENAI_BASE_URL: use https://api.openai.com/v1"
+fi
+OPENAI_API_KEY: configured
+OPENAI_BASE_URL: use https://api.openai.com/v1
+root@srv1087935:/var/www/chatvan# pm2 logs chatvan-api --lines 80 --nostream | grep -A 12 -B 2 "parse-shaken error"
+0|chatvan- | 2026-08-25 18:30:57 +00:00: See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+0|chatvan- | 2026-08-25 18:30:57 +00:00: (Use `node --trace-warnings ...` to show where the warning was created)
+0|chatvan- | 2026-08-25 18:34:28 +00:00: parse-shaken error: Error: spawn pdftoppm ENOENT
+0|chatvan- | 2026-08-25 18:34:28 +00:00:     at ChildProcess._handle.onexit (node:internal/child_process:285:19)
+0|chatvan- | 2026-08-25 18:34:28 +00:00:     at onErrorNT (node:internal/child_process:483:16)
+0|chatvan- | 2026-08-25 18:34:28 +00:00:     at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
+0|chatvan- | 2026-08-25 18:34:28 +00:00:   errno: -2,
+0|chatvan- | 2026-08-25 18:34:28 +00:00:   code: 'ENOENT',
+0|chatvan- | 2026-08-25 18:34:28 +00:00:   syscall: 'spawn pdftoppm',
+0|chatvan- | 2026-08-25 18:34:28 +00:00:   path: 'pdftoppm',
+0|chatvan- | 2026-08-25 18:34:28 +00:00:   spawnargs: [
+0|chatvan- | 2026-08-25 18:34:28 +00:00:     '-r',
+0|chatvan- | 2026-08-25 18:34:28 +00:00:     '200',
+0|chatvan- | 2026-08-25 18:34:28 +00:00:     '-f',
+0|chatvan- | 2026-08-25 18:34:28 +00:00:     '1',
+--
+0|chatvan- | 2026-08-25 18:38:25 +00:00: See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+0|chatvan- | 2026-08-25 18:38:25 +00:00: (Use `node --trace-warnings ...` to show where the warning was created)
+0|chatvan- | 2026-08-25 18:40:29 +00:00: parse-shaken error: Error: spawn pdftoppm ENOENT
+0|chatvan- | 2026-08-25 18:40:29 +00:00:     at ChildProcess._handle.onexit (node:internal/child_process:285:19)
+0|chatvan- | 2026-08-25 18:40:29 +00:00:     at onErrorNT (node:internal/child_process:483:16)
+0|chatvan- | 2026-08-25 18:40:29 +00:00:     at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
+0|chatvan- | 2026-08-25 18:40:29 +00:00:   errno: -2,
+0|chatvan- | 2026-08-25 18:40:29 +00:00:   code: 'ENOENT',
+0|chatvan- | 2026-08-25 18:40:29 +00:00:   syscall: 'spawn pdftoppm',
+0|chatvan- | 2026-08-25 18:40:29 +00:00:   path: 'pdftoppm',
+0|chatvan- | 2026-08-25 18:40:29 +00:00:   spawnargs: [
+0|chatvan- | 2026-08-25 18:40:29 +00:00:     '-r',
+0|chatvan- | 2026-08-25 18:40:29 +00:00:     '200',
+0|chatvan- | 2026-08-25 18:40:29 +00:00:     '-f',
+0|chatvan- | 2026-08-25 18:40:29 +00:00:     '1',
+root@srv1087935:/var/www/chatvan# 
