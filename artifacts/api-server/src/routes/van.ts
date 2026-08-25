@@ -1053,8 +1053,9 @@ router.post("/van/applications/:id/propose", requireAuth, requireAdmin, async (r
   try {
     const appId = parseInt(String(req.params.id));
     const { vehicleIds, message } = req.body as { vehicleIds: number[]; message?: string };
+    const customMessage = typeof message === "string" ? message.trim() : "";
 
-    await db.insert(vanProposalsTable).values({ applicationId: appId, vehicleIds: JSON.stringify(vehicleIds), message: message ?? null });
+    await db.insert(vanProposalsTable).values({ applicationId: appId, vehicleIds: JSON.stringify(vehicleIds), message: customMessage || null });
 
     const [app] = await db.update(vanApplicationsTable)
       .set({ status: "proposed", updatedAt: new Date() })
@@ -1062,7 +1063,9 @@ router.post("/van/applications/:id/propose", requireAuth, requireAdmin, async (r
 
     if (app?.userId) {
       await notifyUser(app.userId, "Chat VAN - 車両提案",
-        "Chat VANから軽バンのご提案が届きました。チャットをご確認ください。");
+        customMessage
+          ? `Chat VANから軽バンのご提案が届きました。\n\n担当者からのメッセージ:\n${customMessage}\n\nチャットをご確認ください。`
+          : "Chat VANから軽バンのご提案が届きました。チャットをご確認ください。");
     }
 
     const vehicles = await db.select().from(vehiclesTable).where(inArray(vehiclesTable.id, vehicleIds));
@@ -1070,7 +1073,7 @@ router.post("/van/applications/:id/propose", requireAuth, requireAdmin, async (r
       `▼ ${v.maker} ${v.model}（${v.prefecture ?? ""}）\n月額: ¥${(Number(v.monthlyPrice) + Number(v.sinJapanFee ?? 0)).toLocaleString()}/月\n最低期間: ${v.minPeriodMonths}ヶ月以上\n利用可能: ${v.availableFrom ?? "即日相談可"}`
     ).join("\n\n");
 
-    const proposalMessage = `Chat VANからのご提案です。条件に合う車両をご用意しました。\n\n${vehicleText}\n\n${message ?? ""}`;
+    const proposalMessage = `Chat VANからのご提案です。条件に合う車両をご用意しました。\n\n${vehicleText}\n\n${customMessage}`;
     await db.insert(vanMessagesTable).values({ vanApplicationId: appId, role: "assistant", content: proposalMessage });
 
     return res.json(app);
