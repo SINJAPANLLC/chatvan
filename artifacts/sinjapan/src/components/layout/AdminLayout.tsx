@@ -7,7 +7,7 @@ import {
   Loader2, ArrowLeft, Bell, Menu, X, MessageSquare,
   Bot, Receipt, TrendingUp, Mail, BookOpen, Search,
   MessageCircle, ScrollText, Activity, ClipboardCheck,
-  Package, Shield, MapPin, AlertTriangle, RotateCcw,
+  Shield, MapPin, AlertTriangle, RotateCcw,
   CreditCard, UserCheck,
 } from 'lucide-react';
 
@@ -20,7 +20,6 @@ const NAV_SECTIONS: Section[] = [
     items: [
       { href: '/admin',              label: 'ダッシュボード', icon: LayoutDashboard },
       { href: '/admin/applications', label: '相談一覧',       icon: MessageSquare },
-      { href: '/admin/shipments',    label: '案件一覧',        icon: Package },
     ],
   },
   {
