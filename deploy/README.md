@@ -39,6 +39,8 @@ NODE_ENV=production
 PORT=4820
 APP_BASE_URL=https://chat-van.com
 
+LOCAL_UPLOAD_DIR=/var/lib/chatvan/uploads
+
 NEON_DATABASE_URL=postgresql://...?sslmode=verify-full
 SESSION_SECRET=（openssl rand -hex 32 で生成）
 SQUARE_ACCESS_TOKEN=（Square本番トークン）
@@ -51,6 +53,13 @@ SMTP_PASS=
 SMTP_FROM=Chat VAN <noreply@chat-van.com>
 ADMIN_NOTIFY_EMAIL=info@chat-van.com
 ```
+
+### アップロードファイル
+
+本番の車両写真・書類・本人確認画像は **VPSの `/var/lib/chatvan/uploads`** に保存されます。
+この場所はリポジトリ外のため、通常の `git pull` やビルドでは消えません。`LOCAL_UPLOAD_DIR` は必ず上記のまま設定してください。
+
+バックアップ時は、DBとあわせてこのディレクトリもバックアップ対象にしてください。
 
 ---
 

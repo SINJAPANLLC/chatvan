@@ -1,5 +1,10 @@
-import { randomUUID } from 'crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
+import { createReadStream, createWriteStream } from 'fs';
+import { mkdir, readFile, rename, rm, stat, writeFile } from 'fs/promises';
+import path from 'path';
 import { Readable } from 'stream';
+import { Transform } from 'stream';
+import { pipeline } from 'stream/promises';
 import { File, Storage } from '@google-cloud/storage';
 
 import {
@@ -38,8 +43,53 @@ export class ObjectNotFoundError extends Error {
   }
 }
 
+export class LocalUploadError extends Error {
+  constructor(
+    message: string,
+    readonly statusCode: number,
+  ) {
+    super(message);
+    this.name = 'LocalUploadError';
+    Object.setPrototypeOf(this, LocalUploadError.prototype);
+  }
+}
+
+export interface ObjectUploadTarget {
+  uploadURL: string;
+  objectPath: string;
+}
+
+interface LocalUploadTokenPayload {
+  objectPath: string;
+  contentType: string;
+  expiresAt: number;
+}
+
+const LOCAL_UPLOAD_MAX_BYTES = 20 * 1024 * 1024;
+
 export class ObjectStorageService {
   constructor() {}
+
+  /**
+   * Production on the VPS uses LOCAL_UPLOAD_DIR. When it is absent (the
+   * Replit development environment), the existing Replit object storage
+   * implementation remains active.
+   */
+  isLocalStorageConfigured(): boolean {
+    return Boolean(process.env.LOCAL_UPLOAD_DIR);
+  }
+
+  isPrivateStorageConfigured(): boolean {
+    return this.isLocalStorageConfigured() || Boolean(process.env.PRIVATE_OBJECT_DIR);
+  }
+
+  getLocalUploadDir(): string {
+    const dir = process.env.LOCAL_UPLOAD_DIR;
+    if (!dir) {
+      throw new Error('LOCAL_UPLOAD_DIR is not set.');
+    }
+    return path.resolve(dir);
+  }
 
   getPublicObjectSearchPaths(): Array<string> {
     const pathsStr = process.env.PUBLIC_OBJECT_SEARCH_PATHS || '';
@@ -133,7 +183,103 @@ export class ObjectStorageService {
     });
   }
 
+  /**
+   * Keep the existing browser contract: first obtain an upload URL, then PUT
+   * file bytes to it. Replit returns a GCS signed URL; the VPS returns a
+   * short-lived, HMAC-protected application URL.
+   */
+  async createObjectEntityUploadTarget(contentType: string): Promise<ObjectUploadTarget> {
+    const normalizedContentType = contentType.split(';', 1)[0].trim().toLowerCase();
+    if (!normalizedContentType) {
+      throw new LocalUploadError('ファイル形式を確認できませんでした。', 400);
+    }
+
+    if (this.isLocalStorageConfigured()) {
+      const objectPath = `/objects/uploads/${randomUUID()}`;
+      const token = this.createLocalUploadToken({
+        objectPath,
+        contentType: normalizedContentType,
+        expiresAt: Date.now() + 15 * 60 * 1000,
+      });
+      return {
+        uploadURL: `/api/storage/local-uploads/${token}`,
+        objectPath,
+      };
+    }
+
+    const uploadURL = await this.getObjectEntityUploadURL();
+    return {
+      uploadURL,
+      objectPath: this.normalizeObjectEntityPath(uploadURL),
+    };
+  }
+
+  /**
+   * Consume a short-lived local upload URL and write the request body to the
+   * VPS's persistent upload directory. Object paths stay compatible with the
+   * existing /objects/... values stored in the database.
+   */
+  async writeLocalObject(
+    token: string,
+    source: NodeJS.ReadableStream,
+    contentType: string,
+  ): Promise<string> {
+    if (!this.isLocalStorageConfigured()) {
+      throw new LocalUploadError('ローカルストレージは有効ではありません。', 404);
+    }
+
+    const payload = this.verifyLocalUploadToken(token);
+    const normalizedContentType = contentType.split(';', 1)[0].trim().toLowerCase();
+    if (normalizedContentType !== payload.contentType) {
+      throw new LocalUploadError('アップロード時のファイル形式が一致しません。', 415);
+    }
+
+    const objectFilePath = this.getLocalObjectFilePath(payload.objectPath);
+    await mkdir(path.dirname(objectFilePath), { recursive: true, mode: 0o750 });
+
+    const temporaryPath = `${objectFilePath}.${randomUUID()}.tmp`;
+    let uploadedBytes = 0;
+    const sizeLimiter = new Transform({
+      transform(chunk, _encoding, callback) {
+        uploadedBytes += chunk.length;
+        if (uploadedBytes > LOCAL_UPLOAD_MAX_BYTES) {
+          callback(new LocalUploadError('ファイルは20MB以内にしてください。', 413));
+          return;
+        }
+        callback(null, chunk);
+      },
+    });
+
+    try {
+      await pipeline(source, sizeLimiter, createWriteStream(temporaryPath, { flags: 'wx', mode: 0o640 }));
+      await rename(temporaryPath, objectFilePath);
+      await writeFile(
+        `${objectFilePath}.metadata.json`,
+        JSON.stringify({ contentType: normalizedContentType, uploadedAt: new Date().toISOString() }),
+        { mode: 0o640 },
+      );
+      return payload.objectPath;
+    } catch (error) {
+      await rm(temporaryPath, { force: true }).catch(() => {});
+      throw error;
+    }
+  }
+
+  async downloadObjectPath(
+    objectPath: string,
+    cacheTtlSec: number = 3600,
+  ): Promise<Response> {
+    if (this.isLocalStorageConfigured()) {
+      return this.downloadLocalObject(objectPath, cacheTtlSec);
+    }
+    const file = await this.getObjectEntityFile(objectPath);
+    return this.downloadObject(file, cacheTtlSec);
+  }
+
   async getObjectEntityFile(objectPath: string): Promise<File> {
+    if (this.isLocalStorageConfigured()) {
+      throw new Error('Use downloadObjectPath when LOCAL_UPLOAD_DIR is configured.');
+    }
     if (!objectPath.startsWith('/objects/')) {
       throw new ObjectNotFoundError();
     }
@@ -192,6 +338,107 @@ export class ObjectStorageService {
     const objectFile = await this.getObjectEntityFile(normalizedPath);
     await setObjectAclPolicy(objectFile, aclPolicy);
     return normalizedPath;
+  }
+
+  private createLocalUploadToken(payload: LocalUploadTokenPayload): string {
+    const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    const signature = createHmac('sha256', this.getLocalUploadSigningSecret())
+      .update(encodedPayload)
+      .digest('base64url');
+    return `${encodedPayload}.${signature}`;
+  }
+
+  private verifyLocalUploadToken(token: string): LocalUploadTokenPayload {
+    const [encodedPayload, providedSignature, ...extraParts] = token.split('.');
+    if (!encodedPayload || !providedSignature || extraParts.length > 0) {
+      throw new LocalUploadError('無効なアップロードURLです。', 400);
+    }
+
+    const expectedSignature = createHmac('sha256', this.getLocalUploadSigningSecret())
+      .update(encodedPayload)
+      .digest('base64url');
+    const provided = Buffer.from(providedSignature);
+    const expected = Buffer.from(expectedSignature);
+    if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
+      throw new LocalUploadError('無効なアップロードURLです。', 400);
+    }
+
+    let payload: LocalUploadTokenPayload;
+    try {
+      payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
+    } catch {
+      throw new LocalUploadError('無効なアップロードURLです。', 400);
+    }
+
+    if (
+      !payload
+      || typeof payload.objectPath !== 'string'
+      || typeof payload.contentType !== 'string'
+      || typeof payload.expiresAt !== 'number'
+      || payload.expiresAt < Date.now()
+    ) {
+      throw new LocalUploadError('アップロードURLの有効期限が切れています。再度お試しください。', 400);
+    }
+    // Also rejects traversal attempts before the path is used on disk.
+    this.getLocalObjectFilePath(payload.objectPath);
+    return payload;
+  }
+
+  private getLocalUploadSigningSecret(): string {
+    const secret = process.env.SESSION_SECRET;
+    if (!secret) {
+      throw new Error('SESSION_SECRET must be set for local uploads.');
+    }
+    return secret;
+  }
+
+  private getLocalObjectFilePath(objectPath: string): string {
+    if (!objectPath.startsWith('/objects/')) {
+      throw new ObjectNotFoundError();
+    }
+    const relativePath = objectPath.slice('/objects/'.length);
+    if (!relativePath || relativePath.includes('\0')) {
+      throw new ObjectNotFoundError();
+    }
+
+    const root = this.getLocalUploadDir();
+    const resolved = path.resolve(root, relativePath);
+    const relativeToRoot = path.relative(root, resolved);
+    if (!relativeToRoot || relativeToRoot.startsWith(`..${path.sep}`) || path.isAbsolute(relativeToRoot)) {
+      throw new ObjectNotFoundError();
+    }
+    return resolved;
+  }
+
+  private async downloadLocalObject(objectPath: string, cacheTtlSec: number): Promise<Response> {
+    const objectFilePath = this.getLocalObjectFilePath(objectPath);
+    try {
+      const fileStat = await stat(objectFilePath);
+      if (!fileStat.isFile()) throw new ObjectNotFoundError();
+    } catch (error) {
+      if (error instanceof ObjectNotFoundError) throw error;
+      throw new ObjectNotFoundError();
+    }
+
+    let contentType = 'application/octet-stream';
+    try {
+      const rawMetadata = await readFile(`${objectFilePath}.metadata.json`, 'utf8');
+      const metadata = JSON.parse(rawMetadata) as { contentType?: unknown };
+      if (typeof metadata.contentType === 'string' && metadata.contentType) {
+        contentType = metadata.contentType;
+      }
+    } catch {
+      // Objects written before metadata support can still be downloaded safely.
+    }
+
+    const fileStat = await stat(objectFilePath);
+    return new Response(Readable.toWeb(createReadStream(objectFilePath)) as ReadableStream, {
+      headers: {
+        'Content-Type': contentType,
+        'Content-Length': String(fileStat.size),
+        'Cache-Control': `private, max-age=${cacheTtlSec}`,
+      },
+    });
   }
 
   async canAccessObjectEntity({

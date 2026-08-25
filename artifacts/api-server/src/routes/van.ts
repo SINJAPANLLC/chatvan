@@ -71,8 +71,7 @@ async function runAIeKYC(verificationId: number, data: {
     // 画像をサーバーサイドで取得してbase64化
     const fetchImageBase64 = async (objectPath: string): Promise<string | null> => {
       try {
-        const file = await objectStorage.getObjectEntityFile(objectPath);
-        const response = await objectStorage.downloadObject(file);
+        const response = await objectStorage.downloadObjectPath(objectPath);
         const buffer = await response.arrayBuffer();
         return Buffer.from(buffer).toString("base64");
       } catch (err) {

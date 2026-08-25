@@ -64,6 +64,11 @@ else
   echo "  → .env.production は既に存在します（スキップ）"
 fi
 
+echo "=== VPSアップロード保存先を用意 ==="
+# リポジトリ外に置くため、git pull やフロントエンドのビルドで消えません。
+mkdir -p /var/lib/chatvan/uploads
+chmod 750 /var/lib/chatvan /var/lib/chatvan/uploads
+
 echo "=== [7/7] nginx サイト設定を配置（HTTP のみ。SSL は certbot 後に有効化）==="
 # 初回は HTTP のみ。certbot が自動で HTTPS 設定を追記してくれる。
 cat > /etc/nginx/sites-available/chat-van.com << 'NGINXEOF'

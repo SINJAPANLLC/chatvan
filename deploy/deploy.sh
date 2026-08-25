@@ -8,11 +8,15 @@ set -euo pipefail
 APP_DIR="/var/www/chatvan"
 PM2_NAME="chatvan-api"
 LOG_FILE="/var/log/pm2/chatvan-deploy.log"
+UPLOAD_DIR="/var/lib/chatvan/uploads"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "${LOG_FILE}"; }
 
 cd "${APP_DIR}"
 mkdir -p /var/log/pm2
+# アップロード済みファイルはアプリ本体と分離して保持する。
+mkdir -p "${UPLOAD_DIR}"
+chmod 750 /var/lib/chatvan "${UPLOAD_DIR}"
 
 log "=== Chat VAN デプロイ開始 ==="
 

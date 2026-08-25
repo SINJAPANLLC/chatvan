@@ -5,25 +5,30 @@
 import { Readable } from 'stream';
 import { Router, type IRouter, type Request, type Response } from 'express';
 import { requireAuth, requireAdmin, requireRentalCompany } from '../middlewares/auth';
-import { ObjectNotFoundError, ObjectStorageService } from '../lib/objectStorage';
+import { LocalUploadError, ObjectNotFoundError, ObjectStorageService } from '../lib/objectStorage';
 import { db } from '@workspace/db';
 import { sql } from 'drizzle-orm';
 
 const router: IRouter = Router();
 const storage = new ObjectStorageService();
 
-/** Returns true when PRIVATE_OBJECT_DIR is configured. */
+/** Returns true when either the VPS disk or Replit private storage is configured. */
 function isPrivateStorageConfigured(): boolean {
-  return !!process.env.PRIVATE_OBJECT_DIR;
+  return storage.isPrivateStorageConfigured();
 }
 
 function privateStorageUnconfiguredResponse(res: Response): void {
-  res.status(503).json({ error: 'ストレージが設定されていません。PRIVATE_OBJECT_DIR が未設定です。' });
+  res.status(503).json({ error: 'ストレージが設定されていません。管理者へお問い合わせください。' });
 }
+
+const ALLOWED_IMAGE_TYPES = new Set([
+  'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif',
+]);
+const ALLOWED_VEHICLE_UPLOAD_TYPES = new Set([...ALLOWED_IMAGE_TYPES, 'application/pdf']);
 
 /**
  * POST /storage/uploads/request-url
- * Admin-only: request a presigned PUT URL for direct-to-GCS upload.
+ * Admin-only: request a direct upload URL for vehicle photos and documents.
  */
 router.post(
   '/storage/uploads/request-url',
@@ -34,12 +39,15 @@ router.post(
       res.status(400).json({ error: 'name, size, contentType が必要です' });
       return;
     }
+    if (!ALLOWED_VEHICLE_UPLOAD_TYPES.has(String(contentType).toLowerCase())) {
+      res.status(400).json({ error: '画像（JPEG/PNG/WebP/HEIC）またはPDFのみアップロードできます' });
+      return;
+    }
 
     if (!isPrivateStorageConfigured()) { privateStorageUnconfiguredResponse(res); return; }
 
     try {
-      const uploadURL = await storage.getObjectEntityUploadURL();
-      const objectPath = storage.normalizeObjectEntityPath(uploadURL);
+      const { uploadURL, objectPath } = await storage.createObjectEntityUploadTarget(contentType);
 
       res.json({ uploadURL, objectPath, metadata: { name, size, contentType } });
     } catch (err) {
@@ -48,10 +56,6 @@ router.post(
     }
   },
 );
-
-const ALLOWED_IMAGE_TYPES = new Set([
-  'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif',
-]);
 
 /**
  * POST /storage/company-uploads/request-url
@@ -68,11 +72,7 @@ router.post(
       res.status(400).json({ error: 'name, contentType が必要です' });
       return;
     }
-    const allowed = new Set([
-      'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif',
-      'application/pdf',
-    ]);
-    if (!allowed.has(contentType)) {
+    if (!ALLOWED_VEHICLE_UPLOAD_TYPES.has(String(contentType).toLowerCase())) {
       res.status(400).json({ error: '画像（JPEG/PNG/WebP/HEIC）またはPDFのみアップロードできます' });
       return;
     }
@@ -85,8 +85,7 @@ router.post(
     }
 
     try {
-      const uploadURL = await storage.getObjectEntityUploadURL();
-      const objectPath = storage.normalizeObjectEntityPath(uploadURL);
+      const { uploadURL, objectPath } = await storage.createObjectEntityUploadTarget(contentType);
 
       // Resolve company_id for the uploader (rental_company users have rental_company_id)
       const userRow = await db.execute(sql`SELECT rental_company_id FROM users WHERE id = ${userId} LIMIT 1`);
@@ -125,7 +124,7 @@ router.post(
       res.status(400).json({ error: 'name, contentType が必要です' });
       return;
     }
-    if (!ALLOWED_IMAGE_TYPES.has(contentType)) {
+    if (!ALLOWED_IMAGE_TYPES.has(String(contentType).toLowerCase())) {
       res.status(400).json({ error: '画像ファイル（JPEG/PNG/WebP/HEIC）のみアップロードできます' });
       return;
     }
@@ -137,8 +136,7 @@ router.post(
     if (!isPrivateStorageConfigured()) { privateStorageUnconfiguredResponse(res); return; }
 
     try {
-      const uploadURL = await storage.getObjectEntityUploadURL();
-      const objectPath = storage.normalizeObjectEntityPath(uploadURL);
+      const { uploadURL, objectPath } = await storage.createObjectEntityUploadTarget(contentType);
 
       // Persist claim so submission can verify ownership
       await db.execute(sql`
@@ -151,6 +149,46 @@ router.post(
     } catch (err) {
       console.error('[storage] user presigned URL error:', err);
       res.status(500).json({ error: 'アップロードURLの生成に失敗しました' });
+    }
+  },
+);
+
+/**
+ * PUT /storage/local-uploads/:token
+ * VPS-only short-lived upload destination. The token carries an HMAC-signed
+ * object path and content type, so it can accept raw bytes without a browser
+ * session while remaining limited to an expiring upload target.
+ */
+router.put(
+  '/storage/local-uploads/:token',
+  async (req: Request, res: Response): Promise<void> => {
+    if (!storage.isLocalStorageConfigured()) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+
+    const contentType = String(req.headers['content-type'] ?? '').split(';', 1)[0].trim().toLowerCase();
+    if (!contentType) {
+      res.status(400).json({ error: 'ファイル形式を確認できませんでした。' });
+      return;
+    }
+
+    try {
+      const rawToken = req.params.token;
+      const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
+      if (!token) {
+        res.status(400).json({ error: '無効なアップロードURLです。' });
+        return;
+      }
+      await storage.writeLocalObject(token, req, contentType);
+      res.status(204).end();
+    } catch (err) {
+      if (err instanceof LocalUploadError) {
+        res.status(err.statusCode).json({ error: err.message });
+        return;
+      }
+      console.error('[storage] local upload error:', err);
+      res.status(500).json({ error: 'ファイルの保存に失敗しました。' });
     }
   },
 );
@@ -235,8 +273,7 @@ router.get(
         }
       }
 
-      const file = await storage.getObjectEntityFile(objectPath);
-      const response = await storage.downloadObject(file);
+      const response = await storage.downloadObjectPath(objectPath);
       res.status(response.status);
       response.headers.forEach((value, key) => res.setHeader(key, value));
       if (response.body) {
@@ -267,8 +304,7 @@ router.get(
     try {
       const raw = req.params.objectPath;
       const objectPath = '/objects/' + (Array.isArray(raw) ? raw.join('/') : raw);
-      const file = await storage.getObjectEntityFile(objectPath);
-      const response = await storage.downloadObject(file);
+      const response = await storage.downloadObjectPath(objectPath);
       res.status(response.status);
       response.headers.forEach((value, key) => res.setHeader(key, value));
       if (response.body) {
