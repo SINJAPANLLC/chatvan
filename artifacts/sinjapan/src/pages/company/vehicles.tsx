@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Loader2, Plus, Edit, Save, Upload, X, ImageIcon,
   FileSearch, Camera, FileText, ExternalLink, Car,
@@ -91,11 +92,50 @@ export default function CompanyVehicles() {
 
   // ── 申請系 state ──
   const [openMenuId, setOpenMenuId]       = useState<number | null>(null);
+  const [menuPosition, setMenuPosition]   = useState<{ top: number; left: number } | null>(null);
   const [deleteReqVehicle, setDeleteReqVehicle] = useState<any | null>(null);
   const [statusReqVehicle, setStatusReqVehicle] = useState<any | null>(null);
   const [reqStatus, setReqStatus]         = useState('');
   const [reqNote,   setReqNote]           = useState('');
   const [sending,   setSending]           = useState(false);
+
+  const closeActionMenu = () => {
+    setOpenMenuId(null);
+    setMenuPosition(null);
+  };
+
+  const toggleActionMenu = (event: React.MouseEvent<HTMLButtonElement>, vehicleId: number) => {
+    if (openMenuId === vehicleId) {
+      closeActionMenu();
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const menuWidth = 208;
+    const menuHeight = 144;
+    const gap = 8;
+    const left = Math.max(8, Math.min(
+      rect.right - menuWidth,
+      window.innerWidth - menuWidth - 8,
+    ));
+    const top = rect.bottom + gap + menuHeight <= window.innerHeight
+      ? rect.bottom + gap
+      : Math.max(8, rect.top - menuHeight - gap);
+
+    setOpenMenuId(vehicleId);
+    setMenuPosition({ top, left });
+  };
+
+  useEffect(() => {
+    if (openMenuId === null) return;
+    const closeOnViewportChange = () => closeActionMenu();
+    window.addEventListener('scroll', closeOnViewportChange, true);
+    window.addEventListener('resize', closeOnViewportChange);
+    return () => {
+      window.removeEventListener('scroll', closeOnViewportChange, true);
+      window.removeEventListener('resize', closeOnViewportChange);
+    };
+  }, [openMenuId]);
 
   // ── Multi-photo state ──
   const [photoPaths, setPhotoPaths] = useState<(string | null)[]>(Array(MAX_PHOTOS).fill(null));
@@ -384,30 +424,34 @@ export default function CompanyVehicles() {
                   <td className="px-4 py-4 text-right">
                     <div className="relative inline-block">
                       <button
-                        onClick={() => setOpenMenuId(openMenuId === v.id ? null : v.id)}
+                         onClick={event => toggleActionMenu(event, v.id)}
                         className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted">
                         <MoreHorizontal className="h-4 w-4" />
                       </button>
-                      {openMenuId === v.id && (
-                        <>
-                          <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)} />
-                          <div className="absolute right-0 top-8 z-50 bg-card border border-border rounded-lg shadow-lg w-52 py-1">
-                            <button onClick={() => { handleOpenEdit(v); setOpenMenuId(null); }}
-                              className="w-full text-left px-4 py-2 text-sm hover:bg-muted flex items-center gap-2.5">
-                              <Edit className="h-3.5 w-3.5 text-muted-foreground" />編集
-                            </button>
-                            <button onClick={() => { setStatusReqVehicle(v); setReqStatus(''); setReqNote(''); setOpenMenuId(null); }}
-                              className="w-full text-left px-4 py-2 text-sm hover:bg-muted flex items-center gap-2.5">
-                              <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />ステータス変更申請
-                            </button>
-                            <div className="border-t border-border my-1" />
-                            <button onClick={() => { setDeleteReqVehicle(v); setOpenMenuId(null); }}
-                              className="w-full text-left px-4 py-2 text-sm hover:bg-muted flex items-center gap-2.5 text-destructive">
-                              <Trash2 className="h-3.5 w-3.5" />削除申請
-                            </button>
-                          </div>
-                        </>
-                      )}
+                       {openMenuId === v.id && menuPosition && createPortal(
+                         <>
+                           <div className="fixed inset-0 z-40" onClick={closeActionMenu} />
+                           <div
+                             className="fixed z-50 bg-card border border-border rounded-lg shadow-lg w-52 py-1"
+                             style={{ top: menuPosition.top, left: menuPosition.left }}
+                           >
+                             <button onClick={() => { handleOpenEdit(v); closeActionMenu(); }}
+                               className="w-full text-left px-4 py-2 text-sm hover:bg-muted flex items-center gap-2.5">
+                               <Edit className="h-3.5 w-3.5 text-muted-foreground" />編集
+                             </button>
+                             <button onClick={() => { setStatusReqVehicle(v); setReqStatus(''); setReqNote(''); closeActionMenu(); }}
+                               className="w-full text-left px-4 py-2 text-sm hover:bg-muted flex items-center gap-2.5">
+                               <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />ステータス変更申請
+                             </button>
+                             <div className="border-t border-border my-1" />
+                             <button onClick={() => { setDeleteReqVehicle(v); closeActionMenu(); }}
+                               className="w-full text-left px-4 py-2 text-sm hover:bg-muted flex items-center gap-2.5 text-destructive">
+                               <Trash2 className="h-3.5 w-3.5" />削除申請
+                             </button>
+                           </div>
+                         </>,
+                         document.body,
+                       )}
                     </div>
                   </td>
                 </tr>
