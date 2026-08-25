@@ -14,6 +14,19 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "${LOG_FILE}"; }
 
 cd "${APP_DIR}"
 mkdir -p /var/log/pm2
+
+# 車検証PDF/HEIC OCRで使う外部変換コマンドを本番VPSに確保する。
+# 不足時だけ導入するため、通常のデプロイでは追加のapt処理は発生しない。
+if ! command -v pdftoppm >/dev/null 2>&1 || ! command -v convert >/dev/null 2>&1; then
+  if [ "$(id -u)" -ne 0 ]; then
+    log "ERROR: PDF/HEIC OCRには poppler-utils と imagemagick が必要です。rootで再実行してください。"
+    exit 1
+  fi
+  log "PDF/HEIC OCR用の変換ツールを導入"
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends poppler-utils imagemagick
+fi
+
 # アップロード済みファイルはアプリ本体と分離して保持する。
 mkdir -p "${UPLOAD_DIR}"
 chmod 750 /var/lib/chatvan "${UPLOAD_DIR}"

@@ -1,5 +1,18 @@
 # Chat VAN — VPS デプロイ手順
 
+## OCR用のシステム依存関係
+
+車検証OCRでPDFまたはHEICを扱うには、`poppler-utils`（`pdftoppm`）と
+`imagemagick`（`convert`）が必要です。`deploy/deploy.sh` は不足を検知した場合、
+root権限でこれらを自動導入してからアプリを起動します。
+
+手動で先に導入する場合:
+
+```bash
+apt-get update
+apt-get install -y --no-install-recommends poppler-utils imagemagick
+```
+
 ## 構成
 
 | 役割 | 詳細 |
